@@ -8,7 +8,8 @@
  * Mark react, react-dom, react/jsx-runtime as external in your bundler.
  */
 
-const React = globalThis.__PLUGIN_EXTERNALS__?.React;
+// React is provided by the host app — access lazily to ensure externals are set
+function getReact() { return globalThis.__PLUGIN_EXTERNALS__?.React; }
 
 // ─── Activate ───────────────────────────────────────────────
 // Called when the plugin is loaded. Return a Disposable to clean up.
@@ -59,7 +60,7 @@ export function activate(api) {
   // disposables.push(
   //   api.ui.registerEmailBanner({
   //     shouldShow: (email) => email.subject?.includes('[ALERT]'),
-  //     render: ({ email }) => React.createElement(
+  //     render: ({ email }) => getReact().createElement(
   //       'div',
   //       { style: { padding: '8px', background: '#fef3c7', color: '#92400e' } },
   //       '⚠️ This email contains an alert'
@@ -73,7 +74,7 @@ export function activate(api) {
   //
   // disposables.push(
   //   api.ui.registerEmailFooter(() =>
-  //     React.createElement('div', { style: { padding: '8px' } }, 'Plugin footer')
+  //     getReact().createElement('div', { style: { padding: '8px' } }, 'Plugin footer')
   //   )
   // );
 
@@ -98,7 +99,7 @@ export function activate(api) {
   //   api.ui.registerSidebarWidget({
   //     id: 'my-widget',
   //     label: 'My Widget',
-  //     render: () => React.createElement('div', null, 'Widget content'),
+  //     render: () => getReact().createElement('div', null, 'Widget content'),
   //     order: 50,
   //   })
   // );
@@ -112,7 +113,7 @@ export function activate(api) {
   //     id: 'my-settings',
   //     label: 'My Plugin',
   //     icon: '⚙️',
-  //     render: () => React.createElement('div', null, 'Plugin settings UI'),
+  //     render: () => getReact().createElement('div', null, 'Plugin settings UI'),
   //   })
   // );
 
@@ -137,7 +138,7 @@ export function activate(api) {
   //
   // disposables.push(
   //   api.ui.registerNavigationRailItem(() =>
-  //     React.createElement('button', { onClick: () => api.toast.info('Nav clicked') }, '🔌')
+  //     getReact().createElement('button', { onClick: () => api.toast.info('Nav clicked') }, '🔌')
   //   )
   // );
 

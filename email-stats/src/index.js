@@ -9,8 +9,11 @@
  * - Creating React components without JSX (no build step needed for React.createElement)
  */
 
-const React = globalThis.__PLUGIN_EXTERNALS__?.React;
-const { createElement: h, useState, useEffect } = React;
+// React is provided by the host app — access lazily to ensure externals are set
+function getReact() { return globalThis.__PLUGIN_EXTERNALS__?.React; }
+const h = (...args) => getReact().createElement(...args);
+const useState = (...args) => getReact().useState(...args);
+const useEffect = (...args) => getReact().useEffect(...args);
 
 // In-memory session counters (reset on reload)
 let sessionStats = { opened: 0, sent: 0, received: 0 };

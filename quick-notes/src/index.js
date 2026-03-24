@@ -10,8 +10,12 @@
  * - Number-type settings (maxNotes)
  */
 
-const React = globalThis.__PLUGIN_EXTERNALS__?.React;
-const { createElement: h, useState, useEffect, useCallback } = React;
+// React is provided by the host app — access lazily to ensure externals are set
+function getReact() { return globalThis.__PLUGIN_EXTERNALS__?.React; }
+const h = (...args) => getReact().createElement(...args);
+const useState = (...args) => getReact().useState(...args);
+const useEffect = (...args) => getReact().useEffect(...args);
+const useCallback = (...args) => getReact().useCallback(...args);
 
 // Shared state between widget and hooks
 let currentEmailId = null;
