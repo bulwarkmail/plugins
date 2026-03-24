@@ -195,7 +195,7 @@ export function activate(api) {
 
   // Register sidebar widget
   disposables.push(
-    api.ui.registerSidebarWidget({
+    api.ui.registerDetailSidebar({
       id: 'quick-notes',
       label: 'Quick Notes',
       render: NotesWidget,
