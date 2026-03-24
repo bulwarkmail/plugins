@@ -1,0 +1,34 @@
+{
+  "id": "auto-tag",
+  "name": "Auto Tag",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Automatically tags incoming emails based on configurable rules",
+  "type": "hook",
+  "permissions": [
+    "email:read",
+    "email:write"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "settingsSchema": {
+    "tagNewsletter": {
+      "type": "boolean",
+      "label": "Tag newsletters",
+      "description": "Auto-tag emails with 'List-Unsubscribe' header as 'newsletter'",
+      "default": true
+    },
+    "tagInvoice": {
+      "type": "boolean",
+      "label": "Tag invoices",
+      "description": "Auto-tag emails with invoice/receipt keywords as 'invoice'",
+      "default": true
+    },
+    "tagGithub": {
+      "type": "boolean",
+      "label": "Tag GitHub notifications",
+      "description": "Auto-tag emails from notifications@github.com as 'github'",
+      "default": true
+    }
+  }
+}

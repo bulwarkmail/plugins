@@ -1,0 +1,12 @@
+{
+  "name": "bulwark-plugin-auto-tag",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=esm --outfile=dist/index.js --external:react --external:react-dom --external:react/jsx-runtime"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

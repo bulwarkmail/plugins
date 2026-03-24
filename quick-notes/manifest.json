@@ -1,0 +1,31 @@
+{
+  "id": "quick-notes",
+  "name": "Quick Notes",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Per-email sticky notes in the sidebar — jot notes while reading emails",
+  "type": "sidebar-app",
+  "permissions": [
+    "email:read",
+    "ui:sidebar-widget",
+    "ui:email-banner"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "settingsSchema": {
+    "showBanner": {
+      "type": "boolean",
+      "label": "Show note indicator",
+      "description": "Show a banner above emails that have notes attached",
+      "default": true
+    },
+    "maxNotes": {
+      "type": "number",
+      "label": "Max stored notes",
+      "description": "Maximum number of notes to keep in storage",
+      "default": 100,
+      "min": 10,
+      "max": 1000
+    }
+  }
+}

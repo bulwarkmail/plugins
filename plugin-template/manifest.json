@@ -1,0 +1,21 @@
+{
+  "id": "my-plugin",
+  "name": "My Plugin",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "description": "A custom plugin for Bulwark Mail",
+  "type": "hook",
+  "permissions": [
+    "email:read"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "settingsSchema": {
+    "enabled": {
+      "type": "boolean",
+      "label": "Enable Plugin",
+      "description": "Toggle the main functionality on or off",
+      "default": true
+    }
+  }
+}

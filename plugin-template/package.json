@@ -1,0 +1,14 @@
+{
+  "name": "bulwark-plugin-template",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=esm --outfile=dist/index.js --external:react --external:react-dom --external:react/jsx-runtime",
+    "zip": "node -e \"const{execSync}=require('child_process');execSync('cd dist && tar -cf ../my-plugin.zip manifest.json index.js',{stdio:'inherit'})\"",
+    "package": "npm run build && cp manifest.json dist/ && cd dist && tar -acf ../my-plugin.zip manifest.json index.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

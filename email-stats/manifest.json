@@ -1,0 +1,28 @@
+{
+  "id": "email-stats",
+  "name": "Email Stats",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Sidebar widget showing email activity statistics",
+  "type": "sidebar-app",
+  "permissions": [
+    "email:read",
+    "ui:sidebar-widget"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "settingsSchema": {
+    "trackOpens": {
+      "type": "boolean",
+      "label": "Track email opens",
+      "description": "Count emails you open during this session",
+      "default": true
+    },
+    "trackSent": {
+      "type": "boolean",
+      "label": "Track sent emails",
+      "description": "Count emails you send during this session",
+      "default": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "hello-world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Minimal example plugin that logs lifecycle events",
+  "type": "hook",
+  "permissions": [
+    "email:read"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0"
+}

@@ -1,0 +1,32 @@
+{
+  "id": "send-later",
+  "name": "Send Later",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Adds a 'Send Later' button to the email composer with scheduling options",
+  "type": "ui-extension",
+  "permissions": [
+    "email:read",
+    "email:send",
+    "ui:composer-toolbar",
+    "ui:toolbar",
+    "ui:keyboard"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "settingsSchema": {
+    "defaultDelay": {
+      "type": "select",
+      "label": "Default delay",
+      "description": "Default scheduling delay when clicking Send Later",
+      "default": "1h",
+      "options": ["30m", "1h", "2h", "4h", "tomorrow-9am"]
+    },
+    "showConfirmation": {
+      "type": "boolean",
+      "label": "Show confirmation",
+      "description": "Show a toast when an email is scheduled",
+      "default": true
+    }
+  }
+}
