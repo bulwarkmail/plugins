@@ -11,7 +11,9 @@
  */
 
 // React is provided by the host app — access lazily to ensure externals are set
-function getReact() { return globalThis.__PLUGIN_EXTERNALS__?.React; }
+function getReact() {
+  return globalThis.__PLUGIN_EXTERNALS__?.React;
+}
 const h = (...args) => getReact().createElement(...args);
 const useState = (...args) => getReact().useState(...args);
 const useEffect = (...args) => getReact().useEffect(...args);
@@ -28,7 +30,7 @@ function notifyStateChange() {
 
 function getNotes() {
   if (!pluginApi) return {};
-  return pluginApi.storage.get('notes') || {};
+  return pluginApi.storage.get("notes") || {};
 }
 
 function saveNote(emailId, text) {
@@ -55,14 +57,14 @@ function saveNote(emailId, text) {
     }
   }
 
-  pluginApi.storage.set('notes', notes);
+  pluginApi.storage.set("notes", notes);
   notifyStateChange();
 }
 
 // ─── Sidebar Widget Component ──────────────────────────────
 
 function NotesWidget() {
-  const [noteText, setNoteText] = useState('');
+  const [noteText, setNoteText] = useState("");
   const [emailId, setEmailId] = useState(currentEmailId);
 
   useEffect(() => {
@@ -70,9 +72,9 @@ function NotesWidget() {
       setEmailId(currentEmailId);
       if (currentEmailId) {
         const notes = getNotes();
-        setNoteText(notes[currentEmailId]?.text || '');
+        setNoteText(notes[currentEmailId]?.text || "");
       } else {
-        setNoteText('');
+        setNoteText("");
       }
     };
 
@@ -84,67 +86,100 @@ function NotesWidget() {
   const handleSave = useCallback(() => {
     if (emailId) {
       saveNote(emailId, noteText);
-      pluginApi?.toast.success('Note saved');
+      pluginApi?.toast.success("Note saved");
     }
   }, [emailId, noteText]);
 
   if (!emailId) {
-    return h('div', {
-      style: { padding: '16px', color: '#888', textAlign: 'center', fontSize: '13px' },
-    }, 'Open an email to add notes');
+    return h(
+      "div",
+      {
+        style: {
+          padding: "16px",
+          color: "#888",
+          textAlign: "center",
+          fontSize: "13px",
+        },
+      },
+      "Open an email to add notes",
+    );
   }
 
   const noteCount = Object.keys(getNotes()).length;
 
-  return h('div', { style: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' } },
-    h('div', { style: { fontSize: '12px', color: '#888' } }, `${noteCount} note(s) stored`),
-    h('textarea', {
+  return h(
+    "div",
+    {
+      style: {
+        padding: "12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+      },
+    },
+    h(
+      "div",
+      { style: { fontSize: "12px", color: "#888" } },
+      `${noteCount} note(s) stored`,
+    ),
+    h("textarea", {
       value: noteText,
       onChange: (e) => setNoteText(e.target.value),
-      placeholder: 'Add a note about this email...',
+      placeholder: "Add a note about this email...",
       rows: 4,
       style: {
-        width: '100%',
-        padding: '8px',
-        borderRadius: '6px',
-        border: '1px solid var(--color-border, #e2e8f0)',
-        background: 'var(--color-background, #fff)',
-        color: 'var(--color-foreground, #000)',
-        fontSize: '13px',
-        resize: 'vertical',
-        fontFamily: 'inherit',
+        width: "100%",
+        padding: "8px",
+        borderRadius: "6px",
+        border: "1px solid var(--color-border, #e2e8f0)",
+        background: "var(--color-background, #fff)",
+        color: "var(--color-foreground, #000)",
+        fontSize: "13px",
+        resize: "vertical",
+        fontFamily: "inherit",
       },
     }),
-    h('div', { style: { display: 'flex', gap: '8px' } },
-      h('button', {
-        onClick: handleSave,
-        style: {
-          flex: 1,
-          padding: '6px 12px',
-          borderRadius: '6px',
-          border: 'none',
-          background: 'var(--color-primary, #3b82f6)',
-          color: 'var(--color-primary-foreground, #fff)',
-          cursor: 'pointer',
-          fontSize: '13px',
+    h(
+      "div",
+      { style: { display: "flex", gap: "8px" } },
+      h(
+        "button",
+        {
+          onClick: handleSave,
+          style: {
+            flex: 1,
+            padding: "6px 12px",
+            borderRadius: "6px",
+            border: "none",
+            background: "var(--color-primary, #3b82f6)",
+            color: "var(--color-primary-foreground, #fff)",
+            cursor: "pointer",
+            fontSize: "13px",
+          },
         },
-      }, 'Save'),
-      noteText.trim() && h('button', {
-        onClick: () => {
-          setNoteText('');
-          if (emailId) saveNote(emailId, '');
-          pluginApi?.toast.info('Note removed');
-        },
-        style: {
-          padding: '6px 12px',
-          borderRadius: '6px',
-          border: '1px solid var(--color-border, #e2e8f0)',
-          background: 'transparent',
-          color: 'var(--color-destructive, #ef4444)',
-          cursor: 'pointer',
-          fontSize: '13px',
-        },
-      }, 'Delete'),
+        "Save",
+      ),
+      noteText.trim() &&
+        h(
+          "button",
+          {
+            onClick: () => {
+              setNoteText("");
+              if (emailId) saveNote(emailId, "");
+              pluginApi?.toast.info("Note removed");
+            },
+            style: {
+              padding: "6px 12px",
+              borderRadius: "6px",
+              border: "1px solid var(--color-border, #e2e8f0)",
+              background: "transparent",
+              color: "var(--color-destructive, #ef4444)",
+              cursor: "pointer",
+              fontSize: "13px",
+            },
+          },
+          "Delete",
+        ),
     ),
   );
 }
@@ -156,19 +191,25 @@ function NoteBanner({ email }) {
   const note = notes[email.id];
   if (!note) return null;
 
-  return h('div', {
-    style: {
-      padding: '6px 12px',
-      background: 'var(--color-accent, #eef)',
-      color: 'var(--color-accent-foreground, #333)',
-      fontSize: '12px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
+  return h(
+    "div",
+    {
+      style: {
+        padding: "6px 12px",
+        background: "var(--color-accent, #eef)",
+        color: "var(--color-accent-foreground, #333)",
+        fontSize: "12px",
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+      },
     },
-  },
-    '📝',
-    h('span', null, `Note: ${note.text.slice(0, 80)}${note.text.length > 80 ? '...' : ''}`),
+    "📝",
+    h(
+      "span",
+      null,
+      `Note: ${note.text.slice(0, 80)}${note.text.length > 80 ? "..." : ""}`,
+    ),
   );
 }
 
@@ -183,24 +224,24 @@ export function activate(api) {
     api.hooks.onEmailOpen((email) => {
       currentEmailId = email.id;
       notifyStateChange();
-    })
+    }),
   );
 
   disposables.push(
     api.hooks.onEmailClose(() => {
       currentEmailId = null;
       notifyStateChange();
-    })
+    }),
   );
 
   // Register sidebar widget
   disposables.push(
     api.ui.registerDetailSidebar({
-      id: 'quick-notes',
-      label: 'Quick Notes',
+      id: "quick-notes",
+      label: "Quick Notes",
       render: NotesWidget,
       order: 20,
-    })
+    }),
   );
 
   // Register email banner (if enabled)
@@ -212,11 +253,11 @@ export function activate(api) {
           return !!notes[email.id];
         },
         render: NoteBanner,
-      })
+      }),
     );
   }
 
-  api.log.info('Quick Notes plugin activated');
+  api.log.info("Quick Notes plugin activated");
 
   return {
     dispose: () => {

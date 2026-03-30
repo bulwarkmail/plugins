@@ -5,10 +5,7 @@
   "author": "Bulwark Mail Community",
   "description": "Automatically tags incoming emails based on configurable rules",
   "type": "hook",
-  "permissions": [
-    "email:read",
-    "email:write"
-  ],
+  "permissions": ["email:read", "email:write"],
   "entrypoint": "index.js",
   "minAppVersion": "1.0.0",
   "settingsSchema": {

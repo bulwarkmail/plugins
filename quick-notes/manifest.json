@@ -5,11 +5,7 @@
   "author": "Bulwark Mail Community",
   "description": "Per-email sticky notes in the sidebar — jot notes while reading emails",
   "type": "sidebar-app",
-  "permissions": [
-    "email:read",
-    "ui:sidebar-widget",
-    "ui:email-banner"
-  ],
+  "permissions": ["email:read", "ui:sidebar-widget", "ui:email-banner"],
   "entrypoint": "index.js",
   "minAppVersion": "1.0.0",
   "settingsSchema": {

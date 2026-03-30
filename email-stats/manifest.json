@@ -5,10 +5,7 @@
   "author": "Bulwark Mail Community",
   "description": "Sidebar widget showing email activity statistics",
   "type": "sidebar-app",
-  "permissions": [
-    "email:read",
-    "ui:sidebar-widget"
-  ],
+  "permissions": ["email:read", "ui:sidebar-widget"],
   "entrypoint": "index.js",
   "minAppVersion": "1.0.0",
   "settingsSchema": {

@@ -5,9 +5,7 @@
   "author": "Your Name",
   "description": "A custom plugin for Bulwark Mail",
   "type": "hook",
-  "permissions": [
-    "email:read"
-  ],
+  "permissions": ["email:read"],
   "entrypoint": "index.js",
   "minAppVersion": "1.0.0",
   "settingsSchema": {

@@ -9,7 +9,10 @@
  */
 
 // React is provided by the host app — access lazily to ensure externals are set
-function getReact() { return globalThis.__PLUGIN_EXTERNALS__?.React; }
+function getReact() {
+  // eslint-disable-line no-unused-vars
+  return globalThis.__PLUGIN_EXTERNALS__?.React;
+}
 
 // ─── Activate ───────────────────────────────────────────────
 // Called when the plugin is loaded. Return a Disposable to clean up.
@@ -17,20 +20,20 @@ function getReact() { return globalThis.__PLUGIN_EXTERNALS__?.React; }
 export function activate(api) {
   const disposables = [];
 
-  api.log.info('Plugin activated!');
+  api.log.info("Plugin activated!");
 
   // ─── Settings ───────────────────────────────────────────
   // Access user-configured settings from manifest.settingsSchema
   const isEnabled = api.plugin.settings.enabled;
   if (!isEnabled) {
-    api.log.info('Plugin is disabled by user settings');
+    api.log.info("Plugin is disabled by user settings");
     return;
   }
 
   // ─── Storage ────────────────────────────────────────────
   // Persistent key-value storage scoped to this plugin
-  const runCount = (api.storage.get('runCount') || 0) + 1;
-  api.storage.set('runCount', runCount);
+  const runCount = (api.storage.get("runCount") || 0) + 1;
+  api.storage.set("runCount", runCount);
   api.log.info(`Plugin has been activated ${runCount} time(s)`);
 
   // ─── Toast notifications ────────────────────────────────
@@ -147,8 +150,8 @@ export function activate(api) {
 
   disposables.push(
     api.hooks.onEmailOpen((email) => {
-      api.log.info('Email opened:', email.subject);
-    })
+      api.log.info("Email opened:", email.subject);
+    }),
   );
 
   // disposables.push(api.hooks.onEmailClose(() => { ... }));
@@ -184,8 +187,8 @@ export function activate(api) {
 
   disposables.push(
     api.hooks.onAppReady(() => {
-      api.log.info('App is ready!');
-    })
+      api.log.info("App is ready!");
+    }),
   );
 
   // Periodic callback (minimum 60 seconds)
@@ -219,7 +222,7 @@ export function activate(api) {
   return {
     dispose: () => {
       disposables.forEach((d) => d.dispose());
-      api.log.info('Plugin deactivated');
+      api.log.info("Plugin deactivated");
     },
   };
 }
