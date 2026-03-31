@@ -16,19 +16,15 @@ export function activate(api) {
       order: 10,
       onClick: async (eventData, { setVirtualLocation }) => {
         try {
-          const authHeaders = api.auth.getHeaders();
-          const response = await fetch("/api/jitsi", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeaders },
-            body: JSON.stringify({ eventTitle: eventData.title || "meeting" }),
+          const response = await api.http.post("/api/jitsi", {
+            eventTitle: eventData.title || "meeting",
           });
 
           if (!response.ok) {
             throw new Error(`Server responded with ${response.status}`);
           }
 
-          const data = await response.json();
-          setVirtualLocation(data.url);
+          setVirtualLocation(response.data.url);
           api.toast.success("Jitsi meeting link added");
         } catch (err) {
           api.log.error("Failed to create Jitsi meeting link", err);

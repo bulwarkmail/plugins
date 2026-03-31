@@ -119,4 +119,4 @@ The built client bundle will be at `dist/index.js`.
 - `calendar:read` — Read calendar event data
 - `calendar:write` — Set the meeting link on events
 - `ui:calendar-action` — Register an action button in the event editor
-- `auth:read` — Read the current user's auth headers to authenticate with the sidecar
+- `http:post` — Make authenticated HTTP requests to the sidecar via the webmail proxy

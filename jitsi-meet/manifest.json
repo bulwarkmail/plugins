@@ -9,7 +9,7 @@
     "calendar:read",
     "calendar:write",
     "ui:calendar-action",
-    "auth:read"
+    "http:post"
   ],
   "entrypoint": "index.js",
   "minAppVersion": "1.0.0"
