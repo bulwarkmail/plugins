@@ -3,39 +3,14 @@
   "name": "Jitsi Meet",
   "version": "1.0.0",
   "author": "Bulwark Mail Community",
-  "description": "Adds a 'Add Jitsi Meeting' button to calendar events. Admin configures the Jitsi server URL and optional JWT secret via the plugin config page.",
+  "description": "Adds a 'Add Jitsi Meeting' button to calendar events. Meeting URLs are generated server-side via the /api/jitsi sidecar.",
   "type": "ui-extension",
   "permissions": [
     "calendar:read",
     "calendar:write",
     "ui:calendar-action",
-    "ui:settings-section",
-    "admin:config"
+    "auth:read"
   ],
   "entrypoint": "index.js",
-  "minAppVersion": "1.0.0",
-  "configSchema": {
-    "jitsi-url": {
-      "type": "string",
-      "label": "Jitsi Server URL",
-      "description": "Base URL of your Jitsi Meet instance (e.g. https://meet.example.com)",
-      "required": true,
-      "placeholder": "https://meet.example.com"
-    },
-    "jitsi-jwt-secret": {
-      "type": "secret",
-      "label": "JWT Secret",
-      "description": "HMAC-SHA256 secret for signing JWTs. Only needed when your Jitsi instance requires JWT authentication. Must match the secret in your Jitsi deployment.",
-      "required": false,
-      "placeholder": "Leave empty if JWT is not required"
-    }
-  },
-  "settingsSchema": {
-    "autoAddMeeting": {
-      "type": "boolean",
-      "label": "Auto-add meeting link",
-      "description": "Automatically set the meeting link when clicking 'Add Jitsi Meeting'",
-      "default": true
-    }
-  }
+  "minAppVersion": "1.0.0"
 }
