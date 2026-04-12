@@ -1,0 +1,35 @@
+{
+  "id": "gravatar",
+  "name": "Gravatar Avatars",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Shows Gravatar profile pictures for email contacts using the Gravatar API",
+  "type": "hook",
+  "permissions": ["email:read"],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "settingsSchema": {
+    "size": {
+      "type": "number",
+      "label": "Image size (px)",
+      "description": "Size of the Gravatar image in pixels (16–512)",
+      "default": 160,
+      "min": 16,
+      "max": 512
+    },
+    "rating": {
+      "type": "select",
+      "label": "Maximum content rating",
+      "description": "Gravatar images above this rating will not be shown",
+      "options": ["g", "pg", "r", "x"],
+      "default": "g"
+    },
+    "defaultStyle": {
+      "type": "select",
+      "label": "Fallback style",
+      "description": "Image style to use when an email has no Gravatar profile. '404' skips Gravatar for that address.",
+      "options": ["404", "mp", "identicon", "monsterid", "wavatar", "retro", "robohash"],
+      "default": "404"
+    }
+  }
+}
