@@ -177,44 +177,81 @@ const STYLES = `
 /* ─── Incoming-mail banner ─────────────────────────────── */
 .erw-banner {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 16px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 24px;
   margin: 0;
-  font-size: 13px;
-  line-height: 1.4;
-  background: rgba(217, 119, 6, 0.08);
+  background: rgba(245, 158, 11, 0.12);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
   color: #92400e;
   min-width: 0;
 }
-.erw-banner-icon {
-  display: inline-flex;
-  width: 14px; height: 14px;
+.erw-banner-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  background: rgba(245, 158, 11, 0.25);
   color: #b45309;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
-.erw-banner-label {
+.erw-banner-icon-wrap svg {
+  width: 20px;
+  height: 20px;
+}
+.erw-banner-content {
+  flex: 1;
+  min-width: 0;
+}
+.erw-banner-eyebrow {
+  font-size: 10px;
   font-weight: 600;
-  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(146, 64, 14, 0.7);
+  line-height: 1.4;
 }
-.erw-banner-dot {
-  flex-shrink: 0;
-  opacity: 0.45;
+.erw-banner-body {
+  font-size: 14px;
+  font-weight: 600;
+  color: #92400e;
+  word-break: break-word;
+  line-height: 1.3;
 }
 .erw-banner-from {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.85;
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(146, 64, 14, 0.85);
+  word-break: break-word;
+  margin-top: 2px;
 }
 .dark .erw-banner,
 .erw-banner.erw-dark {
-  background: rgba(217, 119, 6, 0.12);
+  background: rgba(217, 119, 6, 0.15);
+  border-bottom-color: rgba(217, 119, 6, 0.35);
   color: #fbbf24;
 }
-.dark .erw-banner-icon,
-.erw-banner.erw-dark .erw-banner-icon { color: #fbbf24; }
+.dark .erw-banner-icon-wrap,
+.erw-banner.erw-dark .erw-banner-icon-wrap {
+  background: rgba(217, 119, 6, 0.3);
+  color: #fbbf24;
+}
+.dark .erw-banner-eyebrow,
+.erw-banner.erw-dark .erw-banner-eyebrow {
+  color: rgba(251, 191, 36, 0.7);
+}
+.dark .erw-banner-body,
+.erw-banner.erw-dark .erw-banner-body {
+  color: #fbbf24;
+}
+.dark .erw-banner-from,
+.erw-banner.erw-dark .erw-banner-from {
+  color: rgba(251, 191, 36, 0.85);
+}
 `;
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -478,8 +515,6 @@ function getReact() {
 
 function buildBannerIcon() {
   const svg = svgEl("svg", {
-    width: "14",
-    height: "14",
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -487,9 +522,11 @@ function buildBannerIcon() {
     "stroke-linecap": "round",
     "stroke-linejoin": "round",
   });
-  svg.appendChild(svgEl("circle", { cx: "12", cy: "12", r: "10" }));
-  svg.appendChild(svgEl("line", { x1: "12", y1: "8", x2: "12", y2: "12" }));
-  svg.appendChild(svgEl("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" }));
+  svg.appendChild(svgEl("path", {
+    d: "M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z",
+  }));
+  svg.appendChild(svgEl("line", { x1: "12", y1: "9", x2: "12", y2: "13" }));
+  svg.appendChild(svgEl("line", { x1: "12", y1: "17", x2: "12.01", y2: "17" }));
   return svg.outerHTML;
 }
 
@@ -741,14 +778,17 @@ export function activate(api) {
           role: "note",
           title: fromText,
         },
-        h("span", {
-          className: "erw-banner-icon",
+        h("div", {
+          className: "erw-banner-icon-wrap",
           "aria-hidden": "true",
           dangerouslySetInnerHTML: { __html: buildBannerIcon() },
         }),
-        h("span", { className: "erw-banner-label" }, labelText),
-        h("span", { className: "erw-banner-dot", "aria-hidden": "true" }, "·"),
-        h("span", { className: "erw-banner-from" }, fromText),
+        h(
+          "div",
+          { className: "erw-banner-content" },
+          h("div", { className: "erw-banner-eyebrow" }, labelText),
+          fromText && h("div", { className: "erw-banner-body" }, fromText),
+        ),
       );
     }
 
