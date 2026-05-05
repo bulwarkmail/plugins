@@ -1,107 +1,81 @@
 # Nextcloud Attachments Plugin
 
-Inspired by the Roundcube [`nextcloud_attachments`](https://github.com/bennet0496/nextcloud_attachments) plugin.
+Inspired by the Roundcube [`nextcloud_attachments`](https://github.com/bennet0496/nextcloud_attachments) plugin. Sidecar-less — the plugin talks directly to Nextcloud over WebDAV (PUT) and OCS (public-share create) from the browser using `api.http.fetch`.
 
-Adds an **"Attach from Nextcloud"** button to the composer toolbar. Files picked from the dialog are uploaded to a configured Nextcloud server, a public share link is created, and the link is appended to the outgoing email body at send time — so the binary never travels through the mail server.
+Adds an **"Attach from Nextcloud"** button to the composer toolbar. Files picked from the dialog are uploaded to the user's Nextcloud, a public share link is created, and the link is appended to the outgoing email body at send time — so the binary never travels through the mail server.
 
-## Architecture
+## How it works
 
-Two parts, mirroring the Jitsi Meet plugin layout:
+- Each user supplies their own Nextcloud URL, username and **app password** in plugin settings (Nextcloud → Settings → Security → Devices & sessions → Create new app password).
+- The composer toolbar action picks files, runs WebDAV `MKCOL` to ensure the per-user folder exists (`<base>/<username>/<YYYY>/<MM>` by default), `PUT`s the file, and `POST`s an OCS public-link share with optional password and expiry.
+- Pending uploads show in a right-side composer sidebar with status. At send, `onTransformOutgoingEmail` appends an HTML link card + plain-text fallback to the body and clears the queue.
 
-- **Client** (`dist/index.js`) — composer toolbar action + composer sidebar (right) listing pending uploads. At send time, `onTransformOutgoingEmail` injects an HTML / plain-text link block into the message body.
-- **Server sidecar** (`server/`) — Node HTTP service exposing `POST /api/nextcloud/upload`. Verifies the user's OIDC bearer token via the issuer's userinfo endpoint, uploads the file to Nextcloud over WebDAV using a service account, creates a public share via the OCS Files-Sharing API, and returns the share URL (plus optional password and expiry).
+## Prerequisites
 
-The browser only ever talks to `<webmail-host>/api/nextcloud/upload`. A reverse proxy in front of the webmail forwards that path to the sidecar internally.
+The plugin can only work if both of these are true:
 
-## Why a service account, not per-user auth
+### 1. The Nextcloud origin is in the manifest's `httpOrigins`
 
-The upstream Roundcube plugin authenticates each user with their own Nextcloud account. That's not buildable in this API today — the plugin runs in the browser sandbox and cannot pop a separate login flow. A v1 service-account model uploads everything through one Nextcloud user, partitioned into per-mail-user sub-folders (`<base>/<user@example.com>/...`). Per-user OAuth can layer on later without changing the client side.
+`api.http.fetch` enforces a manifest-declared allowlist. The default ships with `"https://cloud.example.com"` — **edit `manifest.json` to your Nextcloud's origin and rebuild before installing**:
 
-## Setup
-
-### 1. Create a Nextcloud service account
-
-1. In Nextcloud, create a dedicated user (e.g. `webmail-attachments`).
-2. Sign in as that user → **Settings → Security → Devices & sessions → Create new app password**. Note the password.
-3. Create the base folder you want uploads to land in (default `Mail attachments`).
-
-### 2. Deploy the sidecar
-
-```bash
-cd server
-docker build -t nextcloud-attachments-sidecar .
-docker run -d \
-  -e OIDC_ISSUER_URL=https://zitadel.example.com \
-  -e NEXTCLOUD_URL=https://cloud.example.com \
-  -e NEXTCLOUD_USERNAME=webmail-attachments \
-  -e NEXTCLOUD_PASSWORD=<app-password> \
-  -e NEXTCLOUD_FOLDER='Mail attachments' \
-  -e NEXTCLOUD_FOLDER_LAYOUT=date \
-  -e MAX_UPLOAD_BYTES=104857600 \
-  -p 3002:3002 \
-  nextcloud-attachments-sidecar
+```json
+"httpOrigins": ["https://cloud.your-domain.com"]
 ```
 
-#### Environment variables
+A wildcard is allowed (`https://*.your-domain.com`) but matches exactly one subdomain layer.
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `OIDC_ISSUER_URL` | yes | — | OIDC issuer used to verify Bearer tokens (e.g. your Zitadel URL). |
-| `NEXTCLOUD_URL` | yes | — | Base URL of your Nextcloud instance. |
-| `NEXTCLOUD_USERNAME` | yes | — | Service account login. |
-| `NEXTCLOUD_PASSWORD` | yes | — | Service account app password. |
-| `NEXTCLOUD_FOLDER` | no | `Mail attachments` | Root folder for uploads (must already exist). |
-| `NEXTCLOUD_FOLDER_LAYOUT` | no | `date` | `flat`, `date` (`<user>/<YYYY>/<MM>`), or `hash` (`<user>/<xx>/<yy>`). |
-| `MAX_UPLOAD_BYTES` | no | `104857600` (100 MB) | Hard cap on each base64 request body. |
-| `PORT` | no | `3002` | Listen port. |
+### 2. The Nextcloud server returns CORS headers permitting the webmail origin
 
-### 3. Reverse-proxy the path
-
-The browser calls `/api/nextcloud/upload` on the webmail origin. Forward that path to the sidecar before the webmail catch-all:
+Nextcloud's WebDAV and OCS endpoints don't send CORS headers by default. The browser will refuse direct cross-origin requests without them. Configure your reverse proxy in front of Nextcloud (Nginx example):
 
 ```nginx
-server {
-    listen 443 ssl;
-    server_name mail.example.com;
-
-    location /api/nextcloud {
-        proxy_pass http://nextcloud-sidecar:3002;
-        client_max_body_size 110m;     # roughly MAX_UPLOAD_BYTES + slack
-        proxy_request_buffering off;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+location / {
+    # Pre-flight
+    if ($request_method = OPTIONS) {
+        add_header Access-Control-Allow-Origin "https://mail.your-domain.com" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, MKCOL, PROPFIND, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type, Depth, OCS-APIRequest, X-Requested-With" always;
+        add_header Access-Control-Max-Age 86400;
+        add_header Content-Length 0;
+        add_header Content-Type "text/plain charset=UTF-8";
+        return 204;
     }
 
-    location / {
-        proxy_pass http://bulwark-webmail:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+    add_header Access-Control-Allow-Origin "https://mail.your-domain.com" always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, MKCOL, PROPFIND, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Authorization, Content-Type, Depth, OCS-APIRequest, X-Requested-With" always;
+    add_header Access-Control-Expose-Headers "Content-Length, Content-Range, ETag, OC-FileId, OC-ETag" always;
+
+    proxy_pass http://nextcloud-upstream;
+    # … your usual Nextcloud proxy directives …
 }
 ```
 
-`client_max_body_size` must be larger than `MAX_UPLOAD_BYTES` because the JSON body carries the file as base64 (~33 % overhead).
+`api.http.fetch` always uses `credentials: 'omit'`, so `Access-Control-Allow-Credentials` should be left unset (or `false`). Authentication is via the Basic-auth header the plugin builds from the user's app password.
 
-### 4. Install the plugin
+## Build
 
 ```bash
-cd ..
+cd repos/plugins/nextcloud-attachments
 npm install
-npm run build
+npm run build   # → dist/index.js
 ```
 
-Then upload the resulting `dist/index.js` (along with `manifest.json`) through **Admin → Plugins**, or zip the directory and install through the marketplace.
+Install via Admin → Plugins (zip the directory + manifest), or drop the folder under `PLUGIN_DEV_DIR` for live-reload development.
 
 ## User settings
 
 | Setting | Default | Description |
 |---|---|---|
+| `ncUrl` | — | Full URL of your Nextcloud (must match the manifest's `httpOrigins`). |
+| `ncUsername` | — | Your Nextcloud login. |
+| `ncAppPassword` | — | App password (not your account password). Stored unencrypted in this browser. |
+| `ncBaseFolder` | `Mail attachments` | Path inside your home folder; created on demand. |
+| `ncFolderLayout` | `date` | `flat`, `date` (`<user>/<YYYY>/<MM>`), or `hash` (`<user>/<xx>/<yy>`). |
+| `expiryDays` | 14 | Public share expiry in days. `0` disables expiry. |
+| `passwordProtect` | `false` | Generate a random password per share; shown next to the link in the email. |
 | `sizeThreshold` | 10 MB | Files attached the regular way that exceed this size produce a hint toast. |
 | `nudgeOnLargeUpload` | `true` | Disable to silence the hint. |
-| `expiryDays` | 14 | Public share expiry in days. `0` disables expiry. |
-| `passwordProtect` | `false` | Generate a random password per share; the password is shown next to the link in the email body. |
 
 ## Permissions
 
@@ -111,18 +85,21 @@ Then upload the resulting `dist/index.js` (along with `manifest.json`) through *
 | `email:send` | `onTransformOutgoingEmail` for the link-block injection. |
 | `ui:composer-toolbar` | "Attach from Nextcloud" button. |
 | `ui:composer-sidebar` | The cloud-attachments panel on the composer's right side. |
-| `http:post` | Authenticated POST to `/api/nextcloud/upload`. |
+| `ui:settings-section` | The settings page for entering Nextcloud credentials. |
+| `http:fetch` | Cross-origin requests to Nextcloud; gated by `httpOrigins`. |
 
 ## Use
 
-1. Open the composer.
-2. Click **Attach from Nextcloud** in the toolbar and pick one or more files.
-3. Each file uploads in the background; the right-hand sidebar shows status (`uploading` → `ready`) and lets you remove an entry before sending.
-4. On send, an HTML link block is appended to both the HTML and plain-text bodies. Each entry shows the file name, size, expiry, and (optionally) the password.
+1. Install + enable the plugin, then open Settings → Plugins → Nextcloud Attachments and fill in the four required fields.
+2. Open the composer.
+3. Click **Attach from Nextcloud** in the toolbar and pick one or more files.
+4. Each file uploads in the background; the right-hand sidebar shows status (`uploading` → `ready`) and lets you remove an entry before sending.
+5. On send, an HTML link block is appended to both the HTML and plain-text bodies. Each entry shows the file name, size, expiry, and (optionally) the password.
 
-## Limitations vs. the Roundcube plugin
+## Limitations
 
-- **Service-account uploads only** — no per-user Nextcloud login flow. All files end up under one Nextcloud account, partitioned by user email.
-- **Base64-over-JSON transport** — capped by `MAX_UPLOAD_BYTES`. Plain `multipart/form-data` would lift the cap, but `api.http.post` only accepts JSON today; a chunked or pre-signed flow can come later.
-- **No "auto cloud-attach for files over N bytes"** — the plugin can detect the upload (`onBeforeAttachmentUpload`) but does not have access to the file bytes from that hook, so it can only nudge with a toast.
-- **Removing a pending entry does not delete the file from Nextcloud.** The share link is created up-front, before the user decides to send. Orphans get cleaned up when the share expires.
+- **Browser-only auth.** App password lives in plugin settings, persisted in the browser. Don't enable on shared profiles.
+- **CORS dependency.** Nextcloud admin must add the headers shown above. Without them, the browser rejects the cross-origin call before any handler runs and `api.http.fetch` reports a network error.
+- **No streaming.** `api.http.fetch` accepts a `Blob`/`File` body, so files of any size up to your reverse-proxy's `client_max_body_size` work — but the upload is one PUT, no chunking. Very large files (>1 GB) should use Nextcloud's chunked-upload API; not implemented here.
+- **Removing a pending entry does not delete the file from Nextcloud.** The share link is created up-front. Orphans clean themselves up when the share expires.
+- **Per-deployment manifest.** `httpOrigins` is fixed at install time. Each org needs to edit and rebuild with their own Nextcloud URL.

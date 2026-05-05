@@ -3,31 +3,52 @@
   "name": "Nextcloud Attachments",
   "version": "1.0.0",
   "author": "Bulwark Mail Community",
-  "description": "Attach large files via a Nextcloud share link instead of as binary attachments. Files are uploaded to a configured Nextcloud server and a public share link is inserted into the outgoing message at send time.",
+  "description": "Attach large files via a Nextcloud share link instead of as binary attachments. Each user authenticates with their own Nextcloud app password; files are uploaded over WebDAV and a public share link is appended to the outgoing message at send time.",
   "type": "ui-extension",
   "permissions": [
     "email:write",
     "email:send",
     "ui:composer-toolbar",
     "ui:composer-sidebar",
-    "http:post"
+    "ui:settings-section",
+    "http:fetch"
   ],
   "entrypoint": "index.js",
   "minAppVersion": "1.0.0",
+  "httpOrigins": [
+    "https://cloud.example.com"
+  ],
   "settingsSchema": {
-    "sizeThreshold": {
-      "type": "number",
-      "label": "Cloud-attach threshold (bytes)",
-      "description": "Files above this size trigger a hint suggesting Nextcloud cloud attach. Default 10 MB.",
-      "default": 10485760,
-      "min": 0,
-      "max": 1073741824
+    "ncUrl": {
+      "type": "string",
+      "label": "Nextcloud server URL",
+      "description": "Full URL of your Nextcloud instance, e.g. https://cloud.example.com. The origin must also be listed in the plugin's httpOrigins (manifest) and the Nextcloud server must serve CORS headers permitting this webmail's origin.",
+      "default": ""
     },
-    "nudgeOnLargeUpload": {
-      "type": "boolean",
-      "label": "Suggest cloud attach for large files",
-      "description": "Show a toast hint when a regular attachment exceeds the threshold above.",
-      "default": true
+    "ncUsername": {
+      "type": "string",
+      "label": "Nextcloud username",
+      "description": "Your Nextcloud login name.",
+      "default": ""
+    },
+    "ncAppPassword": {
+      "type": "string",
+      "label": "Nextcloud app password",
+      "description": "Generate one in Nextcloud → Settings → Security → Devices & sessions. Stored unencrypted in this browser; do not share this profile.",
+      "default": ""
+    },
+    "ncBaseFolder": {
+      "type": "string",
+      "label": "Upload folder",
+      "description": "Path inside your Nextcloud home where uploads land. Created on demand.",
+      "default": "Mail attachments"
+    },
+    "ncFolderLayout": {
+      "type": "select",
+      "label": "Folder layout",
+      "description": "How uploads are organised inside the upload folder.",
+      "default": "date",
+      "options": ["flat", "date", "hash"]
     },
     "expiryDays": {
       "type": "number",
@@ -42,6 +63,20 @@
       "label": "Password-protect share links",
       "description": "Generate a random password for each share. The password is shown next to the link in the email body so the recipient can copy it.",
       "default": false
+    },
+    "sizeThreshold": {
+      "type": "number",
+      "label": "Cloud-attach hint threshold (bytes)",
+      "description": "Regular attachments above this size produce a hint suggesting cloud attach. Default 10 MB.",
+      "default": 10485760,
+      "min": 0,
+      "max": 1073741824
+    },
+    "nudgeOnLargeUpload": {
+      "type": "boolean",
+      "label": "Suggest cloud attach for large files",
+      "description": "Show a toast hint when a regular attachment exceeds the threshold above.",
+      "default": true
     }
   }
 }
