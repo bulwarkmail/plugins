@@ -1,7 +1,7 @@
 {
   "id": "gravatar",
   "name": "Gravatar Avatars",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "Bulwark Mail Community",
   "description": "Resolves Gravatar profile pictures for email contacts via the avatar transform hook",
   "type": "hook",
