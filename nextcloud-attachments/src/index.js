@@ -1,15 +1,20 @@
 /**
- * Nextcloud Attachments — upload large files to Nextcloud and insert a
- * public share link into the outgoing email body instead of attaching the
- * binary directly.
+ * Nextcloud Attachments — sidecar-less.
  *
- * Architecture:
- *   - Composer toolbar button picks files and POSTs them base64-encoded to
- *     /api/nextcloud/upload (provided by the bundled sidecar).
- *   - A composer sidebar widget shows the pending uploads with status.
- *   - onTransformOutgoingEmail appends an HTML / text link block at send.
- *   - onBeforeAttachmentUpload optionally nudges the user toward cloud
- *     attach when a regular attachment is over the threshold.
+ * Talks directly to the user's Nextcloud over WebDAV (PUT) and OCS
+ * (public-share create) using `api.http.fetch`. Each user supplies their
+ * own Nextcloud URL, username, and app password via plugin settings. The
+ * Nextcloud origin must be present in the manifest's `httpOrigins`, and
+ * the Nextcloud server must serve CORS headers permitting the webmail
+ * origin.
+ *
+ * Composer flow:
+ *   - Toolbar button "Attach from Nextcloud" picks files, uploads them,
+ *     creates public shares, and stages them in a per-compose list.
+ *   - The right-side composer sidebar shows status and lets the user
+ *     remove items before sending.
+ *   - onTransformOutgoingEmail appends an HTML link block + plain-text
+ *     fallback to the body at send time.
  */
 
 function getReact() {
@@ -45,39 +50,167 @@ function escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("Unexpected reader result"));
-        return;
-      }
-      const comma = result.indexOf(",");
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.onerror = () => reject(reader.error || new Error("Read failed"));
-    reader.readAsDataURL(file);
-  });
+function trimTrailingSlash(s) {
+  return String(s).replace(/\/+$/, "");
 }
 
-async function uploadFile(file) {
-  const settings = pluginApi.plugin.settings || {};
-  const base64 = await readFileAsBase64(file);
-  const res = await pluginApi.http.post("/api/nextcloud/upload", {
-    name: file.name,
-    type: file.type || "application/octet-stream",
-    size: file.size,
-    contentBase64: base64,
-    expiryDays: typeof settings.expiryDays === "number" ? settings.expiryDays : 14,
-    passwordProtect: settings.passwordProtect === true,
-  });
-  if (!res.ok) {
-    const msg = (res.data && res.data.error) || `HTTP ${res.status}`;
-    throw new Error(msg);
+function sanitizeFileName(name) {
+  const cleaned = String(name)
+    .replace(/[\\/<>:"|?*\x00-\x1f]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.length === 0 ? "attachment" : cleaned.slice(0, 240);
+}
+
+function userSlug(s) {
+  return String(s).replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function buildSubFolder(layout, username) {
+  const slug = userSlug(username);
+  if (layout === "flat") return slug;
+  if (layout === "hash") {
+    const bytes = crypto.getRandomValues(new Uint8Array(3));
+    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+    return `${slug}/${hex.slice(0, 2)}/${hex.slice(2, 4)}`;
   }
-  return res.data;
+  const d = new Date();
+  return `${slug}/${d.getFullYear()}/${pad2(d.getMonth() + 1)}`;
+}
+
+function randomToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(4));
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function generatePassword(length = 14) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  let out = "";
+  for (let i = 0; i < length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
+function basicAuthHeader(user, pass) {
+  return "Basic " + btoa(unescape(encodeURIComponent(`${user}:${pass}`)));
+}
+
+function getConfig() {
+  const s = (pluginApi && pluginApi.plugin.settings) || {};
+  const ncUrl = trimTrailingSlash(String(s.ncUrl || ""));
+  return {
+    ncUrl,
+    ncUsername: String(s.ncUsername || ""),
+    ncAppPassword: String(s.ncAppPassword || ""),
+    ncBaseFolder: String(s.ncBaseFolder || "Mail attachments"),
+    ncFolderLayout: ["flat", "date", "hash"].includes(s.ncFolderLayout) ? s.ncFolderLayout : "date",
+    expiryDays: typeof s.expiryDays === "number" ? s.expiryDays : 14,
+    passwordProtect: s.passwordProtect === true,
+  };
+}
+
+function isConfigured(cfg) {
+  return cfg.ncUrl && cfg.ncUsername && cfg.ncAppPassword;
+}
+
+function encodePath(p) {
+  return p.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+}
+
+async function ensureFolder(cfg, folderPath) {
+  const parts = folderPath.split("/").filter(Boolean);
+  const auth = basicAuthHeader(cfg.ncUsername, cfg.ncAppPassword);
+  let acc = "";
+  for (const part of parts) {
+    acc += "/" + encodeURIComponent(part);
+    const url = `${cfg.ncUrl}/remote.php/dav/files/${encodeURIComponent(cfg.ncUsername)}${acc}`;
+    const res = await pluginApi.http.fetch(url, {
+      method: "MKCOL",
+      headers: { Authorization: auth },
+    });
+    // 201 = created, 405 = already exists.
+    if (!res.ok && res.status !== 405) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`MKCOL ${acc} failed: HTTP ${res.status} ${text.slice(0, 160)}`);
+    }
+  }
+}
+
+async function uploadAndShare(file) {
+  const cfg = getConfig();
+  if (!isConfigured(cfg)) {
+    throw new Error("Nextcloud is not configured. Set URL, username and app password in plugin settings.");
+  }
+
+  const safeName = sanitizeFileName(file.name);
+  const subFolder = buildSubFolder(cfg.ncFolderLayout, cfg.ncUsername);
+  const folderPath = `${cfg.ncBaseFolder.replace(/^\/+|\/+$/g, "")}/${subFolder}`;
+  await ensureFolder(cfg, folderPath);
+
+  const remoteName = `${randomToken()}-${safeName}`;
+  const remotePath = `${folderPath}/${remoteName}`;
+  const auth = basicAuthHeader(cfg.ncUsername, cfg.ncAppPassword);
+
+  const putUrl =
+    `${cfg.ncUrl}/remote.php/dav/files/${encodeURIComponent(cfg.ncUsername)}/` +
+    encodePath(remotePath);
+
+  const putRes = await pluginApi.http.fetch(putUrl, {
+    method: "PUT",
+    headers: {
+      Authorization: auth,
+      "Content-Type": file.type || "application/octet-stream",
+    },
+    body: file,
+  });
+  if (!putRes.ok) {
+    const text = await putRes.text().catch(() => "");
+    throw new Error(`Upload failed: HTTP ${putRes.status} ${text.slice(0, 160)}`);
+  }
+
+  const password = cfg.passwordProtect ? generatePassword() : undefined;
+  let expiresAt;
+
+  const form = new URLSearchParams();
+  form.set("path", `/${remotePath}`);
+  form.set("shareType", "3"); // public link
+  form.set("permissions", "1"); // read
+  if (password) form.set("password", password);
+  if (cfg.expiryDays > 0) {
+    const d = new Date(Date.now() + cfg.expiryDays * 86400000);
+    form.set("expireDate", d.toISOString().slice(0, 10));
+    expiresAt = d.toISOString();
+  }
+
+  const shareRes = await pluginApi.http.fetch(
+    `${cfg.ncUrl}/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: auth,
+        "OCS-APIRequest": "true",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: form.toString(),
+    },
+  );
+  if (!shareRes.ok) {
+    const text = await shareRes.text().catch(() => "");
+    throw new Error(`Share create failed: HTTP ${shareRes.status} ${text.slice(0, 160)}`);
+  }
+  const shareJson = await shareRes.json();
+  const data = shareJson && shareJson.ocs && shareJson.ocs.data;
+  if (!data || !data.url) throw new Error("Share response missing url");
+
+  return {
+    url: data.url,
+    password,
+    expiresAt,
+    name: safeName,
+    size: file.size,
+  };
 }
 
 function pickFiles() {
@@ -99,6 +232,12 @@ function pickFiles() {
 
 async function handleAttachClick() {
   if (!pluginApi) return;
+  const cfg = getConfig();
+  if (!isConfigured(cfg)) {
+    pluginApi.toast.error("Configure Nextcloud URL, username and app password in plugin settings first.");
+    return;
+  }
+
   const files = await pickFiles();
   if (files.length === 0) return;
 
@@ -114,8 +253,8 @@ async function handleAttachClick() {
     notify();
 
     try {
-      const result = await uploadFile(file);
-      const item = pendingAttachments.find((a) => a.id === id);
+      const result = await uploadAndShare(file);
+      const item = pendingAttachments.find(a => a.id === id);
       if (item) {
         item.status = "ready";
         item.url = result.url;
@@ -125,7 +264,7 @@ async function handleAttachClick() {
       }
       pluginApi.toast.success(`Uploaded "${file.name}" to Nextcloud`);
     } catch (err) {
-      const item = pendingAttachments.find((a) => a.id === id);
+      const item = pendingAttachments.find(a => a.id === id);
       if (item) {
         item.status = "error";
         item.error = err && err.message ? err.message : String(err);
@@ -138,44 +277,39 @@ async function handleAttachClick() {
 }
 
 function removePending(id) {
-  pendingAttachments = pendingAttachments.filter((a) => a.id !== id);
+  pendingAttachments = pendingAttachments.filter(a => a.id !== id);
   notify();
 }
 
 function CloudAttachmentsPanel() {
   const [, setTick] = useState(0);
   useEffect(() => {
-    const fn = () => setTick((t) => t + 1);
+    const fn = () => setTick(t => t + 1);
     listeners.add(fn);
     return () => listeners.delete(fn);
   }, []);
 
+  const cfg = getConfig();
+  if (!isConfigured(cfg)) {
+    return h(
+      "div",
+      { style: { padding: "12px", color: "#888", fontSize: "13px", lineHeight: "1.4" } },
+      "Configure Nextcloud URL, username and app password in plugin settings to use cloud attach.",
+    );
+  }
+
   if (pendingAttachments.length === 0) {
     return h(
       "div",
-      {
-        style: {
-          padding: "12px",
-          color: "#888",
-          fontSize: "13px",
-          lineHeight: "1.4",
-        },
-      },
+      { style: { padding: "12px", color: "#888", fontSize: "13px", lineHeight: "1.4" } },
       "No cloud attachments yet. Use “Attach from Nextcloud” in the composer toolbar to upload large files. A share link is inserted automatically when you send.",
     );
   }
 
   return h(
     "div",
-    {
-      style: {
-        padding: "8px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px",
-      },
-    },
-    pendingAttachments.map((a) =>
+    { style: { padding: "8px", display: "flex", flexDirection: "column", gap: "6px" } },
+    pendingAttachments.map(a =>
       h(
         "div",
         {
@@ -192,13 +326,7 @@ function CloudAttachmentsPanel() {
         },
         h(
           "div",
-          {
-            style: {
-              fontSize: "13px",
-              fontWeight: 500,
-              wordBreak: "break-all",
-            },
-          },
+          { style: { fontSize: "13px", fontWeight: 500, wordBreak: "break-all" } },
           a.name,
         ),
         h(
@@ -215,13 +343,7 @@ function CloudAttachmentsPanel() {
         a.status === "ready" && a.password
           ? h(
               "div",
-              {
-                style: {
-                  fontSize: "11px",
-                  color: "#666",
-                  fontFamily: "monospace",
-                },
-              },
+              { style: { fontSize: "11px", color: "#666", fontFamily: "monospace" } },
               `password: ${a.password}`,
             )
           : null,
@@ -235,10 +357,7 @@ function CloudAttachmentsPanel() {
                   href: a.url,
                   target: "_blank",
                   rel: "noopener noreferrer",
-                  style: {
-                    fontSize: "11px",
-                    color: "var(--color-primary, #3b82f6)",
-                  },
+                  style: { fontSize: "11px", color: "var(--color-primary, #3b82f6)" },
                 },
                 "open",
               )
@@ -344,7 +463,7 @@ export function activate(api) {
 
   disposables.push(
     api.hooks.onTransformOutgoingEmail((email) => {
-      const ready = pendingAttachments.filter((a) => a.status === "ready");
+      const ready = pendingAttachments.filter(a => a.status === "ready");
       if (ready.length === 0) return;
 
       const next = {
@@ -353,9 +472,7 @@ export function activate(api) {
         textBody: (email.textBody || "") + buildTextBlock(ready),
       };
 
-      pendingAttachments = pendingAttachments.filter(
-        (a) => a.status !== "ready",
-      );
+      pendingAttachments = pendingAttachments.filter(a => a.status !== "ready");
       notify();
 
       return next;
@@ -366,7 +483,7 @@ export function activate(api) {
 
   return {
     dispose: () => {
-      disposables.forEach((d) => d.dispose());
+      disposables.forEach(d => d.dispose());
       pendingAttachments = [];
       listeners.clear();
       pluginApi = null;
