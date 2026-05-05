@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/index.js --bundle --format=esm --outfile=dist/index.js",
-    "dev": "esbuild src/index.js --bundle --format=esm --outfile=dist/index.js --watch"
+    "build": "esbuild src/index.js --bundle --format=esm --charset=utf8 --outfile=dist/index.js",
+    "dev": "esbuild src/index.js --bundle --format=esm --charset=utf8 --outfile=dist/index.js --watch"
   },
   "devDependencies": {
     "esbuild": "^0.24.0"
