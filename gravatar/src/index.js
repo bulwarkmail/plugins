@@ -1,99 +1,174 @@
 /**
- * Gravatar Avatars Plugin — resolves Gravatar profile pictures for email contacts.
+ * Gravatar Avatars Plugin
  *
- * Demonstrates:
- * - onAvatarResolve transform hook (avatar resolution pipeline)
- * - Web Crypto API for SHA-256 hashing (no external dependencies)
- * - In-memory caching with session-level storage fallback
- * - Configurable Gravatar parameters via plugin settings
+ * Resolves Gravatar profile pictures via the onAvatarResolve transform hook.
+ *
+ * Highlights:
+ * - SHA-256 hashing through Web Crypto API (no dependencies)
+ * - Persistent cache with separate hit / miss TTLs so freshly created
+ *   profiles are eventually picked up while misses don't keep retrying
+ * - In-flight request coalescing — concurrent avatar renders for the same
+ *   address share a single HEAD request
+ * - Aborts the existence check well before the 5s hook timeout
+ * - Defers to higher-priority avatar plugins instead of overriding them
  */
 
-// ─── SHA-256 via Web Crypto API ───────────────────────────────
-// Gravatar uses SHA-256 of the lowercased, trimmed email address.
+const CACHE_KEY = "cache.v1";
+const CACHE_TTL_HIT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CACHE_TTL_MISS_MS = 24 * 60 * 60 * 1000; // 1 day
+const HEAD_TIMEOUT_MS = 3000;
+const MAX_CACHE_ENTRIES = 500;
 
-async function sha256hex(str) {
-  const encoded = new TextEncoder().encode(str);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+const VALID_RATINGS = new Set(["g", "pg", "r", "x"]);
+const VALID_DEFAULTS = new Set([
+  "404", "mp", "identicon", "monsterid", "wavatar", "retro", "robohash",
+]);
+
+function normalizeEmail(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().toLowerCase();
+  const at = trimmed.indexOf("@");
+  if (at <= 0 || at === trimmed.length - 1) return null;
+  return trimmed;
 }
 
-// ─── Gravatar URL builder ──────────────────────────────────────
+async function sha256Hex(input) {
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const view = new Uint8Array(digest);
+  let out = "";
+  for (let i = 0; i < view.length; i++) {
+    out += view[i].toString(16).padStart(2, "0");
+  }
+  return out;
+}
 
-function gravatarUrl(hash, { size, rating, defaultStyle }) {
+function buildAvatarUrl(hash, { size, rating, defaultStyle }) {
   const params = new URLSearchParams({
     s: String(size),
     r: rating,
     d: defaultStyle,
   });
-  return `https://gravatar.com/avatar/${hash}?${params}`;
+  return `https://gravatar.com/avatar/${hash}?${params.toString()}`;
 }
 
-// ─── Existence check for 404 mode ─────────────────────────────
-// When defaultStyle is "404", Gravatar returns HTTP 404 for unknown addresses.
-// We do a HEAD request so the browser never tries to render a broken image.
+function buildExistenceUrl(hash) {
+  // d=404 forces a real 404 when no profile exists. s=1 keeps the
+  // upstream response payload tiny.
+  return `https://gravatar.com/avatar/${hash}?s=1&d=404`;
+}
 
-async function gravatarExists(url) {
+async function gravatarExists(hash) {
   try {
-    // Append &d=404 to force a 404 response if no profile exists
-    const checkUrl = url.includes("?") ? `${url}&d=404` : `${url}?d=404`;
-    const res = await fetch(checkUrl, { method: "HEAD" });
+    const res = await fetch(buildExistenceUrl(hash), {
+      method: "HEAD",
+      signal: AbortSignal.timeout(HEAD_TIMEOUT_MS),
+    });
     return res.ok;
   } catch {
     return false;
   }
 }
 
-// ─── Plugin Activation ────────────────────────────────────────
+function readSettings(raw) {
+  const rawSize = typeof raw.size === "number" ? raw.size : 160;
+  const size = Math.min(512, Math.max(16, Math.round(rawSize)));
+  const rating = VALID_RATINGS.has(raw.rating) ? raw.rating : "g";
+  const defaultStyle = VALID_DEFAULTS.has(raw.defaultStyle)
+    ? raw.defaultStyle
+    : "404";
+  return { size, rating, defaultStyle };
+}
+
+function loadCache(api) {
+  const stored = api.storage.get(CACHE_KEY);
+  const cache = new Map();
+  if (!stored || typeof stored !== "object") return cache;
+  const now = Date.now();
+  for (const [email, entry] of Object.entries(stored)) {
+    if (
+      entry &&
+      typeof entry === "object" &&
+      typeof entry.expires === "number" &&
+      entry.expires > now &&
+      (entry.url === null || typeof entry.url === "string")
+    ) {
+      cache.set(email, entry);
+    }
+  }
+  return cache;
+}
+
+function trimCache(cache) {
+  if (cache.size <= MAX_CACHE_ENTRIES) return;
+  const sorted = [...cache.entries()].sort((a, b) => a[1].expires - b[1].expires);
+  const dropCount = sorted.length - MAX_CACHE_ENTRIES;
+  for (let i = 0; i < dropCount; i++) cache.delete(sorted[i][0]);
+}
 
 export function activate(api) {
-  const settings = api.plugin.settings;
-  const size = typeof settings.size === "number" ? settings.size : 160;
-  const rating = settings.rating || "g";
-  const defaultStyle = settings.defaultStyle || "404";
+  const settings = readSettings(api.plugin.settings || {});
+  const { size, rating, defaultStyle } = settings;
 
-  // Per-session in-memory cache: email → resolved URL (string) or null (no Gravatar)
-  const cache = new Map();
+  const cache = loadCache(api);
+  const inFlight = new Map();
+  let disposed = false;
 
-  const avatarResolve = api.hooks.onAvatarResolve(
-    async (currentUrl, context) => {
-      const email = context?.email;
-      if (!email) return undefined;
+  function rememberAndPersist(email, url) {
+    if (disposed) return;
+    const ttl = url ? CACHE_TTL_HIT_MS : CACHE_TTL_MISS_MS;
+    cache.set(email, { url, expires: Date.now() + ttl });
+    trimCache(cache);
+    api.storage.set(CACHE_KEY, Object.fromEntries(cache));
+  }
 
-      const normalized = email.trim().toLowerCase();
+  async function resolveFor(email) {
+    const cached = cache.get(email);
+    if (cached && cached.expires > Date.now()) {
+      return cached.url;
+    }
 
-      // Return cached result (including explicit null = "no Gravatar for this address")
-      if (cache.has(normalized)) {
-        return cache.get(normalized) ?? undefined;
+    const existing = inFlight.get(email);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      try {
+        const hash = await sha256Hex(email);
+        const url = buildAvatarUrl(hash, settings);
+        const resolved =
+          defaultStyle === "404"
+            ? (await gravatarExists(hash)) ? url : null
+            : url;
+        rememberAndPersist(email, resolved);
+        return resolved;
+      } finally {
+        inFlight.delete(email);
       }
+    })();
 
-      const hash = await sha256hex(normalized);
-      const url = gravatarUrl(hash, { size, rating, defaultStyle });
+    inFlight.set(email, promise);
+    return promise;
+  }
 
-      if (defaultStyle === "404") {
-        // Only use the URL if the profile actually exists
-        const exists = await gravatarExists(url);
-        if (!exists) {
-          cache.set(normalized, null);
-          return undefined;
-        }
-      }
-
-      cache.set(normalized, url);
-      return url;
-    },
-  );
+  const sub = api.hooks.onAvatarResolve(async (currentUrl, ctx) => {
+    // Defer to any plugin that already produced an avatar.
+    if (currentUrl) return undefined;
+    const email = normalizeEmail(ctx?.email);
+    if (!email) return undefined;
+    const url = await resolveFor(email);
+    return url ?? undefined;
+  });
 
   api.log.info(
-    `Gravatar plugin activated (size=${size}, rating=${rating}, default=${defaultStyle})`,
+    `Gravatar activated (size=${size}, rating=${rating}, default=${defaultStyle}, cached=${cache.size})`,
   );
 
   return {
     dispose: () => {
-      avatarResolve.dispose();
+      disposed = true;
+      sub.dispose();
       cache.clear();
-      api.log.info("Gravatar plugin deactivated");
+      inFlight.clear();
     },
   };
 }

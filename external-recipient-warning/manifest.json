@@ -1,0 +1,58 @@
+{
+  "id": "external-recipient-warning",
+  "name": "External Recipient Warning",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Warns before sending email to recipients outside your safe-domain list, and flags incoming messages from external senders with a banner. Admins can pre-populate organisation-wide safe domains.",
+  "type": "hook",
+  "permissions": ["email:read", "email:send", "ui:email-banner", "admin:config"],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "configSchema": {
+    "safeDomains": {
+      "type": "string",
+      "label": "Safe domains (organisation-wide)",
+      "description": "Comma- or newline-separated list of internal/safe domains. Applies to every user. Subdomains match automatically (example.com also covers eu.example.com).",
+      "placeholder": "example.com, partner.com",
+      "default": ""
+    }
+  },
+  "settingsSchema": {
+    "safeDomainsCsv": {
+      "type": "string",
+      "label": "Additional safe domains",
+      "description": "Comma- or newline-separated list of domains you trust (e.g. acme.com, partner.io). Subdomains are matched automatically.",
+      "default": ""
+    },
+    "treatIdentityDomainAsSafe": {
+      "type": "boolean",
+      "label": "Trust your sending identity's domain",
+      "description": "If enabled, the domain of the From address is treated as safe automatically.",
+      "default": true
+    },
+    "warnOnCcBcc": {
+      "type": "boolean",
+      "label": "Warn about external Cc / Bcc",
+      "description": "If disabled, only To recipients trigger the warning.",
+      "default": true
+    },
+    "warnOnIncoming": {
+      "type": "boolean",
+      "label": "Banner on incoming external mail",
+      "description": "Show a warning banner when an opened message has a sender outside your safe-domain list.",
+      "default": true
+    },
+    "warnOnAuthFailure": {
+      "type": "boolean",
+      "label": "Banner on failed authentication (SPF, DKIM, DMARC, reverse DNS)",
+      "description": "Also show the banner when the message's Authentication-Results header reports a failure — even if the sender's domain is on your safe list. Strong signal of spoofing.",
+      "default": true
+    },
+    "notifyOnIncomingExternal": {
+      "type": "boolean",
+      "label": "Toast when external mail arrives",
+      "description": "Show a toast notification each time a new email arrives from an external sender.",
+      "default": false
+    }
+  }
+}

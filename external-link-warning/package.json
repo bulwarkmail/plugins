@@ -1,0 +1,13 @@
+{
+  "name": "bulwark-plugin-external-link-warning",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=esm --outfile=dist/index.js",
+    "dev": "esbuild src/index.js --bundle --format=esm --outfile=dist/index.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

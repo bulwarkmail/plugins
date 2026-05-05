@@ -1,0 +1,40 @@
+{
+  "id": "external-link-warning",
+  "name": "External Link Warning",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Warns before opening external links to unknown domains. Admins can pre-populate a trusted domain list.",
+  "type": "hook",
+  "permissions": ["admin:config"],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "configSchema": {
+    "trustedDomains": {
+      "type": "string",
+      "label": "Trusted domains (organisation-wide)",
+      "description": "Comma- or newline-separated list of trusted domains. Applies to every user. Subdomains match automatically (example.com also trusts docs.example.com).",
+      "placeholder": "example.com, github.com, slack.com",
+      "default": ""
+    }
+  },
+  "settingsSchema": {
+    "trustedDomainsCsv": {
+      "type": "string",
+      "label": "Trusted domains",
+      "description": "Comma- or newline-separated list of trusted domains (e.g. example.com, github.com). Subdomains are matched automatically.",
+      "default": ""
+    },
+    "warnOnSameDomainEmail": {
+      "type": "boolean",
+      "label": "Warn even when sender domain matches",
+      "description": "If enabled, warn even when the link domain matches the sender's email domain.",
+      "default": false
+    },
+    "rememberLocalChoices": {
+      "type": "boolean",
+      "label": "Allow “Always trust” checkbox",
+      "description": "When enabled, the warning dialog includes a checkbox that permanently trusts the domain on this device.",
+      "default": true
+    }
+  }
+}

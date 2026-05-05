@@ -1,9 +1,9 @@
 {
   "id": "gravatar",
   "name": "Gravatar Avatars",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Bulwark Mail Community",
-  "description": "Shows Gravatar profile pictures for email contacts using the Gravatar API",
+  "description": "Resolves Gravatar profile pictures for email contacts via the avatar transform hook",
   "type": "hook",
   "permissions": ["email:read"],
   "entrypoint": "index.js",
@@ -27,7 +27,7 @@
     "defaultStyle": {
       "type": "select",
       "label": "Fallback style",
-      "description": "Image style to use when an email has no Gravatar profile. '404' skips Gravatar for that address.",
+      "description": "Image style when an email has no Gravatar profile. '404' lets the host show its own fallback (initials / favicon).",
       "options": ["404", "mp", "identicon", "monsterid", "wavatar", "retro", "robohash"],
       "default": "404"
     }
