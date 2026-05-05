@@ -12,5 +12,7 @@
     "http:post"
   ],
   "entrypoint": "index.js",
-  "minAppVersion": "1.0.0"
+  "minAppVersion": "1.0.0",
+  "icon": "media/icon.svg",
+  "banner": "media/banner.svg"
 }

@@ -1,0 +1,47 @@
+{
+  "id": "nextcloud-attachments",
+  "name": "Nextcloud Attachments",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Attach large files via a Nextcloud share link instead of as binary attachments. Files are uploaded to a configured Nextcloud server and a public share link is inserted into the outgoing message at send time.",
+  "type": "ui-extension",
+  "permissions": [
+    "email:write",
+    "email:send",
+    "ui:composer-toolbar",
+    "ui:composer-sidebar",
+    "http:post"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "settingsSchema": {
+    "sizeThreshold": {
+      "type": "number",
+      "label": "Cloud-attach threshold (bytes)",
+      "description": "Files above this size trigger a hint suggesting Nextcloud cloud attach. Default 10 MB.",
+      "default": 10485760,
+      "min": 0,
+      "max": 1073741824
+    },
+    "nudgeOnLargeUpload": {
+      "type": "boolean",
+      "label": "Suggest cloud attach for large files",
+      "description": "Show a toast hint when a regular attachment exceeds the threshold above.",
+      "default": true
+    },
+    "expiryDays": {
+      "type": "number",
+      "label": "Share expiry (days)",
+      "description": "Number of days the public share link stays valid. 0 disables expiry.",
+      "default": 14,
+      "min": 0,
+      "max": 365
+    },
+    "passwordProtect": {
+      "type": "boolean",
+      "label": "Password-protect share links",
+      "description": "Generate a random password for each share. The password is shown next to the link in the email body so the recipient can copy it.",
+      "default": false
+    }
+  }
+}

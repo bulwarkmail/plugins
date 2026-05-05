@@ -8,6 +8,8 @@
   "permissions": ["admin:config"],
   "entrypoint": "index.js",
   "minAppVersion": "1.0.0",
+  "icon": "media/icon.svg",
+  "banner": "media/banner.svg",
   "configSchema": {
     "trustedDomains": {
       "type": "string",

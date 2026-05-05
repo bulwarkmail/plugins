@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675">
+  <defs>
+    <filter id="grain-jitsi-b" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" stitchTiles="stitch"/>
+      <feColorMatrix values="0 0 0 0 1   0 0 0 0 1   0 0 0 0 1   0 0 0 0.16 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <linearGradient id="bg-jitsi-b" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2680E8"/>
+      <stop offset="1" stop-color="#0E3F8C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg-jitsi-b)"/>
+  <rect width="1200" height="675" fill="white" filter="url(#grain-jitsi-b)"/>
+  <g transform="translate(120,200) scale(11.25)" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m22 8-6 4 6 4V8Z"/>
+    <rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>
+  </g>
+  <text x="460" y="325" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="60" font-weight="700" fill="white" dominant-baseline="middle">Jitsi Meet</text>
+  <text x="460" y="395" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="26" font-weight="400" fill="white" fill-opacity="0.82" dominant-baseline="middle">One-click video meetings inside calendar events</text>
+</svg>

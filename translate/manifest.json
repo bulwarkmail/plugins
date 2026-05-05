@@ -1,0 +1,43 @@
+{
+  "id": "translate",
+  "name": "Translate",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Translate received emails into your preferred language using a free public translation API (MyMemory by default, LibreTranslate optional).",
+  "type": "ui-extension",
+  "permissions": ["email:read", "ui:email-banner", "http:post"],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "settingsSchema": {
+    "targetLanguage": {
+      "type": "select",
+      "label": "Translate into",
+      "description": "BCP-47 code of the language to translate received emails into.",
+      "default": "en",
+      "options": [
+        "en", "de", "fr", "es", "it", "pt", "nl", "pl", "ru", "uk", "tr", "sv", "no", "da", "fi", "cs", "el", "ro", "hu", "ja", "ko", "zh", "ar", "he", "hi"
+      ]
+    },
+    "provider": {
+      "type": "select",
+      "label": "Translation provider",
+      "description": "MyMemory works without configuration. LibreTranslate requires the host to be configured with LIBRETRANSLATE_URL (and optionally LIBRETRANSLATE_API_KEY).",
+      "default": "mymemory",
+      "options": ["mymemory", "libretranslate"]
+    },
+    "autoTranslateForeign": {
+      "type": "boolean",
+      "label": "Auto-translate foreign emails",
+      "description": "When enabled, the banner translates the email automatically as soon as it's opened (only if the body language differs from your target language).",
+      "default": false
+    },
+    "maxChars": {
+      "type": "number",
+      "label": "Maximum characters to translate",
+      "description": "Long emails are truncated before being sent to the translator. Lower this value to stay inside MyMemory's free tier (5000 chars/day per IP).",
+      "default": 4000,
+      "min": 200,
+      "max": 5000
+    }
+  }
+}

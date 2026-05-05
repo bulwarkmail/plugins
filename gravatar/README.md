@@ -30,6 +30,23 @@ host's avatar pipeline via the `onAvatarResolve` transform hook.
 - `api.plugin.settings` — schema-driven user configuration
 - Web Crypto + `AbortSignal.timeout` for safe outbound requests
 
+## Marketplace media
+
+The manifest declares three optional image paths (`icon`, `banner`,
+`screenshots`) that the extension directory ingests from this git repo —
+these images do **not** ship in the runtime zip. Drop the corresponding
+files into `media/`:
+
+| Field         | Path                       | Recommended size      | Cap     |
+| ------------- | -------------------------- | --------------------- | ------- |
+| `icon`        | `media/icon.png`           | 256×256 (square)      | 256 KB  |
+| `banner`      | `media/banner.png`         | 1200×675 (16:9)       | 512 KB  |
+| `screenshots` | `media/screenshot-N.png`   | 1280×800              | 512 KB each, 6 max |
+
+Allowed formats: PNG, JPG, WebP, SVG. The directory's approval pipeline
+fetches these straight from the GitHub source at the submitted ref —
+missing files surface as warnings on approval but don't block the release.
+
 ## Build & Install
 
 ```bash

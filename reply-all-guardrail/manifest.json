@@ -1,0 +1,43 @@
+{
+  "id": "reply-all-guardrail",
+  "name": "Reply-All Guardrail",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Asks for confirmation before reply-all (and optionally before any send) when the recipient count crosses a threshold. Catches accidental fan-outs on large threads.",
+  "type": "hook",
+  "permissions": ["email:read", "email:send", "admin:config"],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.0.0",
+  "configSchema": {
+    "forceThreshold": {
+      "type": "number",
+      "label": "Organisation-wide threshold",
+      "description": "Minimum recipient count enforced for every user. The smaller of this value and the per-user threshold wins, so admins can tighten the floor without locking out per-user tuning. Set to 1 to prompt on every send. Set to 0 (or leave blank) to disable the floor entirely.",
+      "default": 0,
+      "min": 0,
+      "max": 1000
+    }
+  },
+  "settingsSchema": {
+    "threshold": {
+      "type": "number",
+      "label": "Warn when recipient count reaches",
+      "description": "A confirmation dialog appears when reply-all (or send, if enabled) would deliver to at least this many recipients. Set to 1 to prompt on every reply-all/send.",
+      "default": 5,
+      "min": 1,
+      "max": 1000
+    },
+    "warnOnSend": {
+      "type": "boolean",
+      "label": "Also warn at send time",
+      "description": "Apply the same threshold to every outgoing email, not only reply-all. Catches manual compositions and forwards that fan out unintentionally.",
+      "default": true
+    },
+    "excludeSelf": {
+      "type": "boolean",
+      "label": "Exclude my own address from the count",
+      "description": "Addresses you have sent from in the past are not counted toward the threshold. Lets the dialog reflect the number of other people who would receive the message.",
+      "default": true
+    }
+  }
+}
