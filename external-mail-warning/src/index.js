@@ -1,5 +1,5 @@
 /**
- * External Recipient Warning - guards the inbox in two directions:
+ * External Mail Warning - guards the inbox in two directions:
  *
  *   1. Outgoing  → intercepts the send and asks the user to confirm before
  *                  delivering to addresses outside the safe-domain list.
@@ -9,7 +9,7 @@
  *
  * Safe-domain sources (merged, de-duplicated):
  *   1. Admin-managed list (api.admin.getConfig('safeDomains'))
- *      - settable via /api/admin/plugins/external-recipient-warning/config
+ *      - settable via /api/admin/plugins/external-mail-warning/config
  *   2. Per-user list from plugin settings (safeDomainsCsv)
  *   3. Sender identity's own domain (outgoing only), when
  *      treatIdentityDomainAsSafe is enabled
@@ -28,7 +28,7 @@
  * again.
  */
 
-const STYLE_ID = "plugin-external-recipient-warning-style";
+const STYLE_ID = "plugin-external-mail-warning-style";
 const HOOK_TIMEOUT_BUDGET_MS = 4500;
 
 const STYLES = `
@@ -821,7 +821,7 @@ export function activate(api) {
     );
   }
 
-  api.log.info("External Recipient Warning plugin activated");
+  api.log.info("External Mail Warning plugin activated");
 
   return {
     dispose: () => {

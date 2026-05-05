@@ -1,5 +1,5 @@
 {
-  "name": "bulwark-plugin-external-recipient-warning",
+  "name": "bulwark-plugin-external-mail-warning",
   "version": "1.1.0",
   "private": true,
   "type": "module",

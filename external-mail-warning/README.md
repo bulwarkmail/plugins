@@ -1,4 +1,4 @@
-# External Recipient Warning
+# External Mail Warning
 
 Intercepts outgoing email and asks the user to confirm before delivering to
 addresses outside the safe-domain list. Useful as a guardrail against
@@ -11,7 +11,7 @@ Three sources are merged (de-duplicated):
 1. **Admin-managed list** — written to plugin admin config under
    `safeDomains`. Set via:
    ```
-   PUT /api/admin/plugins/external-recipient-warning/config
+   PUT /api/admin/plugins/external-mail-warning/config
    { "key": "safeDomains", "value": "example.com, partner.com" }
    ```
    Accepts a comma/newline-separated string or a JSON array.
@@ -61,10 +61,10 @@ can simply click Send again.
 npm install
 npm run build
 cp manifest.json dist/
-cd dist && zip -r ../external-recipient-warning.zip manifest.json index.js
+cd dist && zip -r ../external-mail-warning.zip manifest.json index.js
 ```
 
-Upload `external-recipient-warning.zip` via Admin → Plugins.
+Upload `external-mail-warning.zip` via Admin → Plugins.
 
 ## Notes
 
