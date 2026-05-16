@@ -177,7 +177,7 @@ const STYLES = `
 /* ─── Incoming-mail banner ─────────────────────────────── */
 .erw-banner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   padding: 10px 24px;
   margin: 0;
@@ -205,6 +205,10 @@ const STYLES = `
 .erw-banner-content {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-self: stretch;
 }
 .erw-banner-eyebrow {
   font-size: 10px;

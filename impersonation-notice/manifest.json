@@ -1,0 +1,48 @@
+{
+  "id": "impersonation-notice",
+  "name": "Impersonation Notice",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Shows a persistent top-of-app banner when the active session is a Stalwart master-user impersonation (username contains '%'), with a configurable 'Return to platform' button. Detection is automatic; admins configure the platform return URL and banner styling.",
+  "type": "hook",
+  "permissions": [
+    "auth:observe",
+    "ui:app-top-banner",
+    "ui:admin-page",
+    "admin:config"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.6.7",
+  "configSchema": {
+    "returnUrl": {
+      "type": "string",
+      "label": "Platform return URL",
+      "description": "URL the 'Back to platform' button opens. Leave blank to hide the button. Example: https://platform.example.com/admin",
+      "default": ""
+    },
+    "returnLabel": {
+      "type": "string",
+      "label": "Button label",
+      "description": "Text shown on the return-to-platform button.",
+      "default": "Back to platform"
+    },
+    "bannerBackground": {
+      "type": "string",
+      "label": "Banner background colour",
+      "description": "Any CSS colour. Used as the strip background. Defaults to a forest green matching common platform-admin UIs.",
+      "default": "#1f4e3d"
+    },
+    "bannerForeground": {
+      "type": "string",
+      "label": "Banner text colour",
+      "description": "Any CSS colour. Used for the strip text and icon.",
+      "default": "#ffffff"
+    },
+    "actorRoleLabel": {
+      "type": "string",
+      "label": "Actor role label",
+      "description": "Label appended after the mailbox in the banner copy. Example: 'as Platform-Admin' renders 'You are viewing alice@example.test as Platform-Admin'.",
+      "default": "as Platform Admin"
+    }
+  }
+}
