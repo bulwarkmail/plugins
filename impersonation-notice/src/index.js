@@ -129,7 +129,7 @@ function getReact() {
 const DEFAULT_CONFIG = {
   returnUrl: '',
   returnLabel: 'Back to platform',
-  bannerBackground: '#1f4e3d',
+  bannerBackground: '#3b82f6',
   bannerForeground: '#ffffff',
   actorRoleLabel: 'as Platform Admin',
 };
@@ -202,6 +202,32 @@ function makeBanner(api, configCache) {
     }, []);
 
     const mailbox = parseImpersonatedMailbox(props.username);
+
+    // Drop the impersonation session as soon as the tab is closed or
+    // refreshed. We use keepalive so the DELETE survives the unload.
+    // Side effect: a refresh also drops the session — the admin has to
+    // re-click "Open Webmail" from the platform. That's the right
+    // behaviour for a short-lived support handoff; persistent identity
+    // is what password login is for.
+    useEffect(() => {
+      if (!mailbox) return;
+      const drop = () => {
+        try {
+          fetch('/api/auth/session?all=true', {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            keepalive: true,
+          });
+        } catch { /* ignore */ }
+      };
+      window.addEventListener('pagehide', drop);
+      window.addEventListener('beforeunload', drop);
+      return () => {
+        window.removeEventListener('pagehide', drop);
+        window.removeEventListener('beforeunload', drop);
+      };
+    }, [mailbox]);
+
     if (!mailbox) return null;
 
     async function handleReturn() {
@@ -403,7 +429,7 @@ function makeAdminPage(api, configCache) {
         h('div', { className: 'imp-admin-field' },
           h('label', null, api.i18n.t('colorsLabel')),
           h('div', { className: 'imp-admin-color-row' },
-            h('input', { type: 'color', value: cfg.bannerBackground || '#1f4e3d', onChange: (e) => update('bannerBackground', e.target.value) }),
+            h('input', { type: 'color', value: cfg.bannerBackground || '#3b82f6', onChange: (e) => update('bannerBackground', e.target.value) }),
             h('span', { className: 'imp-admin-hint' }, api.i18n.t('background')),
             h('input', { type: 'color', value: cfg.bannerForeground || '#ffffff', onChange: (e) => update('bannerForeground', e.target.value) }),
             h('span', { className: 'imp-admin-hint' }, api.i18n.t('foreground')),
