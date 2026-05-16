@@ -20,13 +20,13 @@ The cryptographic configuration (signing secret, master credentials) lives in th
 
 ## Admin settings
 
-| Key | Default | Notes |
-|-----|---------|-------|
-| `returnUrl` | _empty_ | Where "Back to platform" navigates after clearing the session. Empty hides the button. |
-| `returnLabel` | `Back to platform` | Button label. |
-| `bannerBackground` | `#1f4e3d` | Strip background colour. |
-| `bannerForeground` | `#ffffff` | Strip text colour. |
-| `actorRoleLabel` | `as Platform Admin` | Suffix appended to the mailbox in the banner copy. |
+| Key                | Default             | Notes                                                                                  |
+| ------------------ | ------------------- | -------------------------------------------------------------------------------------- |
+| `returnUrl`        | _empty_             | Where "Back to platform" navigates after clearing the session. Empty hides the button. |
+| `returnLabel`      | `Back to platform`  | Button label.                                                                          |
+| `bannerBackground` | `#1f4e3d`           | Strip background colour.                                                               |
+| `bannerForeground` | `#ffffff`           | Strip text colour.                                                                     |
+| `actorRoleLabel`   | `as Platform Admin` | Suffix appended to the mailbox in the banner copy.                                     |
 
 All settings are organisation-wide (`api.admin.setConfig`). Per-user override is intentionally not exposed.
 
