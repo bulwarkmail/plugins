@@ -130,9 +130,34 @@ const DEFAULT_CONFIG = {
   returnUrl: '',
   returnLabel: 'Back to platform',
   bannerBackground: '#3b82f6',
+  bannerBackgroundDark: '#1e40af',
   bannerForeground: '#ffffff',
   actorRoleLabel: 'as Platform Admin',
 };
+
+function detectDarkMode() {
+  if (typeof document === 'undefined') return false;
+  return document.documentElement.classList.contains('dark');
+}
+
+// Subscribe to dark-mode toggles via MutationObserver on <html>'s class
+// attribute. Returns an unsubscribe function. fn() is called with the
+// current isDark boolean each time it changes.
+function subscribeDarkMode(fn) {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
+    return () => {};
+  }
+  let last = detectDarkMode();
+  const observer = new MutationObserver(() => {
+    const now = detectDarkMode();
+    if (now !== last) {
+      last = now;
+      fn(now);
+    }
+  });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  return () => observer.disconnect();
+}
 
 // ─── Cached admin config (synchronous-readable) ─────────────────
 //
@@ -195,11 +220,14 @@ function makeBanner(api, configCache) {
 
     const [cfg, setCfg] = useState(configCache.get());
     const [busy, setBusy] = useState(false);
+    const [isDark, setIsDark] = useState(detectDarkMode);
 
     useEffect(() => {
       configCache.load();
       return configCache.subscribe(() => setCfg({ ...configCache.get() }));
     }, []);
+
+    useEffect(() => subscribeDarkMode(setIsDark), []);
 
     const mailbox = parseImpersonatedMailbox(props.username);
 
@@ -284,13 +312,17 @@ function makeBanner(api, configCache) {
         )
       : null;
 
+    const bg = isDark
+      ? (cfg.bannerBackgroundDark || cfg.bannerBackground)
+      : cfg.bannerBackground;
+
     return React.createElement(
       'div',
       {
         className: 'imp-notice-banner',
         role: 'status',
         'aria-live': 'polite',
-        style: { background: cfg.bannerBackground, color: cfg.bannerForeground },
+        style: { background: bg, color: cfg.bannerForeground },
       },
       left,
       button,
@@ -365,23 +397,29 @@ function makeAdminPage(api, configCache) {
         : h('span', { className: 'imp-admin-status-pill imp-admin-status-off' }, '… ', api.i18n.t('statusUnknown'));
 
     const previewMailbox = 'alice@example.test';
-    const previewBanner = h(
-      'div',
-      {
-        className: 'imp-notice-banner',
-        style: { background: cfg.bannerBackground, color: cfg.bannerForeground },
-      },
-      h('div', { className: 'imp-notice-banner-left' },
-        h('span', { className: 'imp-notice-banner-text' },
-          api.i18n.t('viewing'), ' ',
-          h('strong', null, previewMailbox),
-          cfg.actorRoleLabel ? ' ' + cfg.actorRoleLabel : '',
+    function buildPreviewBanner(bgColor) {
+      return h(
+        'div',
+        {
+          className: 'imp-notice-banner',
+          style: { background: bgColor, color: cfg.bannerForeground },
+        },
+        h('div', { className: 'imp-notice-banner-left' },
+          h('span', { className: 'imp-notice-banner-text' },
+            api.i18n.t('viewing'), ' ',
+            h('strong', null, previewMailbox),
+            cfg.actorRoleLabel ? ' ' + cfg.actorRoleLabel : '',
+          ),
         ),
-      ),
-      (cfg.returnUrl || '').trim()
-        ? h('button', { className: 'imp-notice-banner-button', type: 'button', tabIndex: -1 },
-            '← ', cfg.returnLabel || api.i18n.t('back'))
-        : null,
+        (cfg.returnUrl || '').trim()
+          ? h('button', { className: 'imp-notice-banner-button', type: 'button', tabIndex: -1 },
+              '← ', cfg.returnLabel || api.i18n.t('back'))
+          : null,
+      );
+    }
+    const previewBanner = h('div', null,
+      buildPreviewBanner(cfg.bannerBackground || '#3b82f6'),
+      buildPreviewBanner(cfg.bannerBackgroundDark || '#1e40af'),
     );
 
     return h(
@@ -430,7 +468,9 @@ function makeAdminPage(api, configCache) {
           h('label', null, api.i18n.t('colorsLabel')),
           h('div', { className: 'imp-admin-color-row' },
             h('input', { type: 'color', value: cfg.bannerBackground || '#3b82f6', onChange: (e) => update('bannerBackground', e.target.value) }),
-            h('span', { className: 'imp-admin-hint' }, api.i18n.t('background')),
+            h('span', { className: 'imp-admin-hint' }, api.i18n.t('backgroundLight')),
+            h('input', { type: 'color', value: cfg.bannerBackgroundDark || '#1e40af', onChange: (e) => update('bannerBackgroundDark', e.target.value) }),
+            h('span', { className: 'imp-admin-hint' }, api.i18n.t('backgroundDark')),
             h('input', { type: 'color', value: cfg.bannerForeground || '#ffffff', onChange: (e) => update('bannerForeground', e.target.value) }),
             h('span', { className: 'imp-admin-hint' }, api.i18n.t('foreground')),
           ),
@@ -488,7 +528,8 @@ export function activate(api) {
     returnLabelLabel: 'Button label',
     actorRoleLabelLabel: 'Role suffix',
     colorsLabel: 'Colours',
-    background: 'background',
+    backgroundLight: 'light bg',
+    backgroundDark: 'dark bg',
     foreground: 'text',
     preview: 'Preview',
     save: 'Save changes',
@@ -514,7 +555,8 @@ export function activate(api) {
     returnLabelLabel: 'Button-Beschriftung',
     actorRoleLabelLabel: 'Rollen-Zusatz',
     colorsLabel: 'Farben',
-    background: 'Hintergrund',
+    backgroundLight: 'Hell-Hintergrund',
+    backgroundDark: 'Dunkel-Hintergrund',
     foreground: 'Text',
     preview: 'Vorschau',
     save: 'Speichern',
