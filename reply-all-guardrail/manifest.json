@@ -1,13 +1,13 @@
 {
   "id": "reply-all-guardrail",
   "name": "Reply-All Guardrail",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Bulwark Mail Community",
   "description": "Asks for confirmation before reply-all (and optionally before any send) when the recipient count crosses a threshold. Catches accidental fan-outs on large threads.",
   "type": "hook",
   "permissions": ["email:read", "email:send", "admin:config"],
   "entrypoint": "index.js",
-  "minAppVersion": "1.0.0",
+  "minAppVersion": "1.7.0",
   "configSchema": {
     "forceThreshold": {
       "type": "number",

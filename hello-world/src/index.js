@@ -1,51 +1,38 @@
 /**
- * Hello World Plugin — the simplest possible Bulwark Mail plugin.
+ * Hello World Plugin — minimal example using the sandboxed plugin contract.
  *
- * Demonstrates:
- * - activate() / deactivate() lifecycle
- * - Logging with api.log
- * - Subscribing to hooks
- * - Using storage
- * - Showing toast notifications
+ * Plugins now export three top-level fields:
+ *   - `slots`:   { [SlotName]: { component, shouldShow?, order? } } — React components
+ *                rendered inside the plugin's own slot iframe.
+ *   - `hooks`:   { [HookName]: handler } — handlers dispatched into the
+ *                background iframe via postMessage RPC.
+ *   - `activate(api)` — one-shot side effects (storage init, http calls,
+ *                       timers). Runs once in the background iframe.
+ *
+ * `api.storage`, `api.http`, `api.admin` and `api.toast` are async because
+ * every call crosses the postMessage boundary. `api.log` is local.
  */
 
-export function activate(api) {
-  api.log.info("Hello World plugin activated!");
+export async function activate(api) {
+  api.log.info('Hello World plugin activated!');
 
-  // Track how many times the plugin has been loaded
-  const count = (api.storage.get("activationCount") || 0) + 1;
-  api.storage.set("activationCount", count);
+  const previous = (await api.storage.get('activationCount')) || 0;
+  const next = previous + 1;
+  await api.storage.set('activationCount', next);
 
-  // Show a welcome toast on first activation
-  if (count === 1) {
-    api.toast.success("Hello World plugin installed successfully!");
+  if (next === 1) {
+    api.toast.success('Hello World plugin installed successfully!');
   }
-
-  // Log when the app is fully ready
-  const appReady = api.hooks.onAppReady(() => {
-    api.log.info("App is ready — Hello World is running");
-  });
-
-  // Log when an email is opened
-  const emailOpen = api.hooks.onEmailOpen((email) => {
-    api.log.info(`Email opened: "${email.subject}" from ${email.from}`);
-  });
-
-  // Log new email notifications
-  const newEmail = api.hooks.onNewEmailReceived((notification) => {
-    api.log.info("New email received:", notification);
-  });
-
-  return {
-    dispose: () => {
-      appReady.dispose();
-      emailOpen.dispose();
-      newEmail.dispose();
-      api.log.info("Hello World plugin deactivated");
-    },
-  };
 }
 
-export function deactivate() {
-  // Nothing extra to clean up
-}
+export const hooks = {
+  onAppReady() {
+    console.info('[hello-world] App is ready');
+  },
+  onEmailOpen(email) {
+    console.info('[hello-world] Email opened:', email?.subject, 'from', email?.from?.[0]?.email);
+  },
+  onNewEmailReceived(notification) {
+    console.info('[hello-world] New email received:', notification);
+  },
+};

@@ -1,11 +1,11 @@
 {
   "name": "bulwark-plugin-external-link-warning",
-  "version": "1.0.1",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/index.js --bundle --format=esm --outfile=dist/index.js",
-    "dev": "esbuild src/index.js --bundle --format=esm --outfile=dist/index.js --watch"
+    "build": "esbuild src/index.js --bundle --format=cjs --platform=neutral --outfile=dist/index.js --external:react --external:react-dom --external:react-dom/client --external:react/jsx-runtime --external:@plugin-host",
+    "dev": "esbuild src/index.js --bundle --format=cjs --platform=neutral --outfile=dist/index.js --external:react --external:react-dom --external:react-dom/client --external:react/jsx-runtime --external:@plugin-host --watch"
   },
   "devDependencies": {
     "esbuild": "^0.24.0"

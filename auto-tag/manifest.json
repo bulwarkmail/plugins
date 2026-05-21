@@ -1,13 +1,13 @@
 {
   "id": "auto-tag",
   "name": "Auto Tag",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Bulwark Mail Community",
   "description": "Automatically tags incoming emails based on configurable rules",
   "type": "hook",
   "permissions": ["email:read", "email:write"],
   "entrypoint": "index.js",
-  "minAppVersion": "1.0.0",
+  "minAppVersion": "1.7.0",
   "settingsSchema": {
     "tagNewsletter": {
       "type": "boolean",

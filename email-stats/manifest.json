@@ -1,13 +1,13 @@
 {
   "id": "email-stats",
   "name": "Email Stats",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Bulwark Mail Community",
   "description": "Sidebar widget showing email activity statistics",
   "type": "sidebar-app",
   "permissions": ["email:read", "ui:sidebar-widget"],
   "entrypoint": "index.js",
-  "minAppVersion": "1.0.0",
+  "minAppVersion": "1.7.0",
   "settingsSchema": {
     "trackOpens": {
       "type": "boolean",

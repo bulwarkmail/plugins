@@ -1,7 +1,7 @@
 {
   "id": "nextcloud-attachments",
   "name": "Nextcloud Attachments",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Bulwark Mail Community",
   "description": "Attach large files via a Nextcloud share link instead of as binary attachments. Each user authenticates with their own Nextcloud app password; files are uploaded over WebDAV and a public share link is appended to the outgoing message at send time.",
   "type": "ui-extension",
@@ -14,7 +14,7 @@
     "http:fetch"
   ],
   "entrypoint": "index.js",
-  "minAppVersion": "1.0.0",
+  "minAppVersion": "1.7.0",
   "httpOrigins": [
     "https://cloud.example.com"
   ],

@@ -1,270 +1,226 @@
 /**
- * Quick Notes Plugin — per-email sticky notes in the sidebar.
+ * Quick Notes Plugin — per-email sticky notes.
  *
- * Demonstrates:
- * - Sidebar widget with interactive React UI
- * - Email banner showing note indicators
- * - Combining hooks with UI components
- * - Using storage for data persistence
- * - React state management with useState/useEffect
- * - Number-type settings (maxNotes)
+ * v2 status: improved. Slot iframes now have full api access, so the sidebar
+ * widget is once again an interactive textarea: it reads notes via
+ * api.storage.get('notes') on mount (and whenever the open email changes),
+ * and persists edits via api.storage.set('notes', {...}) with a debounce.
+ * The background `onEmailOpen` hook refreshes its own in-memory cache so the
+ * email-banner shouldShow gate stays accurate.
  */
 
-// React is provided by the host app — access lazily to ensure externals are set
-function getReact() {
-  return globalThis.__PLUGIN_EXTERNALS__?.React;
-}
-const h = (...args) => getReact().createElement(...args);
-const useState = (...args) => getReact().useState(...args);
-const useEffect = (...args) => getReact().useEffect(...args);
-const useCallback = (...args) => getReact().useCallback(...args);
+const { createElement: h, useEffect, useState, useRef, useCallback } = require('react');
+const slotApi = require('@plugin-host');
 
-// Shared state between widget and hooks
-let currentEmailId = null;
 let pluginApi = null;
-const stateListeners = new Set();
+let notes = {}; // emailId → { text, updatedAt }
 
-function notifyStateChange() {
-  stateListeners.forEach((fn) => fn());
+// ─── Slot components ────────────────────────────────────────
+
+function NoteBanner() {
+  return h(
+    'div',
+    {
+      style: {
+        padding: '6px 12px',
+        background: '#eef2ff',
+        color: '#3730a3',
+        fontSize: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+      },
+    },
+    '📝',
+    h('span', null, 'This email has a note attached.'),
+  );
 }
 
-function getNotes() {
-  if (!pluginApi) return {};
-  return pluginApi.storage.get("notes") || {};
-}
+function NotesSidebar(props) {
+  const emailId = props?.email?.id || null;
+  const [text, setText] = useState('');
+  const [savedAt, setSavedAt] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const debounceRef = useRef(null);
+  const lastIdRef = useRef(null);
 
-function saveNote(emailId, text) {
-  if (!pluginApi) return;
-  const notes = getNotes();
-  const maxNotes = pluginApi.plugin.settings.maxNotes || 100;
-
-  if (text.trim()) {
-    notes[emailId] = {
-      text: text.trim(),
-      updatedAt: new Date().toISOString(),
-    };
-  } else {
-    delete notes[emailId];
-  }
-
-  // Enforce max notes limit — remove oldest
-  const entries = Object.entries(notes);
-  if (entries.length > maxNotes) {
-    entries.sort((a, b) => a[1].updatedAt.localeCompare(b[1].updatedAt));
-    const toRemove = entries.slice(0, entries.length - maxNotes);
-    for (const [key] of toRemove) {
-      delete notes[key];
-    }
-  }
-
-  pluginApi.storage.set("notes", notes);
-  notifyStateChange();
-}
-
-// ─── Sidebar Widget Component ──────────────────────────────
-
-function NotesWidget() {
-  const [noteText, setNoteText] = useState("");
-  const [emailId, setEmailId] = useState(currentEmailId);
-
+  // Load this email's note whenever the open email changes.
   useEffect(() => {
-    const update = () => {
-      setEmailId(currentEmailId);
-      if (currentEmailId) {
-        const notes = getNotes();
-        setNoteText(notes[currentEmailId]?.text || "");
+    if (!emailId) {
+      setText('');
+      setSavedAt(null);
+      setLoaded(true);
+      lastIdRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = (await slotApi.storage.get('notes')) || {};
+        if (cancelled) return;
+        const entry = (stored && typeof stored === 'object') ? stored[emailId] : null;
+        setText(entry?.text || '');
+        setSavedAt(entry?.updatedAt || null);
+      } catch (err) {
+        slotApi.log.warn('quick-notes: could not load notes', err);
+      } finally {
+        if (!cancelled) {
+          setLoaded(true);
+          lastIdRef.current = emailId;
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [emailId]);
+
+  const persist = useCallback(async (nextText) => {
+    if (!emailId) return;
+    try {
+      const stored = (await slotApi.storage.get('notes')) || {};
+      const map = (stored && typeof stored === 'object') ? { ...stored } : {};
+      const trimmed = nextText.trim();
+      const settings = slotApi.plugin?.settings || {};
+      const maxNotes = Number(settings.maxNotes) || 100;
+      if (!trimmed) {
+        delete map[emailId];
       } else {
-        setNoteText("");
+        map[emailId] = { text: nextText, updatedAt: new Date().toISOString() };
+        // Trim to maxNotes most-recent entries.
+        const ids = Object.keys(map);
+        if (ids.length > maxNotes) {
+          const sorted = ids
+            .map((id) => ({ id, t: map[id]?.updatedAt || '' }))
+            .sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0));
+          const drop = sorted.slice(0, ids.length - maxNotes);
+          for (const { id } of drop) delete map[id];
+        }
+      }
+      await slotApi.storage.set('notes', map);
+      setSavedAt(map[emailId]?.updatedAt || null);
+    } catch (err) {
+      slotApi.log.warn('quick-notes: save failed', err);
+    }
+  }, [emailId]);
+
+  const onChange = useCallback((ev) => {
+    const next = ev.target.value;
+    setText(next);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { void persist(next); }, 500);
+  }, [persist]);
+
+  // Flush pending edit when the open email changes or the slot unmounts.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
       }
     };
-
-    stateListeners.add(update);
-    update();
-    return () => stateListeners.delete(update);
-  }, []);
-
-  const handleSave = useCallback(() => {
-    if (emailId) {
-      saveNote(emailId, noteText);
-      pluginApi?.toast.success("Note saved");
-    }
-  }, [emailId, noteText]);
+  }, [emailId]);
 
   if (!emailId) {
     return h(
-      "div",
+      'div',
+      { style: { padding: '12px', fontSize: '13px', color: '#64748b' } },
+      h('div', { style: { fontWeight: 600, marginBottom: '4px' } }, 'Quick Notes'),
+      'Open an email to add a note.',
+    );
+  }
+
+  return h(
+    'div',
+    {
+      style: {
+        padding: '12px',
+        fontSize: '13px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+      },
+    },
+    h(
+      'div',
       {
         style: {
-          padding: "16px",
-          color: "#888",
-          textAlign: "center",
-          fontSize: "13px",
+          fontWeight: 600,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
         },
       },
-      "Open an email to add notes",
-    );
-  }
-
-  const noteCount = Object.keys(getNotes()).length;
-
-  return h(
-    "div",
-    {
-      style: {
-        padding: "12px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-      },
-    },
-    h(
-      "div",
-      { style: { fontSize: "12px", color: "#888" } },
-      `${noteCount} note(s) stored`,
+      h('span', null, 'Quick Notes'),
+      savedAt
+        ? h(
+            'span',
+            { style: { fontSize: '11px', color: '#94a3b8', fontWeight: 400 } },
+            `saved ${new Date(savedAt).toLocaleTimeString()}`,
+          )
+        : null,
     ),
-    h("textarea", {
-      value: noteText,
-      onChange: (e) => setNoteText(e.target.value),
-      placeholder: "Add a note about this email...",
-      rows: 4,
+    h('textarea', {
+      value: loaded ? text : '',
+      onChange,
+      placeholder: 'Jot a note for this email…',
+      rows: 8,
       style: {
-        width: "100%",
-        padding: "8px",
-        borderRadius: "6px",
-        border: "1px solid var(--color-border, #e2e8f0)",
-        background: "var(--color-background, #fff)",
-        color: "var(--color-foreground, #000)",
-        fontSize: "13px",
-        resize: "vertical",
-        fontFamily: "inherit",
+        width: '100%',
+        boxSizing: 'border-box',
+        font: 'inherit',
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid #cbd5e1',
+        resize: 'vertical',
+        background: '#ffffff',
+        color: '#0f172a',
       },
     }),
     h(
-      "div",
-      { style: { display: "flex", gap: "8px" } },
-      h(
-        "button",
-        {
-          onClick: handleSave,
-          style: {
-            flex: 1,
-            padding: "6px 12px",
-            borderRadius: "6px",
-            border: "none",
-            background: "var(--color-primary, #3b82f6)",
-            color: "var(--color-primary-foreground, #fff)",
-            cursor: "pointer",
-            fontSize: "13px",
-          },
-        },
-        "Save",
-      ),
-      noteText.trim() &&
-        h(
-          "button",
-          {
-            onClick: () => {
-              setNoteText("");
-              if (emailId) saveNote(emailId, "");
-              pluginApi?.toast.info("Note removed");
-            },
-            style: {
-              padding: "6px 12px",
-              borderRadius: "6px",
-              border: "1px solid var(--color-border, #e2e8f0)",
-              background: "transparent",
-              color: "var(--color-destructive, #ef4444)",
-              cursor: "pointer",
-              fontSize: "13px",
-            },
-          },
-          "Delete",
-        ),
+      'div',
+      { style: { fontSize: '11px', color: '#94a3b8' } },
+      'Notes auto-save half a second after you stop typing.',
     ),
   );
 }
 
-// ─── Email Banner Component ────────────────────────────────
-
-function NoteBanner({ email }) {
-  const notes = getNotes();
-  const note = notes[email.id];
-  if (!note) return null;
-
-  return h(
-    "div",
-    {
-      style: {
-        padding: "6px 12px",
-        background: "var(--color-accent, #eef)",
-        color: "var(--color-accent-foreground, #333)",
-        fontSize: "12px",
-        display: "flex",
-        alignItems: "center",
-        gap: "6px",
-      },
-    },
-    "📝",
-    h(
-      "span",
-      null,
-      `Note: ${note.text.slice(0, 80)}${note.text.length > 80 ? "..." : ""}`,
-    ),
-  );
+// shouldShow runs in the background iframe.
+function shouldShowBanner(extraProps) {
+  if (!pluginApi) return false;
+  if (pluginApi.plugin.settings.showBanner === false) return false;
+  const email = extraProps?.email;
+  if (!email?.id) return false;
+  return !!notes[email.id];
 }
 
-// ─── Plugin Activation ─────────────────────────────────────
+export const slots = {
+  'email-banner': {
+    component: NoteBanner,
+    shouldShow: shouldShowBanner,
+    order: 80,
+  },
+  'email-detail-sidebar': {
+    component: NotesSidebar,
+    order: 20,
+  },
+};
 
-export function activate(api) {
+// ─── Hooks ──────────────────────────────────────────────────
+
+export const hooks = {
+  // Refresh the in-memory cache when an email is opened so the banner gate
+  // is accurate even after edits from the sidebar slot.
+  async onEmailOpen() {
+    if (!pluginApi) return;
+    const stored = await pluginApi.storage.get('notes');
+    notes = (stored && typeof stored === 'object') ? stored : {};
+  },
+};
+
+// ─── Activate ───────────────────────────────────────────────
+
+export async function activate(api) {
   pluginApi = api;
-  const disposables = [];
-
-  // Track current email
-  disposables.push(
-    api.hooks.onEmailOpen((email) => {
-      currentEmailId = email.id;
-      notifyStateChange();
-    }),
-  );
-
-  disposables.push(
-    api.hooks.onEmailClose(() => {
-      currentEmailId = null;
-      notifyStateChange();
-    }),
-  );
-
-  // Register sidebar widget
-  disposables.push(
-    api.ui.registerDetailSidebar({
-      id: "quick-notes",
-      label: "Quick Notes",
-      render: NotesWidget,
-      order: 20,
-    }),
-  );
-
-  // Register email banner (if enabled)
-  if (api.plugin.settings.showBanner !== false) {
-    disposables.push(
-      api.ui.registerEmailBanner({
-        shouldShow: (email) => {
-          const notes = getNotes();
-          return !!notes[email.id];
-        },
-        render: NoteBanner,
-      }),
-    );
-  }
-
-  api.log.info("Quick Notes plugin activated");
-
-  return {
-    dispose: () => {
-      disposables.forEach((d) => d.dispose());
-      stateListeners.clear();
-      pluginApi = null;
-      currentEmailId = null;
-    },
-  };
+  const stored = await api.storage.get('notes');
+  notes = (stored && typeof stored === 'object') ? stored : {};
+  api.log.info(`Quick Notes plugin activated (${Object.keys(notes).length} note(s) stored)`);
 }

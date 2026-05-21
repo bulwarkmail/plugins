@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675">
+  <defs>
+    <filter id="grain-osh-b" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="42" stitchTiles="stitch"/>
+      <feColorMatrix values="0 0 0 0 1   0 0 0 0 1   0 0 0 0 1   0 0 0 0.15 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <linearGradient id="bg-osh-b" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#1E1B4B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg-osh-b)"/>
+  <rect width="1200" height="675" fill="white" filter="url(#grain-osh-b)"/>
+  <g transform="translate(120,200) scale(11.25)" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/>
+    <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/>
+  </g>
+  <text x="460" y="325" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="60" font-weight="700" fill="white" dominant-baseline="middle">Outlook-style Quote Headers</text>
+  <text x="460" y="395" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="26" font-weight="400" fill="white" fill-opacity="0.85" dominant-baseline="middle">From / Sent / To / Cc / Subject block on reply and forward</text>
+</svg>

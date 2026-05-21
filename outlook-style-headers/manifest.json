@@ -1,0 +1,34 @@
+{
+  "id": "outlook-style-headers",
+  "name": "Outlook-style Quote Headers",
+  "version": "1.1.0",
+  "author": "Bulwark Mail Community",
+  "description": "Replaces the default reply/forward quote header with an Outlook-style From / Sent / To / Cc / Subject block. The original message follows directly, with no blockquote indent.",
+  "type": "hook",
+  "permissions": [],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.7.0",
+  "icon": "media/icon.svg",
+  "banner": "media/banner.svg",
+  "settingsSchema": {
+    "applyTo": {
+      "type": "select",
+      "label": "Apply to",
+      "description": "Which actions should use the Outlook-style header.",
+      "default": "both",
+      "options": ["reply", "forward", "both"]
+    },
+    "boldLabels": {
+      "type": "boolean",
+      "label": "Bold field labels",
+      "description": "Render From / Sent / To / Cc / Subject in bold.",
+      "default": true
+    },
+    "thinRuleAbove": {
+      "type": "boolean",
+      "label": "Thin rule above the header",
+      "description": "Insert a thin horizontal line above the header to separate the reply from the quoted message.",
+      "default": true
+    }
+  }
+}

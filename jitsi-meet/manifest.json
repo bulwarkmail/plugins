@@ -1,7 +1,7 @@
 {
   "id": "jitsi-meet",
   "name": "Jitsi Meet",
-  "version": "1.0.1",
+  "version": "1.1.1",
   "author": "Bulwark Mail Community",
   "description": "Adds a 'Add Jitsi Meeting' button to calendar events. Meeting URLs are generated server-side via the /api/jitsi sidecar.",
   "type": "ui-extension",
@@ -12,7 +12,7 @@
     "http:post"
   ],
   "entrypoint": "index.js",
-  "minAppVersion": "1.0.0",
+  "minAppVersion": "1.7.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg"
 }
