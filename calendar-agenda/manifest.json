@@ -12,7 +12,7 @@
     "http:post"
   ],
   "entrypoint": "index.js",
-  "minAppVersion": "1.7.0",
+  "minAppVersion": "1.7.4",
   "apiPostPaths": [
     "/api/calendar-agenda"
   ],
