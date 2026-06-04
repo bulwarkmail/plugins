@@ -1,0 +1,56 @@
+{
+  "id": "calendar-agenda",
+  "name": "Calendar Agenda",
+  "version": "1.1.0",
+  "author": "Bulwark Mail Community",
+  "description": "Shows an agenda of your upcoming calendar events in the sidebar.",
+  "type": "sidebar-app",
+  "permissions": [
+    "calendar:read",
+    "ui:sidebar-widget",
+    "ui:app-top-banner",
+    "http:post"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.7.0",
+  "apiPostPaths": [
+    "/api/calendar-agenda"
+  ],
+  "settingsSchema": {
+    "position": {
+      "type": "select",
+      "label": "Widget position",
+      "description": "Where the agenda appears. 'Email reading pane' shows it beside an open email. Changing this may require reloading the plugin.",
+      "default": "Left sidebar",
+      "options": [
+        "Left sidebar",
+        "Email reading pane",
+        "Top banner"
+      ]
+    },
+    "daysAhead": {
+      "type": "number",
+      "label": "Days to look ahead",
+      "description": "How many days of upcoming events to include in the agenda.",
+      "default": 7,
+      "min": 1,
+      "max": 90
+    },
+    "maxEvents": {
+      "type": "number",
+      "label": "Maximum events",
+      "description": "Cap on how many events are shown at once.",
+      "default": 50,
+      "min": 1,
+      "max": 200
+    },
+    "refreshMinutes": {
+      "type": "number",
+      "label": "Auto-refresh interval (minutes)",
+      "description": "How often the agenda re-fetches in the background. It also refreshes immediately whenever you change an event.",
+      "default": 10,
+      "min": 1,
+      "max": 120
+    }
+  }
+}

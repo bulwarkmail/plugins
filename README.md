@@ -593,6 +593,7 @@ api.log.error("Error occurred", err);
 | [auto-tag](auto-tag/)       | `hook`         | Automatically tags emails based on rules |
 | [send-later](send-later/)   | `ui-extension` | Adds "Send Later" button to composer     |
 | [quick-notes](quick-notes/) | `sidebar-app`  | Per-email sticky notes in the sidebar    |
+| [calendar-agenda](calendar-agenda/) | `sidebar-app` | Agenda of upcoming calendar events in the sidebar |
 
 ## Building Plugins
 
