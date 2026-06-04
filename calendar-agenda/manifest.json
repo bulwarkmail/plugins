@@ -1,7 +1,7 @@
 {
   "id": "calendar-agenda",
   "name": "Calendar Agenda",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "Bulwark Mail Community",
   "description": "Shows an agenda of your upcoming calendar events in the sidebar.",
   "type": "sidebar-app",
@@ -13,6 +13,8 @@
   ],
   "entrypoint": "index.js",
   "minAppVersion": "1.7.4",
+  "icon": "media/icon.svg",
+  "banner": "media/banner.svg",
   "apiPostPaths": [
     "/api/calendar-agenda"
   ],
