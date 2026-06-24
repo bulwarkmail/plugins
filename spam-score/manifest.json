@@ -1,0 +1,29 @@
+{
+  "id": "spam-score",
+  "name": "Spam Score",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Adds a Spam Analysis section to a message's \"More details\" panel. Reads the raw spam-filter headers (SpamAssassin / Rspamd score, threshold and level, plus any AI verdict) directly off the message and shows a colour-coded breakdown.",
+  "type": "ui-extension",
+  "permissions": [
+    "email:read",
+    "ui:email-details"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.7.0",
+  "icon": "media/icon.svg",
+  "settingsSchema": {
+    "placeUnderSecurity": {
+      "type": "boolean",
+      "label": "Show under “Authentication & Security”",
+      "description": "Render the spam breakdown beneath the existing Authentication & Security category instead of as its own section. Falls back to its own section when a message has no auth results.",
+      "default": false
+    },
+    "showWhenClean": {
+      "type": "boolean",
+      "label": "Show for clean mail too",
+      "description": "Display the section even when the message scored below the spam threshold. Disable to only surface it for spam / suspicious mail.",
+      "default": true
+    }
+  }
+}

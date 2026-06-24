@@ -1,0 +1,14 @@
+{
+  "name": "bulwark-plugin-spam-score",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=cjs --platform=neutral --charset=utf8 --outfile=dist/index.js --external:react --external:react-dom --external:react-dom/client --external:react/jsx-runtime --external:@plugin-host",
+    "dev": "esbuild src/index.js --bundle --format=cjs --platform=neutral --charset=utf8 --outfile=dist/index.js --external:react --external:react-dom --external:react-dom/client --external:react/jsx-runtime --external:@plugin-host --watch",
+    "package": "npm run build && cp manifest.json dist/ && cd dist && tar -acf ../spam-score.zip manifest.json index.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
