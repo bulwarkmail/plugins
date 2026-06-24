@@ -1,0 +1,41 @@
+{
+  "id": "libravatar",
+  "name": "Libravatar Avatars",
+  "version": "1.0.0",
+  "author": "Bulwark Mail Community",
+  "description": "Resolves Libravatar profile pictures for email contacts via the avatar transform hook. Libravatar is a federated, privacy-friendly Gravatar alternative.",
+  "type": "hook",
+  "permissions": [
+    "email:read"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.7.0",
+  "icon": "media/icon.svg",
+  "banner": "media/banner.svg",
+  "settingsSchema": {
+    "size": {
+      "type": "number",
+      "label": "Image size (px)",
+      "description": "Size of the Libravatar image in pixels (16-512)",
+      "default": 160,
+      "min": 16,
+      "max": 512
+    },
+    "defaultStyle": {
+      "type": "select",
+      "label": "Fallback style",
+      "description": "Image style when an email has no Libravatar profile. '404' lets the host show its own fallback (initials / favicon).",
+      "options": [
+        "404",
+        "mm",
+        "identicon",
+        "monsterid",
+        "wavatar",
+        "retro",
+        "robohash",
+        "pagan"
+      ],
+      "default": "404"
+    }
+  }
+}
