@@ -243,41 +243,53 @@ api.log.info("Normal operation");
 api.log.warn("Something unexpected");
 api.log.error("Error occurred", err);
 ```
+### api.upfiles — Modifying uploaded attachments
+```javascript
+// fileId string is obtained with onBeforeBlobUpload Hook 
+api.upfiles.get(fileId); // return Promise <File | null> if file is found or not.
+api.upfiles.save(formedFileId, file) // take File and formedFileId 
+// to remove old version of file in storage.
+```
 
 ## Complete Hook Reference
 
 ### Email Hooks (29)
 
-| Hook                     | Permission    | Description                                |
-| ------------------------ | ------------- | ------------------------------------------ |
-| `onEmailOpen`            | `email:read`  | Email opened for reading                   |
-| `onEmailClose`           | `email:read`  | Email viewer closed                        |
-| `onEmailContentRender`   | `email:read`  | Email body rendered                        |
-| `onThreadExpand`         | `email:read`  | Thread conversation expanded               |
-| `onComposerOpen`         | `email:read`  | Compose window opened                      |
-| `onBeforeEmailSend`      | `email:send`  | Before email is sent (can cancel)          |
-| `onAfterEmailSend`       | `email:send`  | After email sent successfully              |
-| `onDraftAutoSave`        | `email:read`  | Draft auto-saved                           |
-| `onBeforeEmailDelete`    | `email:write` | Before email deleted                       |
-| `onAfterEmailDelete`     | `email:write` | After email deleted                        |
-| `onBeforeEmailMove`      | `email:write` | Before email moved to folder               |
-| `onAfterEmailMove`       | `email:write` | After email moved                          |
-| `onEmailReadStateChange` | `email:write` | Read/unread toggled                        |
-| `onEmailStarToggle`      | `email:write` | Star/flag toggled                          |
-| `onEmailSpamToggle`      | `email:write` | Spam status changed                        |
-| `onEmailKeywordChange`   | `email:write` | Tag/keyword added or removed               |
-| `onMailboxChange`        | `email:read`  | Active folder changed                      |
-| `onMailboxesRefresh`     | `email:read`  | Mailbox list refreshed                     |
-| `onMailboxCreate`        | `email:write` | New folder created                         |
-| `onMailboxRename`        | `email:write` | Folder renamed                             |
-| `onMailboxDelete`        | `email:write` | Folder deleted                             |
-| `onMailboxEmpty`         | `email:write` | Folder emptied                             |
-| `onSearch`               | `email:read`  | Search initiated                           |
-| `onSearchResults`        | `email:read`  | Search results received                    |
-| `onEmailSelectionChange` | `email:read`  | Email selection changed                    |
-| `onNewEmailReceived`     | `email:read`  | New email arrived                          |
-| `onPushConnectionChange` | `email:read`  | Push notification connection state changed |
-| `onQuotaChange`          | `email:read`  | Storage quota updated                      |
+| Hook                     | Permission         | Description                                |
+| ------------------------ | ------------------ | ------------------------------------------ |
+| `onEmailOpen`            | `email:read`       | Email opened for reading                   |
+| `onEmailClose`           | `email:read`       | Email viewer closed                        |
+| `onEmailContentRender`   | `email:read`       | Email body rendered                        |
+| `onThreadExpand`         | `email:read`       | Thread conversation expanded               |
+| `onComposerOpen`         | `email:read`       | Compose window opened                      |
+| `onBeforeEmailSend`      | `email:send`       | Before email is sent (can cancel)          |
+| `onAfterEmailSend`       | `email:send`       | After email sent successfully              |
+| `onDraftAutoSave`        | `email:read`       | Draft auto-saved                           |
+| `onBeforeEmailDelete`    | `email:write`      | Before email deleted                       |
+| `onAfterEmailDelete`     | `email:write`      | After email deleted                        |
+| `onBeforeEmailMove`      | `email:write`      | Before email moved to folder               |
+| `onAfterEmailMove`       | `email:write`      | After email moved                          |
+| `onEmailReadStateChange` | `email:write`      | Read/unread toggled                        |
+| `onEmailStarToggle`      | `email:write`      | Star/flag toggled                          |
+| `onEmailSpamToggle`      | `email:write`      | Spam status changed                        |
+| `onEmailKeywordChange`   | `email:write`      | Tag/keyword added or removed               |
+| `onMailboxChange`        | `email:read`       | Active folder changed                      |
+| `onMailboxesRefresh`     | `email:read`       | Mailbox list refreshed                     |
+| `onMailboxCreate`        | `email:write`      | New folder created                         |
+| `onMailboxRename`        | `email:write`      | Folder renamed                             |
+| `onMailboxDelete`        | `email:write`      | Folder deleted                             |
+| `onMailboxEmpty`         | `email:write`      | Folder emptied                             |
+| `onSearch`               | `email:read`       | Search initiated                           |
+| `onSearchResults`        | `email:read`       | Search results received                    |
+| `onEmailSelectionChange` | `email:read`       | Email selection changed                    |
+| `onNewEmailReceived`     | `email:read`       | New email arrived                          |
+| `onPushConnectionChange` | `email:read`       | Push notification connection state changed |
+| `onQuotaChange`          | `email:read`       | Storage quota updated                      |
+| `onBeforeBlobUpload`     | `email:blob-write` | Before Attachement is uploaded             |
+| `onBeforeDraftAutoSave`  | `email:write`      | Before the Draft is automatically saved    |
+| `onBeforeEditDraft`      | `email:write`      | Before the composer is populated by email  |
+| `onEmailsFetched`        | `email:read`       | Emails fetched from server                 |
+| `onSearchResults`        | `email:read`       | Server returned results of a search         |
 
 ### Calendar Hooks (16)
 
@@ -500,6 +512,7 @@ api.log.error("Error occurred", err);
 - `email:read` — Read emails, mailboxes, search, quota
 - `email:write` — Modify emails (move, delete, tag, flag)
 - `email:send` — Send emails
+- `email:blob-write` — Modify Attachments before their upload
 
 ### Calendar
 
