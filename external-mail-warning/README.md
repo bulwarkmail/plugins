@@ -51,7 +51,7 @@ is safe, the hook passes through silently. Otherwise a confirmation
 modal is shown listing the external recipients grouped by field.
 
 The host enforces a 5 s timeout on intercept hooks. The modal therefore
-auto-resolves to **Cancel** after 4.5 s if the user has not responded —
+auto-resolves to **Cancel** after 4.5 s if the user has not responded,
 this is fail-closed behaviour appropriate for a security feature. Users
 can simply click Send again.
 
@@ -73,5 +73,5 @@ Upload `external-mail-warning.zip` via Admin → Plugins.
 - Dark mode is detected via the host's `.dark` class on `<html>` plus a
   luminance fallback so third-party themes are also covered.
 - Pressing **Esc** or clicking the overlay cancels; **Enter** sends. The
-  Cancel button is the default focus target on purpose — confirming an
+  Cancel button is the default focus target on purpose, because confirming an
   external send should require intent, not muscle memory.

@@ -48,7 +48,7 @@ the dialog reflects the number of *other* people who would receive the
 message.
 
 The host enforces a 5 s timeout on intercept hooks. The dialog therefore
-auto-cancels at 4.5 s if the user does not respond — fail-closed behaviour
+auto-cancels at 4.5 s if the user does not respond, which is fail-closed behavior
 appropriate for a guardrail. The user can simply click Reply All / Send again.
 
 When `warnOnSend` is on alongside the reply-all gate, a fresh reply-all that

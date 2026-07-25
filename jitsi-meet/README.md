@@ -90,15 +90,15 @@ services:
       - jitsi-sidecar
 ```
 
-The key point is that the browser never contacts the sidecar directly — it only sees `mail.example.com/api/jitsi`, and the reverse proxy forwards that request (including the `Authorization` header) to the sidecar internally.
+The key point is that the browser never contacts the sidecar directly. It only sees `mail.example.com/api/jitsi`, and the reverse proxy forwards that request (including the `Authorization` header) to the sidecar internally.
 
 ### 3. Install the Plugin
 
-Upload or deploy `jitsi-meet` through Admin → Plugins. No plugin configuration is needed — all settings are handled by the sidecar's environment variables.
+Upload or deploy `jitsi-meet` through Admin → Plugins. No plugin configuration is needed; all settings are handled by the sidecar's environment variables.
 
 ### 4. Use
 
-Open any calendar event form — an **"Add Jitsi Meeting"** button appears. Clicking it:
+Open any calendar event form and an **"Add Jitsi Meeting"** button appears. Clicking it:
 
 1. Sends the event title to the sidecar with the user's OIDC Bearer token
 2. The sidecar verifies the token, generates a room name, and optionally appends a signed Jitsi JWT

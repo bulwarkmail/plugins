@@ -2,7 +2,7 @@
 
 End-to-end S/MIME (CMS / PKCS#7) for Bulwark Webmail, implemented as a
 **privileged** (same-origin) plugin. All cryptography runs locally in the
-browser using a bundled `pkijs` / `asn1js` / `webcrypto-liner` stack — no key
+browser using a bundled `pkijs` / `asn1js` / `webcrypto-liner` stack, with no key
 material ever leaves the device.
 
 ## What it does
@@ -21,14 +21,14 @@ material ever leaves the device.
 - **Privileged tier.** Declares `tier: "privileged"` + `crypto:full`. Per
   `resolvePluginTier`, the same-origin tier is only granted to a **signed,
   admin-approved (managed)** bundle after high-risk consent. A self-uploaded
-  copy is refused, not downgraded — sign and ship it through the admin channel.
+  copy is refused rather than downgraded; sign and ship it through the admin channel.
 - **Keys at rest.** Private keys are imported from PKCS#12 and re-wrapped with
   AES-256-GCM under a PBKDF2(SHA-256, 600 000) key derived from a passphrase
   you choose. Stored in IndexedDB; the raw key bytes are never persisted.
 - **Keys in use.** Unlocking imports the key as a **non-extractable**
   `CryptoKey`. Because the background (hooks) iframe and the visible slot
   iframes are same-origin, the unlocked handle is shared through a session
-  IndexedDB store — it stays non-extractable and is **wiped on app boot and on
+  IndexedDB store. It stays non-extractable and is **wiped on app boot and on
   logout / account switch** (configurable), mirroring the former native
   "in-memory, cleared on reload" behaviour.
 - Returned HTML still passes through the host sanitizer.

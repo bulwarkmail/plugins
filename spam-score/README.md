@@ -41,7 +41,7 @@ The `EmailReadView` handed to email slots now carries:
 
 This plugin reads the spam headers straight off `email.headers`
 (`X-Spam-Status`, `X-Spam-Score`, `X-Spam-Level`, `X-Spam-Flag`,
-`X-Rspamd-Score`, `X-Spamd-Result`, `X-Spam-LLM`) — no host-side spam parsing
+`X-Rspamd-Score`, `X-Spamd-Result`, `X-Spam-LLM`), with no host-side spam parsing
 required. The same data could be parsed out of `email.source`.
 
 ## Settings

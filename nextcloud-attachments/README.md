@@ -1,8 +1,8 @@
 # Nextcloud Attachments Plugin
 
-Inspired by the Roundcube [`nextcloud_attachments`](https://github.com/bennet0496/nextcloud_attachments) plugin. Sidecar-less — the plugin talks directly to Nextcloud over WebDAV (PUT) and OCS (public-share create) from the browser using `api.http.fetch`.
+Inspired by the Roundcube [`nextcloud_attachments`](https://github.com/bennet0496/nextcloud_attachments) plugin. Sidecar-less: the plugin talks directly to Nextcloud over WebDAV (PUT) and OCS (public-share create) from the browser using `api.http.fetch`.
 
-Adds an **"Attach from Nextcloud"** button to the composer toolbar. Files picked from the dialog are uploaded to the user's Nextcloud, a public share link is created, and the link is appended to the outgoing email body at send time — so the binary never travels through the mail server.
+Adds an **"Attach from Nextcloud"** button to the composer toolbar. Files picked from the dialog are uploaded to the user's Nextcloud, a public share link is created, and the link is appended to the outgoing email body at send time, so the binary never travels through the mail server.
 
 ## How it works
 
@@ -16,7 +16,7 @@ The plugin can only work if both of these are true:
 
 ### 1. The Nextcloud origin is in the manifest's `httpOrigins`
 
-`api.http.fetch` enforces a manifest-declared allowlist. The default ships with `"https://cloud.example.com"` — **edit `manifest.json` to your Nextcloud's origin and rebuild before installing**:
+`api.http.fetch` enforces a manifest-declared allowlist. The default ships with `"https://cloud.example.com"`. **Edit `manifest.json` to your Nextcloud's origin and rebuild before installing**:
 
 ```json
 "httpOrigins": ["https://cloud.your-domain.com"]
@@ -100,6 +100,6 @@ Install via Admin → Plugins (zip the directory + manifest), or drop the folder
 
 - **Browser-only auth.** App password lives in plugin settings, persisted in the browser. Don't enable on shared profiles.
 - **CORS dependency.** Nextcloud admin must add the headers shown above. Without them, the browser rejects the cross-origin call before any handler runs and `api.http.fetch` reports a network error.
-- **No streaming.** `api.http.fetch` accepts a `Blob`/`File` body, so files of any size up to your reverse-proxy's `client_max_body_size` work — but the upload is one PUT, no chunking. Very large files (>1 GB) should use Nextcloud's chunked-upload API; not implemented here.
+- **No streaming.** `api.http.fetch` accepts a `Blob`/`File` body, so files of any size up to your reverse-proxy's `client_max_body_size` work, but the upload is one PUT, with no chunking. Very large files (>1 GB) should use Nextcloud's chunked-upload API; not implemented here.
 - **Removing a pending entry does not delete the file from Nextcloud.** The share link is created up-front. Orphans clean themselves up when the share expires.
 - **Per-deployment manifest.** `httpOrigins` is fixed at install time. Each org needs to edit and rebuild with their own Nextcloud URL.

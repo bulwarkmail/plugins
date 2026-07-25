@@ -4,7 +4,7 @@ Persistent top-of-app banner shown while a Stalwart master-user impersonation se
 
 ## What it does
 
-When the active session username contains `%` (Stalwart's master-user syntax `<target>%<master>`), the plugin renders a strip across the very top of the app — above the navigation rail, sidebar and content — showing the mailbox being viewed and an optional "Back to platform" button.
+When the active session username contains `%` (Stalwart's master-user syntax `<target>%<master>`), the plugin renders a strip across the very top of the app, above the navigation rail, sidebar and content, showing the mailbox being viewed and an optional "Back to platform" button.
 
 Detection is automatic; admins only configure styling and the platform return URL.
 
@@ -16,7 +16,7 @@ GET https://webmail.example.com/api/auth/impersonate?token=<HS256 JWT>
 
 The server-side route (built into Bulwark) verifies the JWT, mints session cookies for `target%master`, and 303-redirects to `/`. The plugin then surfaces the impersonation status to the user.
 
-The cryptographic configuration (signing secret, master credentials) lives in the Bulwark process environment, not in admin config — see the "Server-side configuration" section of the plugin admin page.
+The cryptographic configuration (signing secret, master credentials) lives in the Bulwark process environment, not in admin config. See the "Server-side configuration" section of the plugin admin page.
 
 ## Admin settings
 

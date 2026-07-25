@@ -1,6 +1,6 @@
 # Calendar Agenda Plugin
 
-A sidebar widget that shows an agenda of your **upcoming calendar events**, grouped by day (Today / Tomorrow / weekday). A companion to the Quick Notes plugin — same slot-iframe + background-hook architecture.
+A sidebar widget that shows an agenda of your **upcoming calendar events**, grouped by day (Today / Tomorrow / weekday). A companion to the Quick Notes plugin, sharing its slot-iframe and background-hook architecture.
 
 ## Features
 
@@ -43,7 +43,7 @@ The background hooks (`onAfterEventCreate`, `onAfterEventUpdate`, `onAfterEventD
 
 ### Position
 
-The widget can live in one of three slots — `sidebar-widget` (left sidebar), `email-detail-sidebar` (beside an open email), or `app-top-banner` (top of the app). At load time the plugin reads the `position` setting and registers **only** the matching slot, so the other locations reserve no space. Changing the position requires reloading the plugin (re-enable it from Admin → Plugins) so it re-registers against the new slot.
+The widget can live in one of three slots: `sidebar-widget` (left sidebar), `email-detail-sidebar` (beside an open email), or `app-top-banner` (top of the app). At load time the plugin reads the `position` setting and registers **only** the matching slot, so the other locations reserve no space. Changing the position requires reloading the plugin (re-enable it from Admin → Plugins) so it re-registers against the new slot.
 
 ## Build & Install
 

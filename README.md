@@ -1,8 +1,8 @@
 # Bulwark Mail Plugins
 
-Example plugins and templates for [Bulwark Mail](https://github.com/nicholasgriffintn/jmap-webmail).
+Example plugins and templates for [Bulwark Mail](https://github.com/bulwarkmail/webmail).
 
-## Quick Start
+## Quick start
 
 1. Copy `plugin-template/` and rename it
 2. Edit `manifest.json` with your plugin info
@@ -11,7 +11,7 @@ Example plugins and templates for [Bulwark Mail](https://github.com/nicholasgrif
 5. ZIP the `dist/` output (`manifest.json` and your `.js` file at the ZIP root)
 6. Upload via **Admin → Plugins** in Bulwark Mail
 
-## Plugin Structure
+## Plugin structure
 
 ```
 my-plugin/
@@ -64,7 +64,7 @@ my-plugin/
 | `minAppVersion`  | No       | Minimum Bulwark Mail version                                                                                |
 | `settingsSchema` | No       | User-configurable settings (shown in plugin settings UI)                                                    |
 
-### Plugin Types
+### Plugin types
 
 | Type           | Use Case                                                |
 | -------------- | ------------------------------------------------------- |
@@ -72,7 +72,7 @@ my-plugin/
 | `sidebar-app`  | Adds a new panel in the sidebar                         |
 | `hook`         | Reacts to events without adding visible UI              |
 
-### Settings Schema Types
+### Settings schema types
 
 ```json
 {
@@ -127,7 +127,7 @@ api.plugin.version; // "1.0.0"
 api.plugin.settings; // { enabled: true, ... } — user-configured values
 ```
 
-### api.ui — UI Registration
+### api.ui: UI registration
 
 ```javascript
 // Add button to email toolbar
@@ -190,7 +190,7 @@ api.ui.registerContextMenuItem({
 api.ui.registerNavigationRailItem(MyNavComponent);
 ```
 
-### UI Slot Names
+### UI slot names
 
 | Slot                     | Location                  |
 | ------------------------ | ------------------------- |
@@ -203,7 +203,7 @@ api.ui.registerNavigationRailItem(MyNavComponent);
 | `context-menu-email`     | Email right-click menu    |
 | `navigation-rail-bottom` | Bottom of navigation rail |
 
-### api.hooks — Event Hooks
+### api.hooks: event hooks
 
 All hooks return a `Disposable` with a `.dispose()` method. Call it to unsubscribe.
 
@@ -215,7 +215,7 @@ const sub = api.hooks.onEmailOpen((email) => {
 // Later: sub.dispose();
 ```
 
-### api.toast — Notifications
+### api.toast: notifications
 
 ```javascript
 api.toast.success("Operation completed");
@@ -224,7 +224,7 @@ api.toast.info("FYI: new emails arrived");
 api.toast.warning("Attachment too large");
 ```
 
-### api.storage — Persistent Storage
+### api.storage: persistent storage
 
 Plugin-scoped key-value storage (uses localStorage with `plugin:<id>:` prefix).
 
@@ -235,7 +235,7 @@ api.storage.remove("lastRun");
 const allKeys = api.storage.keys();
 ```
 
-### api.log — Logging
+### api.log: logging
 
 ```javascript
 api.log.debug("Verbose details");
@@ -251,9 +251,9 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 // to remove old version of file in storage.
 ```
 
-## Complete Hook Reference
+## Complete hook reference
 
-### Email Hooks (29)
+### Email hooks (29)
 
 | Hook                     | Permission         | Description                                |
 | ------------------------ | ------------------ | ------------------------------------------ |
@@ -291,7 +291,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onEmailsFetched`        | `email:read`       | Emails fetched from server                 |
 | `onSearchResults`        | `email:read`       | Server returned results of a search         |
 
-### Calendar Hooks (16)
+### Calendar hooks (16)
 
 | Hook                         | Permission       | Description                        |
 | ---------------------------- | ---------------- | ---------------------------------- |
@@ -312,7 +312,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onCalendarAlert`            | `calendar:read`  | Calendar reminder triggered        |
 | `onCalendarAlertAcknowledge` | `calendar:read`  | Reminder dismissed                 |
 
-### Contact Hooks (12)
+### Contact hooks (12)
 
 | Hook                         | Permission       | Description                           |
 | ---------------------------- | ---------------- | ------------------------------------- |
@@ -329,7 +329,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onContactGroupMemberChange` | `contacts:write` | Group membership changed              |
 | `onContactMove`              | `contacts:write` | Contact moved to another address book |
 
-### File Hooks (15)
+### File hooks (15)
 
 | Hook                    | Permission    | Description            |
 | ----------------------- | ------------- | ---------------------- |
@@ -349,7 +349,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onFileSelectionChange` | `files:read`  | File selection changed |
 | `onFileUndo`            | `files:write` | File operation undone  |
 
-### Auth Hooks (8)
+### Auth hooks (8)
 
 | Hook              | Permission     | Description             |
 | ----------------- | -------------- | ----------------------- |
@@ -362,7 +362,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onTokenRefresh`  | `auth:observe` | Auth token refreshed    |
 | `onAuthReady`     | `auth:observe` | Auth system initialized |
 
-### Settings Hooks (7)
+### Settings hooks (7)
 
 | Hook                    | Permission      | Description                       |
 | ----------------------- | --------------- | --------------------------------- |
@@ -374,7 +374,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onKeywordChange`       | `settings:read` | Keyword/tag configuration changed |
 | `onTrustedSenderChange` | `settings:read` | Trusted sender list changed       |
 
-### Identity Hooks (6)
+### Identity hooks (6)
 
 | Hook                 | Permission       | Description             |
 | -------------------- | ---------------- | ----------------------- |
@@ -385,7 +385,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onIdentitySelect`   | `identity:read`  | Active identity changed |
 | `onSignatureRender`  | `identity:read`  | Signature rendered      |
 
-### Filter Hooks (4)
+### Filter hooks (4)
 
 | Hook                  | Permission      | Description          |
 | --------------------- | --------------- | -------------------- |
@@ -394,7 +394,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onFiltersSave`       | `filters:write` | Filters saved        |
 | `onSieveScriptChange` | `filters:write` | Sieve script changed |
 
-### Task Hooks (6)
+### Task hooks (6)
 
 | Hook                   | Permission    | Description                |
 | ---------------------- | ------------- | -------------------------- |
@@ -405,7 +405,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onTaskToggleComplete` | `tasks:write` | Task completed/uncompleted |
 | `onTaskFilterChange`   | `tasks:read`  | Task filter changed        |
 
-### Template Hooks (6)
+### Template hooks (6)
 
 | Hook                | Permission        | Description        |
 | ------------------- | ----------------- | ------------------ |
@@ -416,7 +416,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onTemplatesImport` | `templates:write` | Templates imported |
 | `onTemplateRender`  | `templates:read`  | Template rendered  |
 
-### S/MIME Hooks (4)
+### S/MIME hooks (4)
 
 | Hook                    | Permission   | Description                 |
 | ----------------------- | ------------ | --------------------------- |
@@ -425,14 +425,14 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onSmimeKeyStateChange` | `smime:read` | S/MIME key state changed    |
 | `onSmimeDefaultsChange` | `smime:read` | S/MIME defaults changed     |
 
-### Vacation Hooks (2)
+### Vacation hooks (2)
 
 | Hook               | Permission       | Description                |
 | ------------------ | ---------------- | -------------------------- |
 | `onVacationLoaded` | `vacation:read`  | Vacation responder loaded  |
 | `onVacationUpdate` | `vacation:write` | Vacation responder updated |
 
-### UI Hooks (7)
+### UI hooks (7)
 
 | Hook                 | Permission   | Description                          |
 | -------------------- | ------------ | ------------------------------------ |
@@ -444,7 +444,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onMobileBack`       | `ui:observe` | Mobile back navigation               |
 | `onMobileViewSwitch` | `ui:observe` | Mobile view switched                 |
 
-### Theme Hooks (3)
+### Theme hooks (3)
 
 | Hook                  | Permission   | Description                        |
 | --------------------- | ------------ | ---------------------------------- |
@@ -452,7 +452,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onCustomThemeChange` | `ui:observe` | Custom theme activated/deactivated |
 | `onLocaleChange`      | `ui:observe` | Language changed                   |
 
-### Toast Hooks (3)
+### Toast hooks (3)
 
 | Hook                    | Permission   | Description                |
 | ----------------------- | ------------ | -------------------------- |
@@ -460,7 +460,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onToastDismiss`        | `ui:observe` | Toast dismissed            |
 | `onBrowserNotification` | `ui:observe` | Browser notification shown |
 
-### Drag & Drop Hooks (4)
+### Drag and drop hooks (4)
 
 | Hook          | Permission    | Description             |
 | ------------- | ------------- | ----------------------- |
@@ -469,7 +469,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onEmailDrop` | `email:write` | Email dropped on target |
 | `onTagDrop`   | `email:write` | Tag dropped on email    |
 
-### Keyboard Hooks (3)
+### Keyboard hooks (3)
 
 | Hook               | Permission    | Description                  |
 | ------------------ | ------------- | ---------------------------- |
@@ -477,7 +477,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onBeforeShortcut` | `ui:keyboard` | Before shortcut executed     |
 | `onAfterShortcut`  | `ui:keyboard` | After shortcut executed      |
 
-### App Lifecycle Hooks (5)
+### App lifecycle hooks (5)
 
 | Hook                 | Permission      | Description                           |
 | -------------------- | --------------- | ------------------------------------- |
@@ -487,7 +487,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onAppError`         | `app:lifecycle` | App error occurred (implicit)         |
 | `onInterval`         | `app:lifecycle` | Periodic callback (min 60s, implicit) |
 
-### Account Security Hooks (5)
+### Account security hooks (5)
 
 | Hook                  | Permission      | Description                 |
 | --------------------- | --------------- | --------------------------- |
@@ -497,7 +497,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onEncryptionChange`  | `security:read` | Encryption settings changed |
 | `onDisplayNameChange` | `security:read` | Display name changed        |
 
-### Sidebar App Hooks (3)
+### Sidebar app hooks (3)
 
 | Hook                 | Permission   | Description                |
 | -------------------- | ------------ | -------------------------- |
@@ -505,7 +505,7 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 | `onSidebarAppClose`  | `ui:observe` | Sidebar app closed         |
 | `onSidebarAppChange` | `ui:observe` | Active sidebar app changed |
 
-## All Permissions
+## All permissions
 
 ### Email
 
@@ -588,27 +588,27 @@ api.upfiles.save(formedFileId, file) // take File and formedFileId
 
 - `app:lifecycle` — App lifecycle events (implicit, always granted)
 
-## Validation Rules
+## Validation rules
 
 - Maximum plugin ZIP size: **5 MB**
 - Allowed file extensions: `.js`, `.mjs`, `.css`, `.json`, `.png`, `.svg`, `.woff2`, `.jpg`, `.jpeg`, `.webp`
 - Code is scanned for suspicious patterns (`eval()`, `new Function()`, `document.cookie`, `document.write`, `innerHTML =`)
 - Plugin ID format: `/^[a-z0-9][a-z0-9-]*[a-z0-9]$/` (min 2 chars)
-- Plugins receive React, ReactDOM, and ReactJSX via `__PLUGIN_EXTERNALS__` — do not bundle React
+- Plugins receive React, ReactDOM, and ReactJSX via `__PLUGIN_EXTERNALS__`, so do not bundle React
 - Auto-disabled after 3 errors within 60 seconds
 
-## Available Examples
+## Available examples
 
 | Plugin                      | Type           | Description                              |
 | --------------------------- | -------------- | ---------------------------------------- |
-| [hello-world](hello-world/) | `hook`         | Minimal plugin — logs lifecycle events   |
+| [hello-world](hello-world/) | `hook`         | Minimal plugin, logs lifecycle events    |
 | [email-stats](email-stats/) | `sidebar-app`  | Sidebar widget showing email statistics  |
 | [auto-tag](auto-tag/)       | `hook`         | Automatically tags emails based on rules |
 | [send-later](send-later/)   | `ui-extension` | Adds "Send Later" button to composer     |
 | [quick-notes](quick-notes/) | `sidebar-app`  | Per-email sticky notes in the sidebar    |
 | [calendar-agenda](calendar-agenda/) | `sidebar-app` | Agenda of upcoming calendar events in the sidebar |
 
-## Building Plugins
+## Building plugins
 
 Plugins are ES modules. Use any bundler (esbuild, Rollup, webpack) to produce a single `.js` file.
 
@@ -620,7 +620,7 @@ npx esbuild src/index.js --bundle --format=esm --outfile=dist/index.js \
   --external:react --external:react-dom --external:react/jsx-runtime
 ```
 
-### Important: Do NOT bundle React
+### Important: do not bundle React
 
 Bulwark Mail exposes React to plugins via `__PLUGIN_EXTERNALS__`. Mark React as external in your bundler:
 
