@@ -59,10 +59,12 @@ export async function smimeVerify(cmsBytes, fromHeader) {
   if (certNotYetValid && !signatureError) signatureError = 'Signer certificate is not yet valid';
 
   const signerEmail = certInfo.emailAddresses[0] ?? '';
+  const chainCertificates = extractChainCertificates(signedData, signerCert);
   const signerPublicCert = {
     id: `signer-${certInfo.fingerprint}`,
     email: signerEmail.toLowerCase(),
     certificate: certDer,
+    chainCertificates,
     issuer: certInfo.issuer,
     subject: certInfo.subject,
     notBefore: certInfo.notBefore,
@@ -82,6 +84,103 @@ export async function smimeVerify(cmsBytes, fromHeader) {
 
   return {
     mimeBytes: innerContent,
+    status: {
+      isSigned: true,
+      isEncrypted: false,
+      signatureValid: signatureValid && !certExpired && !certNotYetValid,
+      signatureError,
+      signerCert: signerPublicCert,
+      signerEmailMatch,
+      selfSigned,
+    },
+  };
+}
+
+/**
+ * Verify a DETACHED CMS SignedData (RFC 5751 §3.1.2 / multipart/signed)
+ * against externally supplied content bytes. Unlike opaque SignedData, the
+ * CMS structure here carries no eContent — the caller must supply the exact
+ * signed octets (see mime-signed.js for byte-exact extraction).
+ *
+ * @param {Uint8Array} contentBytes   The protected MIME entity, exactly as
+ *                                     it was signed (headers + CRLF body).
+ * @param {ArrayBuffer|Uint8Array} signatureCmsDer  The detached CMS DER.
+ * @param {string} [fromHeader]
+ * @returns { mimeBytes: Uint8Array, status: SmimeStatus }
+ */
+export async function smimeVerifyDetached(contentBytes, signatureCmsDer, fromHeader) {
+  const contentInfo = parseContentInfo(signatureCmsDer);
+  const signedData = extractSignedData(contentInfo);
+
+  const signerCert = extractSignerCertificate(signedData);
+  if (!signerCert) {
+    return {
+      mimeBytes: contentBytes,
+      status: {
+        isSigned: true,
+        isEncrypted: false,
+        signatureValid: false,
+        signatureError: 'Signer certificate not found in CMS structure',
+      },
+    };
+  }
+
+  let signatureValid = false;
+  let signatureError;
+  const contentBuffer = contentBytes.buffer.slice(
+    contentBytes.byteOffset,
+    contentBytes.byteOffset + contentBytes.byteLength,
+  );
+
+  try {
+    // Detached verification: pass the externally-recovered content as `data`
+    // since encapContentInfo.eContent is absent for multipart/signed CMS.
+    signatureValid = await signedData.verify(
+      { signer: 0, data: contentBuffer, checkChain: false },
+      nativeEngine(),
+    );
+  } catch (err) {
+    signatureError = err instanceof Error ? err.message : 'Signature verification failed';
+  }
+
+  const certDer = signerCert.toSchema(true).toBER(false);
+  const certInfo = await extractCertificateInfo(signerCert, certDer);
+
+  const now = new Date();
+  const notBefore = new Date(certInfo.notBefore);
+  const notAfter = new Date(certInfo.notAfter);
+  const certExpired = now > notAfter;
+  const certNotYetValid = now < notBefore;
+
+  if (certExpired && !signatureError) signatureError = 'Signer certificate has expired';
+  if (certNotYetValid && !signatureError) signatureError = 'Signer certificate is not yet valid';
+
+  const signerEmail = certInfo.emailAddresses[0] ?? '';
+  const chainCertificates = extractChainCertificates(signedData, signerCert);
+  const signerPublicCert = {
+    id: `signer-${certInfo.fingerprint}`,
+    email: signerEmail.toLowerCase(),
+    certificate: certDer,
+    chainCertificates,
+    issuer: certInfo.issuer,
+    subject: certInfo.subject,
+    notBefore: certInfo.notBefore,
+    notAfter: certInfo.notAfter,
+    fingerprint: certInfo.fingerprint,
+    source: 'signed-email',
+  };
+
+  let signerEmailMatch;
+  if (fromHeader && signerEmail) {
+    signerEmailMatch = fromHeader.toLowerCase() === signerEmail.toLowerCase();
+  }
+
+  const issuerDer = new Uint8Array(signerCert.issuer.toSchema().toBER(false));
+  const subjectDer = new Uint8Array(signerCert.subject.toSchema().toBER(false));
+  const selfSigned = arraysEqual(issuerDer, subjectDer);
+
+  return {
+    mimeBytes: contentBytes,
     status: {
       isSigned: true,
       isEncrypted: false,
@@ -161,4 +260,27 @@ function extractSignerCertificate(signedData) {
   }
 
   return null;
+}
+
+/**
+ * Any other X.509 certificates the sender's CMS structure carried besides the
+ * signer's own leaf cert — in practice this is usually the intermediate CA(s),
+ * since many S/MIME gateways (SEPPmail included) bundle them in by default so
+ * recipients without the CA already trusted can still build the chain. A root
+ * CA is rarely included (roots are meant to be distributed out-of-band), so
+ * don't assume completeness — this is "whatever the sender chose to attach",
+ * not a guaranteed full chain to a trusted root.
+ */
+function extractChainCertificates(signedData, signerCert) {
+  if (!signedData.certificates?.length) return [];
+  const signerDer = signerCert.toSchema(true).toBER(false);
+  const signerHex = toHex(new Uint8Array(signerDer));
+  const chain = [];
+  for (const certItem of signedData.certificates) {
+    if (!(certItem instanceof pkijs.Certificate)) continue;
+    const der = certItem.toSchema(true).toBER(false);
+    if (toHex(new Uint8Array(der)) === signerHex) continue; // skip the leaf itself
+    chain.push(der);
+  }
+  return chain;
 }

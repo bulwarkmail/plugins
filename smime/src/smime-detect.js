@@ -30,8 +30,17 @@ export function detectSmime(contentType, bodyStructure, attachments) {
       }
     }
 
-    if (ct.includes('multipart/signed') && ct.includes('application/pkcs7-signature')) {
-      return { type: 'detached-sig', supported: false };
+    if (ct.includes('multipart/signed') &&
+        (ct.includes('application/pkcs7-signature') || ct.includes('application/x-pkcs7-signature'))) {
+      const boundary = extractBoundary(contentType);
+      const parts = findDetachedSigParts(bodyStructure);
+      return {
+        type: 'detached-sig',
+        supported: !!boundary, // still refuse gracefully if we truly can't split it
+        boundary,
+        contentPart: parts?.contentPart,
+        sigPart: parts?.sigPart,
+      };
     }
   }
 
@@ -80,8 +89,16 @@ function walkBodyStructure(part) {
   }
 
   if (type === 'multipart/signed') {
-    if (part.subParts?.some((sp) => sp.type?.toLowerCase().includes('application/pkcs7-signature'))) {
-      return { type: 'detached-sig', supported: false };
+    const parts = findDetachedSigParts(part);
+    if (parts) {
+      const boundary = extractBoundary(part.type);
+      return {
+        type: 'detached-sig',
+        supported: !!boundary,
+        boundary,
+        contentPart: parts.contentPart,
+        sigPart: parts.sigPart,
+      };
     }
   }
 
@@ -108,6 +125,34 @@ function findCmsPart(bodyStructure, _smimeType) {
     }
   }
   return null;
+}
+
+/** Extract the boundary= parameter from a raw Content-Type header string. */
+function extractBoundary(contentType) {
+  if (!contentType) return null;
+  const m = contentType.match(/boundary\s*=\s*"?([^";]+)"?/i);
+  return m ? m[1] : null;
+}
+
+/**
+ * Given a multipart/signed bodyStructure node, find its two children: the
+ * protected content part and the application/pkcs7-signature part. Returns
+ * blobId/partId for each (used as a fallback reference; the actual byte-exact
+ * extraction happens on the raw parent blob via mime-signed.js, not on these
+ * individually-decoded child blobs — see index.js).
+ */
+function findDetachedSigParts(part) {
+  if (!part?.subParts) return null;
+  const sigPart = part.subParts.find((sp) => {
+    const t = sp.type?.toLowerCase() || '';
+    return t.includes('application/pkcs7-signature') || t.includes('application/x-pkcs7-signature');
+  });
+  if (!sigPart) return null;
+  const contentPart = part.subParts.find((sp) => sp !== sigPart);
+  return {
+    sigPart: { blobId: sigPart.blobId, partId: sigPart.partId },
+    contentPart: contentPart ? { blobId: contentPart.blobId, partId: contentPart.partId } : undefined,
+  };
 }
 
 function inferSmimeTypeFromContentType(ct) {
