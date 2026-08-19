@@ -1,7 +1,7 @@
 {
   "id": "smime",
   "name": "S/MIME",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Bulwark Mail Community",
   "description": "End-to-end S/MIME for webmail: sign and encrypt outgoing messages, and automatically verify signatures and decrypt incoming CMS (PKCS#7) mail. Private keys are imported from a PKCS#12 (.p12/.pfx) file, encrypted at rest with a passphrase, and unlocked into non-extractable WebCrypto keys that never leave your browser. Runs in the privileged (same-origin) plugin tier so all cryptography happens locally with bundled pkijs/asn1js.",
   "type": "ui-extension",
@@ -29,7 +29,10 @@
       "label": "Content encryption algorithm",
       "description": "Symmetric cipher used to encrypt the message body. AES-256-GCM is recommended; AES-128-GCM is slightly smaller and still strong.",
       "default": "aes-256",
-      "options": ["aes-256", "aes-128"]
+      "options": [
+        "aes-256",
+        "aes-128"
+      ]
     },
     "autoImportSignerCerts": {
       "type": "boolean",
@@ -48,18 +51,6 @@
       "label": "Warn on self-signed signer",
       "description": "Show a caution banner when an incoming signature validates against a self-signed certificate (not chained to a trusted CA).",
       "default": true
-    }
-  },
-  "locales": {
-    "en": {
-      "banner.signed_valid": "Signature valid",
-      "banner.signed_invalid": "Signature invalid",
-      "banner.encrypted": "Encrypted message",
-      "banner.decrypted": "Decrypted",
-      "banner.locked": "Encrypted — unlock your key to read",
-      "toolbar.sign": "Sign",
-      "toolbar.encrypt": "Encrypt",
-      "settings.title": "S/MIME keys & certificates"
     }
   }
 }
