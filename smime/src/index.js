@@ -20,13 +20,15 @@ const React = require('react');
 const h = React.createElement;
 const { useState, useEffect, useCallback, useRef } = React;
 
-import { buildMimeMessage, wrapCmsAsSmimeMessage, base64Encode } from './mime-builder.js';
-import { smimeSign } from './smime-sign.js';
+import {
+  buildMimeMessage, buildMimeEntity, wrapCmsAsSmimeMessage, wrapDetachedSignedMessage, base64Encode,
+} from './mime-builder.js';
+import { smimeSign, smimeSignDetached } from './smime-sign.js';
 import { smimeEncrypt } from './smime-encrypt.js';
-import { smimeVerify } from './smime-verify.js';
+import { smimeVerify, smimeVerifyDetached } from './smime-verify.js';
 import { smimeDecrypt, normalizeCmsBytes, SmimeKeyLockedError } from './smime-decrypt.js';
 import { detectSmime } from './smime-detect.js';
-import { parseMime } from './mime-parse.js';
+import { parseMime, extractDetachedSigned } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
 import { parseCertificatePemOrDer, extractCertificateInfo } from './certificate-utils.js';
 import { generateUUID } from './util.js';
@@ -61,6 +63,9 @@ function settings() {
 }
 function useAes128() {
   return settings().encryptionStrength === 'aes-128';
+}
+function useDetachedSignature() {
+  return settings().signatureFormat === 'detached';
 }
 
 // ─── Privileged-tier capability probe ─────────────────────────────────
@@ -281,7 +286,7 @@ async function onComposeSend(req) {
 
     // Build the inner MIME message from the draft.
     const attachments = await fetchAttachments(req);
-    let payloadBytes = buildMimeMessage({
+    const mimeInput = {
       from,
       to,
       cc,
@@ -291,51 +296,27 @@ async function onComposeSend(req) {
       inReplyTo: req.inReplyTo,
       references: req.references,
       attachments,
-    });
+    };
 
-    // 1. Sign (opaque). If we'll also encrypt, nest the signed CMS as a MIME entity.
-    if (sign) {
-      // Locked keys are normally unlocked in onBeforeEmailSend (which can abort
-      // the send cleanly). This is a fallback for that path not having run: the
-      // popup shows here too, but cancelling clears the composer, so prefer the
-      // pre-send hook.
+    let rfc822;
+    if (sign && !encrypt && useDetachedSignature()) {
+      // multipart/signed stays readable in clients without S/MIME.
       const session = await ensureKeyUnlocked(keyRecord);
       if (!session || !session.signingKey) {
         return false; // refuse rather than send unsigned
       }
-      const signedBlob = await smimeSign(
-        payloadBytes,
+      const entityBytes = buildMimeEntity(mimeInput);
+      const signatureDer = await smimeSignDetached(
+        entityBytes,
         session.signingKey,
         keyRecord.certificate,
         keyRecord.certificateChain || [],
       );
-      const signedBytes = await blobToBytes(signedBlob);
-      payloadBytes = encrypt ? cmsInnerEntity(signedBytes, 'signed-data') : signedBytes;
+      rfc822 = wrapDetachedSignedMessage(entityBytes, signatureDer, mimeInput);
+    } else {
+      rfc822 = await buildOpaqueMessage(mimeInput, { sign, encrypt, keyRecord, allRecipientEmails });
+      if (!rfc822) return false;
     }
-
-    // 2. Encrypt (envelope). Always includes the sender cert so Sent is readable.
-    let smimeType = sign ? 'signed-data' : null;
-    if (encrypt) {
-      const { found, missing } = await recipientCertsFor(allRecipientEmails);
-      if (missing.length > 0) {
-        host.toast.error(`Missing encryption certificate for: ${missing.join(', ')}`);
-        return false;
-      }
-      const envBlob = await smimeEncrypt(payloadBytes, found, keyRecord.certificate, useAes128());
-      payloadBytes = await blobToBytes(envBlob);
-      smimeType = 'enveloped-data';
-    }
-
-    // 3. Wrap as RFC822 and submit raw.
-    const rfc822 = wrapCmsAsSmimeMessage(payloadBytes, {
-      from,
-      to,
-      cc,
-      subject: req.subject || '',
-      inReplyTo: req.inReplyTo,
-      references: req.references,
-      smimeType,
-    });
     const rawBytes = await blobToBytes(rfc822);
 
     const envelopeRecipients = [...new Set([...allRecipientEmails])];
@@ -354,6 +335,47 @@ async function onComposeSend(req) {
     host.toast.error(`S/MIME send failed: ${err && err.message ? err.message : String(err)}`);
     return false; // do NOT fall through to a plaintext send when sign/encrypt was requested
   }
+}
+
+/** Opaque sign and/or encrypt. Returns the message Blob, or null to refuse the send. */
+async function buildOpaqueMessage(mimeInput, { sign, encrypt, keyRecord, allRecipientEmails }) {
+  let payloadBytes = buildMimeMessage(mimeInput);
+
+  // 1. Sign (opaque). If we'll also encrypt, nest the signed CMS as a MIME entity.
+  if (sign) {
+    // Locked keys are normally unlocked in onBeforeEmailSend (which can abort
+    // the send cleanly). This is a fallback for that path not having run: the
+    // popup shows here too, but cancelling clears the composer, so prefer the
+    // pre-send hook.
+    const session = await ensureKeyUnlocked(keyRecord);
+    if (!session || !session.signingKey) {
+      return null; // refuse rather than send unsigned
+    }
+    const signedBlob = await smimeSign(
+      payloadBytes,
+      session.signingKey,
+      keyRecord.certificate,
+      keyRecord.certificateChain || [],
+    );
+    const signedBytes = await blobToBytes(signedBlob);
+    payloadBytes = encrypt ? cmsInnerEntity(signedBytes, 'signed-data') : signedBytes;
+  }
+
+  // 2. Encrypt (envelope). Always includes the sender cert so Sent is readable.
+  let smimeType = sign ? 'signed-data' : null;
+  if (encrypt) {
+    const { found, missing } = await recipientCertsFor(allRecipientEmails);
+    if (missing.length > 0) {
+      host.toast.error(`Missing encryption certificate for: ${missing.join(', ')}`);
+      return null;
+    }
+    const envBlob = await smimeEncrypt(payloadBytes, found, keyRecord.certificate, useAes128());
+    payloadBytes = await blobToBytes(envBlob);
+    smimeType = 'enveloped-data';
+  }
+
+  // 3. Wrap as RFC822.
+  return wrapCmsAsSmimeMessage(payloadBytes, { ...mimeInput, smimeType });
 }
 
 // ─── Render-body takeover (verify / decrypt) ───────────────────────────
@@ -430,10 +452,35 @@ async function onRenderEmailBody(body, ctx) {
     return undefined; // let the host render the original body
   }
 
+  const fromEmail = (addrList(ctx.from)[0] || {}).email;
+
+  if (detection.type === 'detached-sig') {
+    // Verify against the raw message — the host's decoded parts are not byte-exact.
+    if (!ctx.blobId) return undefined;
+    try {
+      const raw = await host.jmap.fetchBlob(ctx.blobId);
+      const signed = extractDetachedSigned(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
+      if (!signed) return undefined;
+      const v = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, fromEmail);
+      await maybeAutoImportSigner(v.status);
+      const parsed = parseMime(v.mimeBytes);
+      await persistVerifyStatus(ctx.id, v.status);
+      return {
+        ...body,
+        handledBy: 'smime',
+        html: parsed.html || '',
+        text: parsed.text || '',
+        attachments: parsed.attachments,
+        verification: v.status,
+      };
+    } catch (err) {
+      host.log.error('detached signature verification failed', err);
+      return undefined; // the body is readable without us
+    }
+  }
+
   const blobId = detection.blobId || ctx.blobId;
   if (!blobId) return undefined;
-
-  const fromEmail = (addrList(ctx.from)[0] || {}).email;
 
   try {
     const raw = await host.jmap.fetchBlob(blobId);
@@ -669,7 +716,7 @@ function EmailBanner(props) {
         const det = detectSmime(Array.isArray(ct) ? ct[0] : ct, undefined, undefined);
         if (det.type === 'enveloped-data') s = { isEncrypted: true };
         else if (det.type === 'signed-data') s = { isSigned: true };
-        else if (det.type === 'detached-sig') s = { isSigned: true, unsupportedReason: 'detached signature' };
+        else if (det.type === 'detached-sig') s = { isSigned: true };
       }
       if (alive) { setStatus(s || null); setLoaded(true); }
     })();

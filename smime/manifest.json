@@ -1,9 +1,9 @@
 {
   "id": "smime",
   "name": "S/MIME",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "author": "Bulwark Mail Community",
-  "description": "End-to-end S/MIME for webmail: sign and encrypt outgoing messages, and automatically verify signatures and decrypt incoming CMS (PKCS#7) mail. Private keys are imported from a PKCS#12 (.p12/.pfx) file, encrypted at rest with a passphrase, and unlocked into non-extractable WebCrypto keys that never leave your browser. Runs in the privileged (same-origin) plugin tier so all cryptography happens locally with bundled pkijs/asn1js.",
+  "description": "End-to-end S/MIME for webmail: sign (opaque or detached) and encrypt outgoing messages, and automatically verify signatures and decrypt incoming CMS (PKCS#7) mail. Private keys are imported from a PKCS#12 (.p12/.pfx) file, encrypted at rest with a passphrase, and unlocked into non-extractable WebCrypto keys that never leave your browser. Runs in the privileged (same-origin) plugin tier so all cryptography happens locally with bundled pkijs/asn1js.",
   "type": "ui-extension",
   "tier": "privileged",
   "permissions": [
@@ -30,6 +30,13 @@
       "description": "Symmetric cipher used to encrypt the message body. AES-256-GCM is recommended; AES-128-GCM is slightly smaller and still strong.",
       "default": "aes-256",
       "options": ["aes-256", "aes-128"]
+    },
+    "signatureFormat": {
+      "type": "select",
+      "label": "Signature format",
+      "description": "How signed-only mail is sent. Detached (multipart/signed) keeps the message readable in mail clients without S/MIME support; opaque wraps the whole message inside the signature. Signed and encrypted mail is always opaque inside the encryption.",
+      "default": "opaque",
+      "options": ["opaque", "detached"]
     },
     "autoImportSignerCerts": {
       "type": "boolean",

@@ -1,5 +1,5 @@
 /**
- * Verify CMS SignedData (opaque signed) and extract the inner content.
+ * Verify CMS SignedData (opaque or detached) and extract the signed content.
  * Ported from lib/smime/smime-verify.ts.
  */
 
@@ -7,7 +7,7 @@ import * as pkijs from 'pkijs';
 import * as asn1js from 'asn1js';
 import { extractCertificateInfo } from './certificate-utils.js';
 import { nativeEngine } from './crypto-engine.js';
-import { arraysEqual, toHex } from './util.js';
+import { arraysEqual, toArrayBuffer, toHex } from './util.js';
 
 /**
  * Verify a CMS SignedData structure and extract the encapsulated content.
@@ -19,16 +19,38 @@ export async function smimeVerify(cmsBytes, fromHeader) {
 
   const innerContent = extractInnerContent(signedData);
 
+  return {
+    mimeBytes: innerContent,
+    status: await verifyStatus(signedData, { signer: 0, checkChain: false }, fromHeader),
+  };
+}
+
+/**
+ * Verify a detached signature over the signed entity's raw bytes.
+ * @returns { mimeBytes: Uint8Array, status: SmimeStatus }
+ */
+export async function smimeVerifyDetached(signatureDer, entityBytes, fromHeader) {
+  const signedData = extractSignedData(parseContentInfo(signatureDer));
+
+  // Retry with CRLF line endings in case a relay stripped the CRs.
+  let status = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(entityBytes) }, fromHeader);
+  const canonical = toCrlf(entityBytes);
+  if (!status.signatureValid && canonical) {
+    const retry = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(canonical) }, fromHeader);
+    if (retry.signatureValid) status = retry;
+  }
+
+  return { mimeBytes: entityBytes, status };
+}
+
+async function verifyStatus(signedData, verifyParams, fromHeader) {
   const signerCert = extractSignerCertificate(signedData);
   if (!signerCert) {
     return {
-      mimeBytes: innerContent,
-      status: {
-        isSigned: true,
-        isEncrypted: false,
-        signatureValid: false,
-        signatureError: 'Signer certificate not found in CMS structure',
-      },
+      isSigned: true,
+      isEncrypted: false,
+      signatureValid: false,
+      signatureError: 'Signer certificate not found in CMS structure',
     };
   }
 
@@ -41,7 +63,7 @@ export async function smimeVerify(cmsBytes, fromHeader) {
     // than collapsing "untrusted issuer" into "invalid signature". This matches
     // how most S/MIME clients present results and keeps validly-signed mail from
     // self-signed or non-bundled CAs from showing a scary "invalid" badge.
-    signatureValid = await signedData.verify({ signer: 0, checkChain: false }, nativeEngine());
+    signatureValid = await signedData.verify(verifyParams, nativeEngine());
   } catch (err) {
     signatureError = err instanceof Error ? err.message : 'Signature verification failed';
   }
@@ -81,17 +103,30 @@ export async function smimeVerify(cmsBytes, fromHeader) {
   const selfSigned = arraysEqual(issuerDer, subjectDer);
 
   return {
-    mimeBytes: innerContent,
-    status: {
-      isSigned: true,
-      isEncrypted: false,
-      signatureValid: signatureValid && !certExpired && !certNotYetValid,
-      signatureError,
-      signerCert: signerPublicCert,
-      signerEmailMatch,
-      selfSigned,
-    },
+    isSigned: true,
+    isEncrypted: false,
+    signatureValid: signatureValid && !certExpired && !certNotYetValid,
+    signatureError,
+    signerCert: signerPublicCert,
+    signerEmailMatch,
+    selfSigned,
   };
+}
+
+/** Bare LF → CRLF, or null if there are none. */
+function toCrlf(bytes) {
+  let bare = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0x0a && (i === 0 || bytes[i - 1] !== 0x0d)) bare++;
+  }
+  if (bare === 0) return null;
+  const out = new Uint8Array(bytes.length + bare);
+  let j = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0x0a && (i === 0 || bytes[i - 1] !== 0x0d)) out[j++] = 0x0d;
+    out[j++] = bytes[i];
+  }
+  return out;
 }
 
 // --- Internal helpers ---
