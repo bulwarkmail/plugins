@@ -34,7 +34,7 @@
     "signatureFormat": {
       "type": "select",
       "label": "Signature format",
-      "description": "How signed-only mail is sent. Detached (multipart/signed) keeps the message readable in mail clients without S/MIME support; opaque wraps the whole message inside the signature. Signed and encrypted mail is always opaque inside the encryption.",
+      "description": "How signed-only mail is sent. Detached (multipart/signed) keeps the message readable in mail clients without S/MIME support; opaque wraps the whole message inside the signature. Signed and encrypted mail is always opaque inside the encryption. Reload the page after changing this.",
       "default": "opaque",
       "options": ["opaque", "detached"]
     },

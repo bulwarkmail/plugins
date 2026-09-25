@@ -325,7 +325,8 @@ async function onComposeSend(req) {
     host.toast.success(
       encrypt && sign ? 'Message signed, encrypted and sent'
         : encrypt ? 'Message encrypted and sent'
-          : 'Message signed and sent',
+          : useDetachedSignature() ? 'Message signed (detached) and sent'
+            : 'Message signed (opaque) and sent',
     );
     // Clear the per-message intent so the next compose starts from defaults.
     await host.storage.set(INTENT_KEY, {});
@@ -656,7 +657,18 @@ function ComposerToolbar() {
       title: 'Encrypt this message to its recipients',
       onClick: () => toggle('encrypt'),
     }, intent.encrypt ? '✓ Encrypt' : 'Encrypt'),
+    intent.sign && h('span', {
+      style: { fontSize: '12px', color: 'var(--color-muted-foreground, #64748b)' },
+      title: signatureFormatHint(intent),
+    }, intent.encrypt ? 'opaque, inside encryption' : useDetachedSignature() ? 'detached' : 'opaque'),
   );
+}
+
+function signatureFormatHint(intent) {
+  if (intent.encrypt) return 'Signed and encrypted mail carries an opaque signature inside the encryption.';
+  return useDetachedSignature()
+    ? 'Detached signature (multipart/signed): readable in mail clients without S/MIME. Change under Settings → Plugins → S/MIME.'
+    : 'Opaque signature (application/pkcs7-mime): only S/MIME-capable clients can show the text. Change under Settings → Plugins → S/MIME.';
 }
 
 // ─── UI: email banner (verification / encryption status) ───────────────
