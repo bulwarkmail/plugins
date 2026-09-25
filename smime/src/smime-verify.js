@@ -59,6 +59,7 @@ async function verifyStatus(signedData, verifyParams, fromHeader) {
 
   let signatureValid = false;
   let signatureError;
+  let verifyError;
 
   try {
     // checkChain:false — validate the signature cryptographically. Trust of the
@@ -69,6 +70,7 @@ async function verifyStatus(signedData, verifyParams, fromHeader) {
     signatureValid = await signedData.verify(verifyParams, nativeEngine());
   } catch (err) {
     signatureError = err instanceof Error ? err.message : 'Signature verification failed';
+    verifyError = signatureError;
   }
 
   const certDer = signerCert.toSchema(true).toBER(false);
@@ -95,6 +97,8 @@ async function verifyStatus(signedData, verifyParams, fromHeader) {
     notBefore: certInfo.notBefore,
     notAfter: certInfo.notAfter,
     fingerprint: certInfo.fingerprint,
+    serialNumber: certInfo.serialNumber,
+    algorithm: certInfo.algorithm,
     source: 'signed-email',
   };
 
@@ -115,6 +119,12 @@ async function verifyStatus(signedData, verifyParams, fromHeader) {
     signerCert: signerPublicCert,
     signerEmailMatch,
     selfSigned,
+    // The individual checks behind signatureValid, for the details view.
+    cryptoValid: signatureValid,
+    verifyError,
+    certExpired,
+    certNotYetValid,
+    fromEmail: fromHeader || undefined,
   };
 }
 
