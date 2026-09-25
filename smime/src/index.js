@@ -412,6 +412,8 @@ function iconSvg(size, ...children) {
   return h('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }, ...children);
 }
 const ICONS = {
+  chevronDown: (s = 20) => iconSvg(s, h('path', { d: 'm6 9 6 6 6-6' })),
+  chevronUp: (s = 20) => iconSvg(s, h('path', { d: 'm18 15-6-6-6 6' })),
   lock: (s = 20) => iconSvg(s,
     h('rect', { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }),
     h('path', { d: 'M7 11V7a5 5 0 0 1 10 0v4' })),
@@ -917,9 +919,11 @@ function EmailBanner(props) {
             'aria-expanded': detailsOpen,
             style: {
               marginTop: '2px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
-              fontSize: '12px', color: 'var(--color-primary, #2563eb)',
+              display: 'inline-flex', alignItems: 'center', gap: '4px',
+              fontSize: '12px', color: 'var(--color-muted-foreground, #64748b)',
             },
-          }, detailsOpen ? '▾ Hide certificate details' : '▸ Certificate details'),
+          }, detailsOpen ? ICONS.chevronUp(14) : ICONS.chevronDown(14),
+          detailsOpen ? 'Hide certificate details' : 'Show certificate details'),
           r.details && detailsOpen && h(SignatureDetails, { status }),
           r.action === 'unlock' && h('div', { style: { marginTop: '8px' } },
             h('button', {
