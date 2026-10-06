@@ -22,8 +22,15 @@ function JitsiAddButton(props) {
     if (busy) return;
     setBusy(true);
     try {
-      const data = await slotApi.http.post('/api/jitsi', { eventTitle });
-      const url = data?.url;
+      // api.http.post resolves to { ok, status, data }: the parsed body is in
+      // `data`, not at the top level. Reading `response.url` always yields
+      // undefined, so every click failed with 'No url in response' even when
+      // the sidecar answered 200 with a valid URL.
+      const response = await slotApi.http.post('/api/jitsi', { eventTitle });
+      if (!response || !response.ok) {
+        throw new Error(response?.data?.error || `HTTP ${response?.status ?? 'error'}`);
+      }
+      const url = response.data?.url;
       if (!url) throw new Error('No url in response');
 
       if (typeof setVirtualLocation === 'function') {
