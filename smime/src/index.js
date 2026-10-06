@@ -458,10 +458,26 @@ async function onRenderEmailBody(body, ctx) {
   if (detection.type === 'detached-sig') {
     // Verify against the raw message — the host's decoded parts are not byte-exact.
     if (!ctx.blobId) return undefined;
+    let raw;
     try {
-      const raw = await host.jmap.fetchBlob(ctx.blobId);
+      raw = await host.jmap.fetchBlob(ctx.blobId);
+    } catch (err) {
+      host.log.error('failed to fetch the signed message', err);
+      return undefined; // transient; don't record a verdict
+    }
+    // A broken signature must read as invalid, not as a neutral "Signed message".
+    const invalid = (signatureError) => persistVerifyStatus(ctx.id, {
+      isSigned: true,
+      isEncrypted: false,
+      signatureValid: false,
+      signatureError,
+    });
+    try {
       const signed = extractDetachedSigned(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
-      if (!signed) return undefined;
+      if (!signed) {
+        await invalid('Malformed multipart/signed message');
+        return undefined;
+      }
       const v = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, fromEmail);
       await maybeAutoImportSigner(v.status);
       const parsed = parseMime(v.mimeBytes);
@@ -476,6 +492,7 @@ async function onRenderEmailBody(body, ctx) {
       };
     } catch (err) {
       host.log.error('detached signature verification failed', err);
+      await invalid(err && err.message ? err.message : String(err));
       return undefined; // the body is readable without us
     }
   }
