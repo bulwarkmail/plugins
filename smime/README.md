@@ -9,9 +9,9 @@ material ever leaves the device.
 
 | Capability | How |
 |---|---|
-| **Sign** outgoing mail | `onComposeSend` builds the MIME, wraps it in opaque CMS `SignedData`, and submits via `api.jmap.sendRaw`. |
+| **Sign** outgoing mail | `onComposeSend` builds the MIME and signs it with CMS `SignedData`, then submits via `api.jmap.sendRaw`. The *Signature format* setting picks opaque (`application/pkcs7-mime`) or detached (`multipart/signed`, readable without S/MIME). |
 | **Encrypt** outgoing mail | `onComposeSend` builds CMS `EnvelopedData` to every recipient (AES-256-GCM by default; AES-128 optional) plus the sender, then submits raw. Sign + Encrypt does proper sign-then-encrypt. |
-| **Verify** incoming signatures | `onRenderEmailBody` fetches the CMS blob (`api.jmap.fetchBlob`), validates the signature cryptographically, checks validity dates, flags self-signed signers and signer≠From mismatches, and renders the inner body. |
+| **Verify** incoming signatures | `onRenderEmailBody` fetches the CMS blob (`api.jmap.fetchBlob`) — for detached `multipart/signed` mail the raw message, so the signed part is checked byte-for-byte — validates the signature cryptographically, checks validity dates, flags self-signed signers and signer≠From mismatches, and renders the inner body. |
 | **Decrypt** incoming mail | `onRenderEmailBody` decrypts `EnvelopedData` with your unlocked key (RSA-OAEP, with an RSAES-PKCS1-v1_5 + 3DES/RC2 legacy fallback for old Outlook/Thunderbird mail). |
 | **Key management** | `settings-section` slot: import PKCS#12 (`.p12`/`.pfx`), unlock/lock, delete, import recipient certificates, set sign/encrypt defaults. |
 | **Status** | `email-banner` slot shows signature / encryption state; `composer-toolbar` slot has per-message Sign / Encrypt toggles. |
@@ -56,7 +56,7 @@ src/
   mime-builder.js     deterministic CRLF MIME builder + CMS RFC822 wrapper
   mime-parse.js       inner-MIME parser for decrypted/verified content
   smime-detect.js     detect CMS from Content-Type / bodyStructure / attachments
-  smime-sign.js       CMS SignedData (opaque)
+  smime-sign.js       CMS SignedData (opaque or detached)
   smime-encrypt.js    CMS EnvelopedData
   smime-decrypt.js    CMS decrypt + blob normalisation + recipient matching
   smime-verify.js     CMS signature verification + signer status

@@ -30,8 +30,8 @@ export function detectSmime(contentType, bodyStructure, attachments) {
       }
     }
 
-    if (ct.includes('multipart/signed') && ct.includes('application/pkcs7-signature')) {
-      return { type: 'detached-sig', supported: false };
+    if (ct.includes('multipart/signed') && ct.includes('pkcs7-signature')) {
+      return { type: 'detached-sig', supported: true };
     }
   }
 
@@ -58,7 +58,7 @@ export function detectSmime(contentType, bodyStructure, attachments) {
         return { type: 'enveloped-data', blobId: att.blobId, partId: att.partId, supported: true };
       }
       if (name.endsWith('.p7s')) {
-        return { type: 'detached-sig', blobId: att.blobId, partId: att.partId, supported: false };
+        return { type: 'detached-sig', blobId: att.blobId, partId: att.partId, supported: true };
       }
     }
   }
@@ -80,8 +80,8 @@ function walkBodyStructure(part) {
   }
 
   if (type === 'multipart/signed') {
-    if (part.subParts?.some((sp) => sp.type?.toLowerCase().includes('application/pkcs7-signature'))) {
-      return { type: 'detached-sig', supported: false };
+    if (part.subParts?.some((sp) => sp.type?.toLowerCase().includes('pkcs7-signature'))) {
+      return { type: 'detached-sig', supported: true };
     }
   }
 

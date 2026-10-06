@@ -24,6 +24,30 @@ export function parseMime(bytes) {
   return out;
 }
 
+/** Find a multipart/signed part and return { entityBytes, signatureDer }, or null. */
+export function extractDetachedSigned(bytes) {
+  const node = findMultipartSigned(parseEntity(binaryString(bytes)));
+  if (!node || node.children.length < 2) return null;
+  const sig = node.children.find((c) => /^application\/(x-)?pkcs7-signature$/.test(c.type));
+  if (!sig) return null;
+  return { entityBytes: latin1Bytes(node.children[0].raw), signatureDer: decodeBody(sig) };
+}
+
+function findMultipartSigned(node) {
+  if (node.type === 'multipart/signed' && /pkcs7-signature/.test(node.params.protocol || '')) return node;
+  for (const child of node.children) {
+    const found = findMultipartSigned(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+function latin1Bytes(s) {
+  const bytes = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xff;
+  return bytes;
+}
+
 // Treat bytes as latin1 so byte boundaries survive; decode per-part by charset.
 function binaryString(bytes) {
   let s = '';
@@ -42,7 +66,7 @@ function parseEntity(raw) {
   const cte = (headers['content-transfer-encoding'] || '7bit').trim().toLowerCase();
   const disposition = (headers['content-disposition'] || '').toLowerCase();
 
-  const node = { type, params, cte, disposition, headers, body, children: [] };
+  const node = { type, params, cte, disposition, headers, body, raw, children: [] };
 
   if (type.startsWith('multipart/') && params.boundary) {
     node.children = splitMultipart(body, params.boundary).map(parseEntity);
@@ -85,7 +109,8 @@ function splitMultipart(body, boundary) {
   for (let i = 1; i < segments.length; i++) {
     let seg = segments[i];
     if (seg.startsWith('--')) break; // closing delimiter
-    seg = seg.replace(/^\r?\n/, '').replace(/\r?\n$/, '');
+    // Strip delimiter line padding and the CRLF owned by the next delimiter.
+    seg = seg.replace(/^[ \t]*\r?\n/, '').replace(/\r?\n$/, '');
     parts.push(seg);
   }
   return parts;

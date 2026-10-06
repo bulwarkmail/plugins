@@ -9,9 +9,19 @@ const CRLF = '\r\n';
 
 /** Build a complete MIME message and return it as a Uint8Array (UTF-8). */
 export function buildMimeMessage(input) {
-  const boundary = generateBoundary();
-  const lines = [];
+  const lines = messageHeaderLines(input);
+  lines.push('MIME-Version: 1.0');
+  lines.push(...entityLines(input));
+  return new TextEncoder().encode(lines.join(CRLF));
+}
 
+/** Build only the body entity (Content-* headers + body) — the part a detached signature covers. */
+export function buildMimeEntity(input) {
+  return new TextEncoder().encode(entityLines(input).join(CRLF));
+}
+
+function messageHeaderLines(input) {
+  const lines = [];
   lines.push(formatHeader('From', formatAddress(input.from)));
   lines.push(formatHeader('To', input.to.map(formatAddress).join(', ')));
   if (input.cc?.length) lines.push(formatHeader('Cc', input.cc.map(formatAddress).join(', ')));
@@ -20,7 +30,12 @@ export function buildMimeMessage(input) {
   lines.push(formatHeader('Message-ID', input.messageId ?? `<${generateUUID()}@smime.local>`));
   if (input.inReplyTo) lines.push(formatHeader('In-Reply-To', input.inReplyTo));
   if (input.references?.length) lines.push(formatHeader('References', input.references.join(' ')));
-  lines.push('MIME-Version: 1.0');
+  return lines;
+}
+
+function entityLines(input) {
+  const boundary = generateBoundary();
+  const lines = [];
 
   const hasText = !!input.textBody;
   const hasHtml = !!input.htmlBody;
@@ -101,7 +116,7 @@ export function buildMimeMessage(input) {
     lines.push('');
   }
 
-  return new TextEncoder().encode(lines.join(CRLF));
+  return lines;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -169,16 +184,7 @@ function formatDate(date) {
  * Returns a Blob of type message/rfc822.
  */
 export function wrapCmsAsSmimeMessage(cmsBlob, input) {
-  const lines = [];
-
-  lines.push(formatHeader('From', formatAddress(input.from)));
-  lines.push(formatHeader('To', input.to.map(formatAddress).join(', ')));
-  if (input.cc?.length) lines.push(formatHeader('Cc', input.cc.map(formatAddress).join(', ')));
-  lines.push(formatHeader('Subject', encodeHeaderValue(input.subject)));
-  lines.push(formatHeader('Date', formatDate(input.date ?? new Date())));
-  lines.push(formatHeader('Message-ID', input.messageId ?? `<${generateUUID()}@smime.local>`));
-  if (input.inReplyTo) lines.push(formatHeader('In-Reply-To', input.inReplyTo));
-  if (input.references?.length) lines.push(formatHeader('References', input.references.join(' ')));
+  const lines = messageHeaderLines(input);
   lines.push('MIME-Version: 1.0');
   lines.push(`Content-Type: application/pkcs7-mime; smime-type=${input.smimeType}; name="smime.p7m"`);
   lines.push('Content-Transfer-Encoding: base64');
@@ -192,6 +198,38 @@ export function wrapCmsAsSmimeMessage(cmsBlob, input) {
   // receiving side as "Invalid ASN.1 data - cannot parse CMS envelope".
   const headerBytes = new TextEncoder().encode(lines.join(CRLF) + CRLF + CRLF);
   return new Blob([headerBytes, cmsToBase64Blob(cmsBlob)], { type: 'message/rfc822' });
+}
+
+/**
+ * Wrap a signed entity and its detached signature as multipart/signed (RFC 8551 §3.5.3).
+ * Returns a Blob of type message/rfc822.
+ */
+export function wrapDetachedSignedMessage(entityBytes, signatureDer, input) {
+  const boundary = generateBoundary();
+  const lines = messageHeaderLines(input);
+  lines.push('MIME-Version: 1.0');
+  lines.push('Content-Type: multipart/signed; protocol="application/pkcs7-signature";');
+  lines.push(` micalg=sha-256; boundary="${boundary}"`);
+  lines.push('');
+  lines.push('This is a cryptographically signed message in MIME format.');
+  lines.push('');
+  lines.push(`--${boundary}`);
+  const head = new TextEncoder().encode(lines.join(CRLF) + CRLF);
+
+  // The CRLF before a boundary belongs to the boundary (RFC 2046 §5.1.1).
+  const tail = [
+    '',
+    `--${boundary}`,
+    'Content-Type: application/pkcs7-signature; name="smime.p7s"',
+    'Content-Transfer-Encoding: base64',
+    'Content-Disposition: attachment; filename="smime.p7s"',
+    '',
+    base64Encode(signatureDer.buffer.slice(signatureDer.byteOffset, signatureDer.byteOffset + signatureDer.byteLength)),
+    `--${boundary}--`,
+    '',
+  ].join(CRLF);
+
+  return new Blob([head, entityBytes, new TextEncoder().encode(tail)], { type: 'message/rfc822' });
 }
 
 function cmsToBase64Blob(data) {
@@ -221,7 +259,7 @@ export function quotedPrintableEncode(input) {
 
     if (b === 0x0a) {
       if (line.endsWith('\r')) line = line.slice(0, -1);
-      lines.push(line);
+      lines.push(...hardLine(line));
       line = '';
       continue;
     }
@@ -233,8 +271,17 @@ export function quotedPrintableEncode(input) {
       line += encoded;
     }
   }
-  lines.push(line);
+  lines.push(...hardLine(line));
   return lines.join(CRLF);
+}
+
+// Encode trailing whitespace (RFC 2045 §6.7) — relays may strip it and break the signature.
+function hardLine(line) {
+  const last = line[line.length - 1];
+  if (last !== ' ' && last !== '\t') return [line];
+  const escaped = last === ' ' ? '=20' : '=09';
+  const rest = line.slice(0, -1);
+  return rest.length + escaped.length > 76 ? [rest + '=', escaped] : [rest + escaped];
 }
 
 /** Encode ArrayBuffer as base64 with line breaks at 76 chars. */
