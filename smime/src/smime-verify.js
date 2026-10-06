@@ -31,6 +31,9 @@ export async function smimeVerify(cmsBytes, fromHeader) {
  */
 export async function smimeVerifyDetached(signatureDer, entityBytes, fromHeader) {
   const signedData = extractSignedData(parseContentInfo(signatureDer));
+  // pkijs checks embedded eContent in preference to the data we pass, so a
+  // CMS carrying its own content would vouch for that, not the shown part.
+  if (signedData.encapContentInfo?.eContent) throw new Error('Detached signature carries its own content');
 
   // Retry with CRLF line endings in case a relay stripped the CRs.
   let status = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(entityBytes) }, fromHeader);
