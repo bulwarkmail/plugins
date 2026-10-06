@@ -77,6 +77,8 @@ async function verifyStatus(signedData, verifyParams, fromHeader) {
   const certExpired = now > notAfter;
   const certNotYetValid = now < notBefore;
 
+  // pkijs returns false (no throw) on a digest mismatch.
+  if (!signatureValid && !signatureError) signatureError = 'Signature does not match the message content';
   if (certExpired && !signatureError) signatureError = 'Signer certificate has expired';
   if (certNotYetValid && !signatureError) signatureError = 'Signer certificate is not yet valid';
 
