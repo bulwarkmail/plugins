@@ -22,6 +22,8 @@
 const { createElement: h, useState, useCallback, useEffect, useRef } = require('react');
 const slotApi = require('@plugin-host');
 
+const t = (key, vars) => slotApi.i18n.t(key, vars);
+
 const FALLBACK_TARGET = 'en';
 const FALLBACK_PROVIDER = 'mymemory';
 const FALLBACK_MAX_CHARS = 4000;
@@ -83,7 +85,7 @@ function TranslateBanner(props) {
     try {
       const source = pickPlainText(props.email, maxChars);
       if (!source) {
-        setState({ status: 'error', error: 'No translatable text in this message' });
+        setState({ status: 'error', error: t('error.no_text') });
         return;
       }
       const result = await callTranslate({ text: source, target, provider });
@@ -168,18 +170,21 @@ function TranslateBanner(props) {
         color: 'var(--color-muted-foreground)',
       },
     },
-    'Translate',
+    t('label'),
   );
 
   let message;
   if (state.status === 'idle') {
-    message = `Translate this message into ${target.toUpperCase()}?`;
+    message = t('idle', { target: target.toUpperCase() });
   } else if (state.status === 'loading') {
-    message = 'Translating…';
+    message = t('translating');
   } else if (state.status === 'skipped') {
-    message = `This message is already in ${target.toUpperCase()}.`;
+    message = t('skipped', { target: target.toUpperCase() });
   } else if (state.status === 'done') {
-    message = `Translated from ${state.detected ? String(state.detected).toUpperCase() : 'auto'} to ${target.toUpperCase()}${state.truncated ? ' · long message truncated' : ''}`;
+    message = t('done', {
+      source: state.detected ? String(state.detected).toUpperCase() : t('source_auto'),
+      target: target.toUpperCase(),
+    }) + (state.truncated ? t('truncated') : '');
   } else if (state.status === 'error') {
     message = state.error;
   }
@@ -226,7 +231,7 @@ function TranslateBanner(props) {
           onClick: run,
           style: outlineButton(),
         },
-        '🌐 Translate',
+        '🌐 ' + t('action.translate'),
       ),
     );
   } else if (state.status === 'loading') {
@@ -239,7 +244,7 @@ function TranslateBanner(props) {
           disabled: true,
           style: outlineButton({ cursor: 'progress', opacity: 0.6 }),
         },
-        'Translating…',
+        t('translating'),
       ),
     );
   } else if (showRetry) {
@@ -252,7 +257,7 @@ function TranslateBanner(props) {
           onClick: run,
           style: outlineButton(),
         },
-        '↻ Translate again',
+        '↻ ' + t('action.again'),
       ),
     );
   }

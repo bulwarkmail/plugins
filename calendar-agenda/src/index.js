@@ -18,6 +18,11 @@ const slotApi = require('@plugin-host');
 const DIRTY_KEY = 'agendaDirty'; // timestamp bumped by calendar hooks
 const AGENDA_PATH = '/api/calendar-agenda';
 
+// Texts come from manifest.locales (English, with translations); dates and
+// times follow the webmail's language, not the browser's.
+const t = (key, vars) => slotApi.i18n.t(key, vars);
+const uiLocale = () => slotApi.i18n.locale || undefined;
+
 // ─── Date helpers ────────────────────────────────────────────
 
 function startOfDay(d) {
@@ -34,9 +39,9 @@ function relativeDayLabel(date) {
   const today = startOfDay(new Date());
   const that = startOfDay(date);
   const diffDays = Math.round((that.getTime() - today.getTime()) / 86_400_000);
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Tomorrow';
-  return that.toLocaleDateString(undefined, {
+  if (diffDays === 0) return t('day.today');
+  if (diffDays === 1) return t('day.tomorrow');
+  return that.toLocaleDateString(uiLocale(), {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -44,9 +49,9 @@ function relativeDayLabel(date) {
 }
 
 function timeLabel(ev) {
-  if (ev.allDay) return 'All day';
+  if (ev.allDay) return t('event.all_day');
   const start = new Date(ev.start);
-  return start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return start.toLocaleTimeString(uiLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 // ─── Slot component ──────────────────────────────────────────
@@ -185,7 +190,7 @@ function AgendaWidget() {
       {
         type: 'button',
         onClick: toggleCollapsed,
-        title: collapsed ? 'Expand agenda' : 'Collapse agenda',
+        title: collapsed ? t('header.expand') : t('header.collapse'),
         'aria-expanded': !collapsed,
         style: {
           flex: 1,
@@ -205,14 +210,14 @@ function AgendaWidget() {
         },
       },
       Chevron(!collapsed),
-      h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, 'Agenda'),
+      h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, t('header.title')),
     ),
     h(
       'button',
       {
         type: 'button',
         onClick: (e) => { e.stopPropagation(); void fetchAgenda(); },
-        title: 'Refresh agenda',
+        title: t('header.refresh'),
         style: {
           font: 'inherit',
           fontSize: '12px',
@@ -232,17 +237,17 @@ function AgendaWidget() {
   let bodyEl = null;
   if (!collapsed) {
     if (state === 'loading') {
-      bodyEl = h('div', { style: mutedStyle() }, 'Loading…');
+      bodyEl = h('div', { style: mutedStyle() }, t('state.loading'));
     } else if (state === 'unauth') {
-      bodyEl = h('div', { style: mutedStyle() }, 'Sign in to see your agenda.');
+      bodyEl = h('div', { style: mutedStyle() }, t('state.unauth'));
     } else if (state === 'error') {
       bodyEl = h(
         'div',
         { style: { ...mutedStyle(), color: 'var(--color-destructive, #ef4444)' } },
-        `Couldn't load agenda: ${error}`,
+        t('state.error', { error }),
       );
     } else if (events.length === 0) {
-      bodyEl = h('div', { style: mutedStyle() }, `No events in the next ${days} day(s).`);
+      bodyEl = h('div', { style: mutedStyle() }, t('state.empty', { days }));
     } else {
       bodyEl = h('div', null, ...renderGroups(events));
     }

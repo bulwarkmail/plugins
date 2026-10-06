@@ -1,7 +1,7 @@
 {
   "id": "translate",
   "name": "Translate",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "author": "Bulwark Mail Community",
   "description": "Translate received emails into your preferred language using a free public translation API (MyMemory by default, LibreTranslate optional).",
   "type": "ui-extension",
@@ -72,6 +72,32 @@
       "default": 4000,
       "min": 200,
       "max": 5000
+    }
+  },
+  "locales": {
+    "en": {
+      "label": "Translate",
+      "idle": "Translate this message into {target}?",
+      "translating": "Translating…",
+      "skipped": "This message is already in {target}.",
+      "done": "Translated from {source} to {target}",
+      "source_auto": "auto",
+      "truncated": " · long message truncated",
+      "error.no_text": "No translatable text in this message",
+      "action.translate": "Translate",
+      "action.again": "Translate again"
+    },
+    "cs": {
+      "label": "Překlad",
+      "idle": "Přeložit tuto zprávu do jazyka {target}?",
+      "translating": "Překládám…",
+      "skipped": "Tato zpráva už je v jazyce {target}.",
+      "done": "Přeloženo z {source} do {target}",
+      "source_auto": "autom.",
+      "truncated": " · dlouhá zpráva zkrácena",
+      "error.no_text": "V této zprávě není žádný text k překladu",
+      "action.translate": "Přeložit",
+      "action.again": "Přeložit znovu"
     }
   }
 }

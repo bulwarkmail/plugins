@@ -1,7 +1,7 @@
 {
   "id": "calendar-agenda",
   "name": "Calendar Agenda",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "author": "Bulwark Mail Community",
   "description": "Shows an agenda of your upcoming calendar events in the sidebar.",
   "type": "sidebar-app",
@@ -54,6 +54,34 @@
       "default": 10,
       "min": 1,
       "max": 120
+    }
+  },
+  "locales": {
+    "en": {
+      "header.title": "Agenda",
+      "header.expand": "Expand agenda",
+      "header.collapse": "Collapse agenda",
+      "header.refresh": "Refresh agenda",
+      "day.today": "Today",
+      "day.tomorrow": "Tomorrow",
+      "event.all_day": "All day",
+      "state.loading": "Loading…",
+      "state.unauth": "Sign in to see your agenda.",
+      "state.error": "Couldn't load agenda: {error}",
+      "state.empty": "No events in the next {days} day(s)."
+    },
+    "cs": {
+      "header.title": "Agenda",
+      "header.expand": "Rozbalit agendu",
+      "header.collapse": "Sbalit agendu",
+      "header.refresh": "Obnovit agendu",
+      "day.today": "Dnes",
+      "day.tomorrow": "Zítra",
+      "event.all_day": "Celý den",
+      "state.loading": "Načítání…",
+      "state.unauth": "Pro zobrazení agendy se přihlaste.",
+      "state.error": "Agendu se nepodařilo načíst: {error}",
+      "state.empty": "V příštích {days} dnech nejsou žádné události."
     }
   }
 }
