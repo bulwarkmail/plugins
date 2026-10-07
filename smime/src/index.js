@@ -65,7 +65,8 @@ function useAes128() {
   return settings().encryptionStrength === 'aes-128';
 }
 function useDetachedSignature() {
-  return settings().signatureFormat === 'detached';
+  // Also detached for installs that predate the setting.
+  return settings().signatureFormat !== 'opaque';
 }
 
 // ─── Privileged-tier capability probe ─────────────────────────────────

@@ -9,7 +9,7 @@ material ever leaves the device.
 
 | Capability | How |
 |---|---|
-| **Sign** outgoing mail | `onComposeSend` builds the MIME and signs it with CMS `SignedData`, then submits via `api.jmap.sendRaw`. The *Signature format* setting picks opaque (`application/pkcs7-mime`) or detached (`multipart/signed`, readable without S/MIME). |
+| **Sign** outgoing mail | `onComposeSend` builds the MIME and signs it with CMS `SignedData`, then submits via `api.jmap.sendRaw`. The *Signature format* setting picks detached (`multipart/signed`, readable without S/MIME; the default) or opaque (`application/pkcs7-mime`). |
 | **Encrypt** outgoing mail | `onComposeSend` builds CMS `EnvelopedData` to every recipient (AES-256-GCM by default; AES-128 optional) plus the sender, then submits raw. Sign + Encrypt does proper sign-then-encrypt. |
 | **Verify** incoming signatures | `onRenderEmailBody` fetches the CMS blob (`api.jmap.fetchBlob`) — for detached `multipart/signed` mail the raw message, so the signed part is checked byte-for-byte — validates the signature cryptographically, checks validity dates, flags self-signed signers and signer≠From mismatches, and renders the inner body. |
 | **Decrypt** incoming mail | `onRenderEmailBody` decrypts `EnvelopedData` with your unlocked key (RSA-OAEP, with an RSAES-PKCS1-v1_5 + 3DES/RC2 legacy fallback for old Outlook/Thunderbird mail). |
