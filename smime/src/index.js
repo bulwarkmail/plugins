@@ -412,6 +412,8 @@ function iconSvg(size, ...children) {
   return h('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }, ...children);
 }
 const ICONS = {
+  chevronDown: (s = 20) => iconSvg(s, h('path', { d: 'm6 9 6 6 6-6' })),
+  chevronUp: (s = 20) => iconSvg(s, h('path', { d: 'm18 15-6-6-6 6' })),
   lock: (s = 20) => iconSvg(s,
     h('rect', { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }),
     h('path', { d: 'M7 11V7a5 5 0 0 1 10 0v4' })),
@@ -479,6 +481,7 @@ async function onRenderEmailBody(body, ctx) {
         return undefined;
       }
       const v = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, fromEmail);
+      v.status.format = 'detached';
       await maybeAutoImportSigner(v.status);
       const parsed = parseMime(v.mimeBytes);
       await persistVerifyStatus(ctx.id, v.status);
@@ -536,6 +539,7 @@ async function onRenderEmailBody(body, ctx) {
         try {
           const signedDer = normalizeCmsBytes(bytesArrayBuffer(innerBytes));
           const v = await smimeVerify(signedDer, fromEmail);
+          v.status.format = 'opaque';
           innerBytes = v.mimeBytes;
           Object.assign(verification, v.status, { isEncrypted: true, decryptionSuccess: true });
           await maybeAutoImportSigner(v.status);
@@ -556,6 +560,7 @@ async function onRenderEmailBody(body, ctx) {
 
     if (detection.type === 'signed-data') {
       const v = await smimeVerify(der, fromEmail);
+      v.status.format = 'opaque';
       await maybeAutoImportSigner(v.status);
       const parsed = parseMime(v.mimeBytes);
       await persistVerifyStatus(ctx.id, v.status);
@@ -690,11 +695,95 @@ function signatureFormatHint(intent) {
 
 // ─── UI: email banner (verification / encryption status) ───────────────
 
+function fmtDateTime(iso) {
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+}
+
+// Checks behind the signature verdict. Older persisted statuses lack some fields; those are skipped.
+function signatureChecks(status) {
+  const checks = [];
+  const cert = status.signerCert;
+  if (!cert) {
+    checks.push({ tone: 'bad', text: status.signatureError || 'Signer certificate not found in the message' });
+    return checks;
+  }
+  if (status.cryptoValid === true) {
+    checks.push({ tone: 'ok', text: 'Signature matches the message content — unchanged since signing' });
+  } else if (status.cryptoValid === false) {
+    checks.push({
+      tone: 'bad',
+      text: status.verifyError
+        ? `Signature could not be verified: ${status.verifyError}`
+        : 'Signature does not match the message content — it was changed after signing or the signature is damaged',
+    });
+  }
+  if (status.certExpired) checks.push({ tone: 'bad', text: `Certificate expired on ${fmtDateTime(cert.notAfter)}` });
+  else if (status.certNotYetValid) checks.push({ tone: 'bad', text: `Certificate is not valid before ${fmtDateTime(cert.notBefore)}` });
+  else checks.push({ tone: 'ok', text: `Certificate valid until ${fmtDate(cert.notAfter)}` });
+
+  if (status.signerEmailMatch === true) {
+    checks.push({ tone: 'ok', text: `Certificate belongs to the sender (${cert.email})` });
+  } else if (status.signerEmailMatch === false) {
+    checks.push({
+      tone: 'warn',
+      text: `Certificate is for ${cert.email || 'another address'}, but the message is from ${status.fromEmail || 'someone else'}`,
+    });
+  }
+
+  if (status.selfSigned) {
+    checks.push({ tone: 'warn', text: 'Self-signed certificate — not issued by a certificate authority' });
+  } else {
+    checks.push({ tone: 'info', text: 'Issued by a certificate authority; whether you trust that authority is not checked' });
+  }
+  return checks;
+}
+
+function certificateFields(status) {
+  const cert = status.signerCert || {};
+  const fields = [
+    ['Subject', cert.subject],
+    ['E-mail', cert.email],
+    ['Issuer', cert.issuer],
+    ['Valid', cert.notBefore && cert.notAfter ? `${fmtDateTime(cert.notBefore)} – ${fmtDateTime(cert.notAfter)}` : null],
+    ['Algorithm', cert.algorithm],
+    ['Serial', cert.serialNumber],
+    ['SHA-256', cert.fingerprint],
+    ['Format', status.format === 'detached' ? 'Detached (multipart/signed)'
+      : status.format === 'opaque' ? 'Opaque (application/pkcs7-mime)' : null],
+  ];
+  return fields.filter(([, v]) => v);
+}
+
+function SignatureDetails({ status }) {
+  const checkColor = (tone) => tone === 'ok' ? 'var(--color-success, #16a34a)'
+    : tone === 'bad' ? 'var(--color-destructive, #dc2626)'
+      : tone === 'warn' ? 'var(--color-warning, #d97706)'
+        : 'var(--color-muted-foreground, #64748b)';
+  const checkMark = (tone) => tone === 'ok' ? '✓' : tone === 'bad' ? '✗' : tone === 'warn' ? '!' : 'i';
+  const muted = 'var(--color-muted-foreground, #64748b)';
+
+  return h('div', { style: { marginTop: '8px', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' } },
+    h('ul', { style: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '2px' } },
+      signatureChecks(status).map((c, i) => h('li', { key: i, style: { display: 'flex', gap: '8px' } },
+        h('span', { style: { color: checkColor(c.tone), fontWeight: 700, width: '12px', flexShrink: 0, textAlign: 'center' } }, checkMark(c.tone)),
+        h('span', null, c.text),
+      )),
+    ),
+    h('dl', { style: { display: 'grid', gridTemplateColumns: 'max-content 1fr', columnGap: '12px', rowGap: '2px', margin: 0 } },
+      certificateFields(status).flatMap(([k, v]) => [
+        h('dt', { key: `${k}-k`, style: { color: muted } }, k),
+        h('dd', { key: `${k}-v`, style: { margin: 0, overflowWrap: 'anywhere', fontFamily: k === 'SHA-256' || k === 'Serial' ? 'monospace' : undefined } }, v),
+      ]),
+    ),
+  );
+}
+
 function EmailBanner(props) {
   const email = props && props.email;
   const [status, setStatus] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   // "Unlock now" action for the locked-encryption banner: unlock any locked key
   // (prompting for the storage passphrase), then ask the host to re-run the
@@ -778,9 +867,10 @@ function EmailBanner(props) {
         eyebrow: 'Signature',
         text: `Valid signature${who}${ss}${mismatch}`,
         tone: untrusted ? 'warning' : 'success',
+        details: true,
       });
     } else if (status.signatureError) {
-      rows.push({ icon: 'shieldAlert', eyebrow: 'Signature', text: `Invalid signature: ${status.signatureError}`, tone: 'destructive' });
+      rows.push({ icon: 'shieldAlert', eyebrow: 'Signature', text: `Invalid signature: ${status.signatureError}`, tone: 'destructive', details: true });
     } else {
       rows.push({ icon: 'shieldCheck', eyebrow: 'Signature', text: 'Signed message', tone: 'info' });
     }
@@ -819,7 +909,22 @@ function EmailBanner(props) {
         }, ICONS[r.icon]()),
         h('div', { style: { flex: 1, minWidth: 0 } },
           h('div', { style: { fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted-foreground, #64748b)' } }, r.eyebrow),
-          h('div', { style: { fontSize: '14px', fontWeight: 500, color: 'var(--color-foreground, #0f172a)', overflowWrap: 'break-word' } }, r.text),
+          h('div', {
+            style: { fontSize: '14px', fontWeight: 500, color: 'var(--color-foreground, #0f172a)', overflowWrap: 'break-word' },
+            title: r.details ? signatureChecks(status).map((c) => c.text).join('\n') : undefined,
+          }, r.text),
+          r.details && h('button', {
+            type: 'button',
+            onClick: () => setDetailsOpen(!detailsOpen),
+            'aria-expanded': detailsOpen,
+            style: {
+              marginTop: '2px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: '4px',
+              fontSize: '12px', color: 'var(--color-muted-foreground, #64748b)',
+            },
+          }, detailsOpen ? ICONS.chevronUp(14) : ICONS.chevronDown(14),
+          detailsOpen ? 'Hide certificate details' : 'Show certificate details'),
+          r.details && detailsOpen && h(SignatureDetails, { status }),
           r.action === 'unlock' && h('div', { style: { marginTop: '8px' } },
             h('button', {
               type: 'button',
