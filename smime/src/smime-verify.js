@@ -38,9 +38,11 @@ export async function smimeVerifyDetached(signatureDer, entityBytes, fromHeader)
   // Retry with CRLF line endings in case a relay stripped the CRs.
   let status = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(entityBytes) }, fromHeader);
   const canonical = toCrlf(entityBytes);
-  if (!status.signatureValid && canonical) {
+  // Compare the digest result alone: with an expired certificate signatureValid
+  // is false either way, and the LF attempt would report changed content.
+  if (!status.cryptoValid && canonical) {
     const retry = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(canonical) }, fromHeader);
-    if (retry.signatureValid) status = retry;
+    if (retry.cryptoValid) status = retry;
   }
 
   return { mimeBytes: entityBytes, status };

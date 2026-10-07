@@ -718,12 +718,18 @@ function signatureChecks(status) {
         : 'Signature does not match the message content — it was changed after signing or the signature is damaged',
     });
   }
-  if (status.certExpired) checks.push({ tone: 'bad', text: `Certificate expired on ${fmtDateTime(cert.notAfter)}` });
-  else if (status.certNotYetValid) checks.push({ tone: 'bad', text: `Certificate is not valid before ${fmtDateTime(cert.notBefore)}` });
+  // Older statuses lack certExpired/certNotYetValid; work them out from the dates
+  // like verifyStatus does, rather than calling an expired certificate valid.
+  const certExpired = status.certExpired ?? isExpired(cert.notAfter);
+  const certNotYetValid = status.certNotYetValid ?? new Date(cert.notBefore).getTime() > Date.now();
+  if (certExpired) checks.push({ tone: 'bad', text: `Certificate expired on ${fmtDateTime(cert.notAfter)}` });
+  else if (certNotYetValid) checks.push({ tone: 'bad', text: `Certificate is not valid before ${fmtDateTime(cert.notBefore)}` });
   else checks.push({ tone: 'ok', text: `Certificate valid until ${fmtDate(cert.notAfter)}` });
 
+  // Without a chain check anyone can mint a certificate for any address, so say
+  // what the certificate claims, not who it belongs to.
   if (status.signerEmailMatch === true) {
-    checks.push({ tone: 'ok', text: `Certificate belongs to the sender (${cert.email})` });
+    checks.push({ tone: 'ok', text: `Certificate is for the sender's address (${cert.email})` });
   } else if (status.signerEmailMatch === false) {
     checks.push({
       tone: 'warn',
@@ -734,7 +740,7 @@ function signatureChecks(status) {
   if (status.selfSigned) {
     checks.push({ tone: 'warn', text: 'Self-signed certificate — not issued by a certificate authority' });
   } else {
-    checks.push({ tone: 'info', text: 'Issued by a certificate authority; whether you trust that authority is not checked' });
+    checks.push({ tone: 'info', text: 'Issuer not verified: the certificate chain is not checked against trusted authorities' });
   }
   return checks;
 }
@@ -871,7 +877,7 @@ function EmailBanner(props) {
         details: true,
       });
     } else if (status.signatureError) {
-      rows.push({ icon: 'shieldAlert', eyebrow: 'Signature', text: `Invalid signature: ${status.signatureError}`, tone: 'destructive', details: true });
+      rows.push({ icon: 'shieldAlert', eyebrow: 'Signature', text: `Invalid signature: ${status.signatureError}`, tone: 'destructive', details: !!status.signerCert });
     } else {
       rows.push({ icon: 'shieldCheck', eyebrow: 'Signature', text: 'Signed message', tone: 'info' });
     }
