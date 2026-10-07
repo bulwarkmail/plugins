@@ -1,7 +1,7 @@
 {
   "id": "smime",
   "name": "S/MIME",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "Bulwark Mail Community",
   "description": "End-to-end S/MIME for webmail: sign (opaque or detached) and encrypt outgoing messages, and automatically verify signatures and decrypt incoming CMS (PKCS#7) mail. Private keys are imported from a PKCS#12 (.p12/.pfx) file, encrypted at rest with a passphrase, and unlocked into non-extractable WebCrypto keys that never leave your browser. Runs in the privileged (same-origin) plugin tier so all cryptography happens locally with bundled pkijs/asn1js.",
   "type": "ui-extension",
