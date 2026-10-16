@@ -10,7 +10,7 @@ import * as React from 'react';
 const h = React.createElement;
 const cls = (name) => `bk-${name}`;
 
-export const KIT_VERSION = 1;
+export const KIT_VERSION = 2;
 
 export function Icon({ name }) {
   return h('span', { 'data-icon': name ?? 'puzzle', 'aria-hidden': 'true' });
@@ -53,6 +53,328 @@ export function Select({ options, children, onChange, block, ...rest }) {
   void block;
   return h('select', { onChange: (e) => onChange?.(e.target.value, e), ...rest },
     options?.map((o) => h('option', { key: o.value, value: o.value, disabled: o.disabled }, o.label)), children);
+}
+
+export function Combobox({
+  options = [],
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+  block = false,
+  multiple = false,
+  clearable = true,
+  id,
+  ariaLabel,
+  className,
+}) {
+  void block;
+  void className;
+  const autoId = React.useId();
+  const inputId = id ?? autoId;
+  const listboxId = `${inputId}-listbox`;
+
+  const containerRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+  const optionRefs = React.useRef([]);
+
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
+  const [isTyping, setIsTyping] = React.useState(false);
+  const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
+
+  const selectedValues = React.useMemo(() => {
+    if (multiple) {
+      return Array.isArray(value) ? value : value ? [value] : [];
+    }
+    return [];
+  }, [multiple, value]);
+
+  const singleValue = React.useMemo(() => {
+    if (multiple) return '';
+    return typeof value === 'string' ? value : '';
+  }, [multiple, value]);
+
+  const selectedOption = React.useMemo(() => {
+    if (multiple || !singleValue) return null;
+    return options.find((o) => o.value === singleValue) || null;
+  }, [multiple, singleValue, options]);
+
+  const selectedOptions = React.useMemo(() => {
+    if (!multiple) return [];
+    return options.filter((o) => selectedValues.includes(o.value));
+  }, [multiple, options, selectedValues]);
+
+  React.useEffect(() => {
+    if (!isTyping) {
+      if (multiple) {
+        setQuery('');
+      } else {
+        setQuery(selectedOption ? selectedOption.label : '');
+      }
+    }
+  }, [selectedOption, isTyping, multiple]);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!isTyping || !query.trim()) return options;
+    const q = query.trim().toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, isTyping, query]);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (multiple) {
+        setHighlightedIndex(filteredOptions.length > 0 ? 0 : -1);
+      } else {
+        const idx = filteredOptions.findIndex((o) => o.value === singleValue);
+        setHighlightedIndex(idx >= 0 ? idx : filteredOptions.length > 0 ? 0 : -1);
+      }
+    } else {
+      setHighlightedIndex(-1);
+    }
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (isOpen && highlightedIndex >= 0 && optionRefs.current[highlightedIndex]) {
+      const el = optionRefs.current[highlightedIndex];
+      if (typeof el?.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [isOpen, highlightedIndex]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const onDocMouseDown = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setIsTyping(false);
+        if (multiple) {
+          setQuery('');
+        } else {
+          setQuery(selectedOption ? selectedOption.label : '');
+        }
+      }
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [isOpen, selectedOption, multiple]);
+
+  const toggleMultipleOption = (opt) => {
+    if (opt.disabled) return;
+    const exists = selectedValues.includes(opt.value);
+    const next = exists ? selectedValues.filter((v) => v !== opt.value) : [...selectedValues, opt.value];
+    onChange?.(next);
+    setQuery('');
+    setIsTyping(false);
+    if (isOpen) {
+      inputRef.current?.focus();
+    }
+  };
+
+  const selectOption = (opt) => {
+    if (opt.disabled) return;
+    if (multiple) {
+      toggleMultipleOption(opt);
+    } else {
+      onChange?.(opt.value);
+      setIsOpen(false);
+      setIsTyping(false);
+      setQuery(opt.value ? opt.label : '');
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleClear = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (multiple) {
+      onChange?.([]);
+    } else {
+      onChange?.('');
+    }
+    setQuery('');
+    setIsTyping(false);
+    setIsOpen(false);
+  };
+
+  const handleToggle = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (disabled) return;
+    if (isOpen) {
+      setIsOpen(false);
+      setIsTyping(false);
+      if (multiple) {
+        setQuery('');
+      } else {
+        setQuery(selectedOption ? selectedOption.label : '');
+      }
+    } else {
+      setIsOpen(true);
+      setIsTyping(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (disabled) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        setIsTyping(false);
+      } else if (filteredOptions.length > 0) {
+        setHighlightedIndex((prev) => (prev + 1 < filteredOptions.length ? prev + 1 : 0));
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        setIsTyping(false);
+      } else if (filteredOptions.length > 0) {
+        setHighlightedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : filteredOptions.length - 1));
+      }
+    } else if (e.key === 'Enter') {
+      if (isOpen && highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+        e.preventDefault();
+        selectOption(filteredOptions[highlightedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      if (isOpen) {
+        e.preventDefault();
+        setIsOpen(false);
+        setIsTyping(false);
+        if (multiple) {
+          setQuery('');
+        } else {
+          setQuery(selectedOption ? selectedOption.label : '');
+        }
+      }
+    } else if (e.key === 'Tab') {
+      if (isOpen) {
+        setIsOpen(false);
+        setIsTyping(false);
+        if (multiple) {
+          setQuery('');
+        } else {
+          setQuery(selectedOption ? selectedOption.label : '');
+        }
+      }
+    } else if (e.key === 'Backspace' && multiple && query === '' && selectedValues.length > 0) {
+      const next = selectedValues.slice(0, -1);
+      onChange?.(next);
+    }
+  };
+
+  const hasValue = multiple ? selectedValues.length > 0 : Boolean(singleValue);
+
+  return h('div', { ref: containerRef, className: cls('combobox') },
+    h('div', { className: cls('combobox-control') },
+      multiple ? selectedOptions.map((opt) => (
+        h('span', {
+          key: opt.value,
+          role: 'checkbox',
+          'aria-checked': true,
+          'aria-label': opt.label,
+          className: cls('combobox-chip'),
+        },
+          opt.label,
+          !disabled ? h('button', {
+            type: 'button',
+            tabIndex: -1,
+            onMouseDown: (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            },
+            onClick: (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleMultipleOption(opt);
+            },
+            'aria-label': `Remove ${opt.label}`,
+          }, '×') : null,
+        )
+      )) : null,
+      h('input', {
+        ref: inputRef,
+        id: inputId,
+        type: 'text',
+        role: 'combobox',
+        autoComplete: 'off',
+        disabled,
+        'aria-expanded': isOpen,
+        'aria-controls': listboxId,
+        'aria-autocomplete': 'list',
+        'aria-label': ariaLabel,
+        'aria-activedescendant': isOpen && highlightedIndex >= 0 ? `${listboxId}-opt-${highlightedIndex}` : undefined,
+        value: query,
+        placeholder: multiple && selectedValues.length > 0 ? '' : placeholder,
+        onChange: (e) => {
+          setQuery(e.target.value);
+          setIsTyping(true);
+          if (!isOpen) setIsOpen(true);
+        },
+        onFocus: () => {
+          if (!disabled && !isOpen) {
+            setIsOpen(true);
+            setIsTyping(false);
+          }
+        },
+        onClick: () => {
+          if (!disabled && !isOpen) {
+            setIsOpen(true);
+            setIsTyping(false);
+          }
+        },
+        onKeyDown: handleKeyDown,
+      }),
+      clearable && hasValue && !disabled ? h('button', {
+        type: 'button',
+        tabIndex: -1,
+        onMouseDown: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        },
+        onClick: handleClear,
+        'aria-label': 'Clear',
+      }, '×') : null,
+      h('button', {
+        type: 'button',
+        tabIndex: -1,
+        disabled,
+        onMouseDown: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        },
+        onClick: handleToggle,
+        'aria-label': isOpen ? 'Close' : 'Open',
+      }, isOpen ? '▴' : '▾'),
+    ),
+    isOpen ? h('div', {
+      id: listboxId,
+      role: 'listbox',
+      'aria-multiselectable': multiple || undefined,
+      'aria-label': ariaLabel ?? placeholder,
+      className: cls('combobox-listbox'),
+    },
+      filteredOptions.length === 0
+        ? h('div', { className: cls('combobox-empty') }, 'No results')
+        : filteredOptions.map((opt, i) => {
+          const isSelected = multiple ? selectedValues.includes(opt.value) : opt.value === singleValue;
+          return h('div', {
+            key: opt.value,
+            ref: (el) => { optionRefs.current[i] = el; },
+            id: `${listboxId}-opt-${i}`,
+            role: 'option',
+            'aria-selected': isSelected,
+            'aria-disabled': opt.disabled,
+            'data-highlighted': highlightedIndex === i || undefined,
+            onMouseDown: (e) => e.preventDefault(),
+            onClick: () => selectOption(opt),
+            onMouseEnter: () => setHighlightedIndex(i),
+          }, opt.label);
+        }),
+    ) : null,
+  );
 }
 
 export function Checkbox({ checked, onChange, label, hint, disabled = false, id, ariaLabel }) {
