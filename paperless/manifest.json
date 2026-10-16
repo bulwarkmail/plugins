@@ -1,7 +1,7 @@
 {
   "id": "paperless",
   "name": "Paperless-ngx",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "Bulwark Mail Community",
   "description": "Send attachments and messages to Paperless-ngx, find your documents there and attach them to new mail.",
   "type": "ui-extension",
@@ -20,7 +20,7 @@
     "ui:download-file"
   ],
   "entrypoint": "index.js",
-  "minAppVersion": "1.7.0",
+  "minAppVersion": "1.16.0",
   "configSchema": {
     "serverUrl": {
       "type": "string",
