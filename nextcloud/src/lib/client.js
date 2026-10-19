@@ -129,7 +129,7 @@ export function createClient(api, conn) {
       const parts = [];
       let loaded = 0;
       try {
-        for (;;) {
+        for (; ;) {
           const { done, value } = await reader.read();
           if (done) break;
           parts.push(value);
@@ -188,6 +188,31 @@ export function createClient(api, conn) {
         if (typeof data?.password === 'string' && data.password) return data.password;
       } catch { /* the app may be off; fall back */ }
       return localPassword();
+    },
+
+    async createTalkRoom(eventTitle, eventDescription) {
+      const data = await ocs(
+        api,
+        origin,
+        '/ocs/v2.php/apps/spreed/api/v4/room',
+        {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            {
+              roomName: eventTitle,
+              description: eventDescription,
+              roomType: 3,
+            }),
+        },
+        { kind: 'room' }
+      );
+
+      const token = data?.token;
+      if (!token) throw new Error("No token in response");
+
+      const url = `${origin}/call/${token}`;
+
+      return url;
     },
 
     /** Where to open a file in the Nextcloud web interface. */

@@ -12,6 +12,7 @@ import { applyPickerResult } from './lib/picker-result.js';
 import { SettingsSection } from './ui/settings-section.js';
 import { PluginDialog } from './ui/dialog.js';
 import { FilesPage } from './ui/files-page.js';
+import { AddTalkMeetingButton } from './ui/talkmeeting-button.js';
 
 const FIRST_RUN_KEY = 'firstRunOffered';
 
@@ -44,8 +45,8 @@ export async function activate(api) {
   bg = api;
   setApi(api);
   await registerActions(api).catch((err) => api.log.warn('setActions failed', err));
-  api.i18n.onLocaleChange(() => { void registerActions(api).catch(() => {}); });
-  await offerFirstRun(api).catch(() => {});
+  api.i18n.onLocaleChange(() => { void registerActions(api).catch(() => { }); });
+  await offerFirstRun(api).catch(() => { });
 }
 
 /**
@@ -130,4 +131,5 @@ export const slots = {
   'settings-section': { component: SettingsSection },
   'plugin-dialog': { component: PluginDialog },
   'app-page': { component: FilesPage },
+  'calendar-event-actions': { component: AddTalkMeetingButton },
 };
