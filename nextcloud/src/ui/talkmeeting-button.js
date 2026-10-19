@@ -18,10 +18,8 @@ export function AddTalkMeetingButton(props) {
         return null
     }
 
-    let conn
     let client
     getConnection(api).then(connection => {
-        conn = connection
         client = createClient(api, connection)
     })
 
@@ -31,15 +29,12 @@ export function AddTalkMeetingButton(props) {
         if (busy) return;
         setBusy(true);
         try {
-            // api.http.post resolves to { ok, status, data }: the parsed body is in `data`.
             const roomUrl = await client.createTalkRoom(eventTitle, eventDescription)
 
             if (typeof setVirtualLocation === 'function') {
-                // An RPC stub: await it so a host-side error surfaces here.
                 await setVirtualLocation(roomUrl);
                 api.toast.success(t('talkMeeting.added'));
             } else {
-                // No host setter: show the URL so the user can still copy it.
                 await api.ui.alert({ title: t('talkMeeting.added'), message: url });
             }
         } catch (err) {
