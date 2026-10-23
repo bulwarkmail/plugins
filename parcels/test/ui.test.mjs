@@ -64,7 +64,7 @@ function makeApi({ settings = {}, locale = 'en', openDialog } = {}) {
 
 const parcel = (number, extra = {}) => ({
   number, carrier: 'dhl', carrierName: 'DHL', trackingUrl: `https://track.example/${number}`, emailId: null, subject: '',
-  addedAt: 1, status: null, text: '', location: '', time: '', eta: null, events: [], lastPolledAt: 0, lastChangeAt: Date.now(),
+  addedAt: Date.now(), status: null, text: '', location: '', time: '', eta: null, events: [], lastPolledAt: 0, lastChangeAt: Date.now(),
   received: false, stopped: false, error: null, ...extra,
 });
 
@@ -131,6 +131,19 @@ describe('reader card', () => {
     const { component: Card } = load(api).slots['email-banner'];
     await show(React.createElement(Card, { email: { ...SHIPPING, text: 'UPS: 1Z999AA10123456784' } }));
     expect((await screen.findByRole('status')).textContent).toBe("The tracking service didn't accept the API key. Ask your administrator to check it.");
+  });
+});
+
+describe('delivery heading actions', () => {
+  it('shows refresh and most recent tracking time in the inline slot', async () => {
+    const api = makeApi();
+    await api.storage.set('parcel:1Z999AA10123456784', parcel('1Z999AA10123456784',
+      { carrier: 'ups', lastPolledAt: Date.parse('2026-10-21T19:10:00Z') }));
+    const Header = load(api).slots['sidebar-section-actions'].component;
+    await show(React.createElement(Header));
+    const button = await screen.findByRole('button', { name: 'Refresh' });
+    expect(button).toBeTruthy();
+    expect(screen.getByText(/\d{1,2}:\d\d/)).toBeTruthy();
   });
 });
 

@@ -8,6 +8,7 @@ import host from '@plugin-host';
 import { SidebarEmpty, SidebarRow, Stack } from '@plugin-host/ui';
 import { applyOutcome, getParcel, listParcels, saveParcel, visibleParcels } from '../lib/parcels.js';
 import { createTracker } from '../lib/tracking.js';
+import { getBackground } from '../lib/runtime.js';
 import { carrierLabel, shortNumber, shortStatus, shownStatus, statusIcon, statusLabel } from '../lib/view.js';
 
 const h = React.createElement;
@@ -52,13 +53,24 @@ export function DeliveriesWidget() {
     }
   }, []);
 
+  const refreshAll = React.useCallback(async () => {
+    try {
+      await getBackground(host).visit();
+    } catch (err) {
+      host.log.warn('parcels: could not refresh deliveries', err);
+    } finally {
+      await reload();
+    }
+  }, [reload]);
+
   React.useEffect(() => {
     void reload();
+    void refreshAll(); // One check when entering webmail (five-minute floor).
     const timer = setInterval(() => { void reload(); }, RELOAD_MS);
-    const onFocus = () => { void reload(); };
+    const onFocus = () => { void refreshAll(); };
     window.addEventListener('focus', onFocus);
     return () => { clearInterval(timer); window.removeEventListener('focus', onFocus); };
-  }, [reload]);
+  }, [reload, refreshAll]);
 
   const openParcel = (p) => async () => {
     try {

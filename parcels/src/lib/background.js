@@ -3,7 +3,12 @@
 
 import { detectParcels } from './detect.js';
 import { CARRIERS } from './carriers/index.js';
-import { pollDue, rememberParcels } from './parcels.js';
+import { MANUAL_REFRESH_MS, POLL_INTERVAL_MS, pollDue, rememberParcels } from './parcels.js';
+
+// Avoid a request on every tab focus, while still refreshing when a user
+// returns to webmail. A manual refresh is separate and intentionally faster.
+export const VISIT_REFRESH_MS = 5 * 60_000;
+
 import { createTracker } from './tracking.js';
 import { notificationFor } from './view.js';
 
@@ -22,6 +27,8 @@ export function mightContainParcel(summary) {
 export function createBackground(api, { tracker = createTracker(api), now = () => Date.now() } = {}) {
   let backoffUntil = 0;
   let running = false;
+  let lastVisitAt = -Infinity;
+  let lastManualAt = -Infinity;
 
   const setting = (key, fallback) => {
     const v = api.plugin?.settings?.[key];
@@ -38,11 +45,11 @@ export function createBackground(api, { tracker = createTracker(api), now = () =
   }
 
   /** One polling round; skipped while another runs or a service asked us to wait. */
-  async function tick() {
+  async function poll(intervalMs = POLL_INTERVAL_MS) {
     if (running || now() < backoffUntil) return null;
     running = true;
     try {
-      const result = await pollDue(api.storage, tracker, { now: now(), onChange: notifyChange });
+      const result = await pollDue(api.storage, tracker, { now: now(), onChange: notifyChange, intervalMs });
       if (result.retryAfter) backoffUntil = now() + result.retryAfter * 1000;
       return result;
     } catch (err) {
@@ -51,6 +58,23 @@ export function createBackground(api, { tracker = createTracker(api), now = () =
     } finally {
       running = false;
     }
+  }
+
+  /** Routine updates every 30 minutes, even while the page remains open. */
+  const tick = () => poll();
+
+  /** Refresh on entry/focus, throttled across widget remounts in this session. */
+  async function visit() {
+    if (now() - lastVisitAt < VISIT_REFRESH_MS || running || now() < backoffUntil) return null;
+    lastVisitAt = now();
+    return poll(VISIT_REFRESH_MS);
+  }
+
+  /** User-initiated refresh checks all eligible parcels, not just a mail. */
+  async function refresh() {
+    if (now() - lastManualAt < MANUAL_REFRESH_MS || running || now() < backoffUntil) return null;
+    lastManualAt = now();
+    return poll(MANUAL_REFRESH_MS);
   }
 
   /** onNewEmailReceived: follow the parcels a new shipping mail mentions. */
@@ -68,7 +92,7 @@ export function createBackground(api, { tracker = createTracker(api), now = () =
     return rememberParcels(api.storage, found, { emailId: mail.id, subject: mail.subject, now: now() });
   }
 
-  return { tick, onNewEmail, notifyChange };
+  return { tick, visit, refresh, onNewEmail, notifyChange };
 }
 
 /** email-banner shouldShow: only messages with a tracking number get a card. */

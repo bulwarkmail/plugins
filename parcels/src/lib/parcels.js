@@ -84,12 +84,12 @@ export async function rememberParcels(storage, found, meta = {}) {
 }
 
 /** Whether the background poller should ask about this parcel now. */
-export function isDue(p, now) {
+export function isDue(p, now, intervalMs = POLL_INTERVAL_MS) {
   if (!p || p.received || p.stopped) return false;
   if (p.status && FINAL_STATUSES.has(p.status)) return false;
   if (now - (p.addedAt || 0) >= MAX_AGE_MS) return false;
   if (p.retryAt && now < p.retryAt) return false;
-  return !p.lastPolledAt || now - p.lastPolledAt >= POLL_INTERVAL_MS;
+  return !p.lastPolledAt || now - p.lastPolledAt >= intervalMs;
 }
 
 /** Whether polling has run out of time for this parcel (30 days, not delivered). */
@@ -145,12 +145,12 @@ export function visibleParcels(list) {
  * Resolves to { polled, changed, retryAfter } (seconds, when a service
  * asked us to slow down).
  */
-export async function pollDue(storage, tracker, { now = Date.now(), onChange, claimDelayMs = 50 } = {}) {
+export async function pollDue(storage, tracker, { now = Date.now(), onChange, claimDelayMs = 50, intervalMs = POLL_INTERVAL_MS } = {}) {
   const all = await listParcels(storage);
   for (const p of all) {
     if (isTooOld(p, now)) await saveParcel(storage, { ...p, stopped: true });
   }
-  const candidates = all.filter((p) => isDue(p, now))
+  const candidates = all.filter((p) => isDue(p, now, intervalMs))
     .sort((a, b) => (a.lastPolledAt || 0) - (b.lastPolledAt || 0))
     .slice(0, MAX_PER_TICK);
   if (!candidates.length) return { polled: 0, changed: 0, retryAfter: 0 };
@@ -163,7 +163,7 @@ export async function pollDue(storage, tracker, { now = Date.now(), onChange, cl
     // Read again right before claiming: someone else may have claimed it
     // since the list above was read.
     const fresh = await getParcel(storage, p.number);
-    if (fresh && isDue(fresh, now)) await saveParcel(storage, { ...fresh, lastPolledAt: now, pollClaim: token });
+    if (fresh && isDue(fresh, now, intervalMs)) await saveParcel(storage, { ...fresh, lastPolledAt: now, pollClaim: token });
   }
   if (claimDelayMs) await new Promise((r) => setTimeout(r, claimDelayMs));
   const due = [];
