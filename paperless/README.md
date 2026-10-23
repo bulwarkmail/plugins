@@ -29,6 +29,21 @@ Users connect in Settings > Paperless-ngx (or when they first press Send to Pape
 
 Paperless can sit under a path (`https://example.com/paperless`) when the administrator enters that URL; a user-entered server must serve Paperless at the root of its address.
 
+### Paperless permissions
+
+The Paperless user behind the token needs these permissions (Users & Groups > Permissions). The plugin never changes or deletes anything in Paperless.
+
+| Paperless permission | Why |
+| --- | --- |
+| UI Settings: View | Connecting and showing who is connected (`/api/ui_settings/`). |
+| Documents: View | Search, "Already in Paperless", thumbnails, previews and downloads. |
+| Documents: Add | Send to Paperless. Tags, correspondent, type and storage path are sent with the upload, so Change is not needed. |
+| Tags, Correspondents, Document Types: View | Filters and the choices in the send dialog. |
+| Storage Paths: View | Optional; without it the dialog has no storage path choice. |
+| Tasks: View | Following the import after an upload (filed, failed, duplicate). |
+
+The user sees only the documents, tags and so on that they own or that are shared with them. A shared token makes every webmail user see what that one Paperless account sees, so it should not be a superuser's.
+
 ![Settings](screenshots/settings-light.png)
 
 Screenshots in dark mode: [settings](screenshots/settings-dark.png), [documents](screenshots/documents-dark.png), [document](screenshots/document-details-dark.png), [send dialog](screenshots/send-dialog-dark.png).
