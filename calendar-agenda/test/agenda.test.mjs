@@ -41,9 +41,22 @@ const events = [
 
 const calendars = [{ id: 'cal', name: 'Work', color: '#3b82f6', isVisible: true, isDefault: true, isTasksOnly: false }];
 
-function setup(slot, { getEvents = async () => events, listCalendars = async () => calendars, settings = { daysAhead: 7 } } = {}) {
+function setup(slot, {
+  getEvents = async () => events,
+  listCalendars = async () => calendars,
+  settings = { daysAhead: 7 },
+  locale = 'en',
+  dateLocale,
+  timeFormat,
+  timeZone,
+} = {}) {
   const api = fakeApi({
-    translations: manifest.locales, settings,
+    translations: manifest.locales,
+    settings,
+    locale,
+    dateLocale,
+    timeFormat,
+    timeZone,
     handlers: { 'calendar.getEvents': getEvents, 'calendar.listCalendars': listCalendars },
   });
   const Agenda = makeAgenda(React, api, { slot, now: NOW });
@@ -222,5 +235,45 @@ describe('reading pane and top banner', () => {
     const bar = document.querySelector('.bk-infobar');
     expect(bar.textContent.startsWith('Agenda')).toBe(true);
     expect(bar.querySelectorAll('span[title]')).toHaveLength(3);
+  });
+});
+
+describe('regional formatting and locale settings', () => {
+  it('formats times in 24h when timeFormat is 24h', async () => {
+    const { Agenda } = setup('sidebar-section', {
+      timeFormat: '24h',
+      getEvents: async () => [timed('a', 'Afternoon Meeting', new Date(2026, 9, 14, 14, 30), 30)],
+    });
+    await show(Agenda);
+    expect(document.body.textContent).toContain('Afternoon Meeting14:30');
+  });
+
+  it('formats times in 12h when timeFormat is 12h', async () => {
+    const { Agenda } = setup('sidebar-section', {
+      timeFormat: '12h',
+      getEvents: async () => [timed('a', 'Afternoon Meeting', new Date(2026, 9, 14, 14, 30), 30)],
+    });
+    await show(Agenda);
+    expect(document.body.textContent).toMatch(/Afternoon Meeting(2:30|02:30)\s*PM/);
+  });
+
+  it('formats date headings using dateLocale when provided', async () => {
+    const { Agenda } = setup('sidebar-section', {
+      dateLocale: 'de',
+      getEvents: async () => [allDay('n', 'Future', '2026-10-18')],
+    });
+    await show(Agenda);
+    const headings = dayHeadings();
+    // 'de' locale short weekday for Sunday is 'So.'
+    expect(headings.some((h) => h.includes('So.'))).toBe(true);
+  });
+
+  it('resolves untitled fallback dynamically in the active locale', async () => {
+    const { Agenda } = setup('sidebar-section', {
+      locale: 'de',
+      getEvents: async () => [timed('x', '', new Date(2026, 9, 14, 11, 0), 30)],
+    });
+    await show(Agenda);
+    expect(rowTitles()).toEqual(['(Kein Titel)']);
   });
 });

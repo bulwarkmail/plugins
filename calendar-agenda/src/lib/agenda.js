@@ -52,7 +52,7 @@ export function durationMs(duration) {
  * event's `start` is wall-clock time in its own zone, so its UTC start
  * places it; an all-day event starts at local midnight.
  */
-export function toAgendaEvent(view, untitled, colors = new Map()) {
+export function toAgendaEvent(view, untitled = '', colors = new Map()) {
   const allDay = !!view.isAllDay;
   const start = !allDay && view.utcStart ? new Date(view.utcStart) : new Date(view.start);
   const end = !allDay && view.utcEnd ? new Date(view.utcEnd) : new Date(start.getTime() + durationMs(view.duration));
@@ -117,17 +117,23 @@ export function groupByDay(events, now = new Date()) {
 
 export function makeFormat(api, now = () => new Date()) {
   const t = (key, vars) => api.i18n.t(key, vars);
-  const locale = () => api.i18n.locale || (api.i18n.getLocale && api.i18n.getLocale()) || undefined;
+  const locale = () => api.i18n.dateLocale || api.i18n.locale || (api.i18n.getLocale && api.i18n.getLocale()) || undefined;
 
   function dayLabel(date) {
     const diffDays = Math.round((startOfDay(date).getTime() - startOfDay(now()).getTime()) / 86_400_000);
     if (diffDays === 0) return t('day.today');
     if (diffDays === 1) return t('day.tomorrow');
+    if (typeof api.i18n?.formatDate === 'function') {
+      return api.i18n.formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' });
+    }
     return date.toLocaleDateString(locale(), { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   function timeLabel(ev) {
     if (ev.allDay) return t('event.all_day');
+    if (typeof api.i18n?.formatTime === 'function') {
+      return api.i18n.formatTime(ev.start, { hour: '2-digit', minute: '2-digit' });
+    }
     return new Date(ev.start).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
   }
 
@@ -147,9 +153,10 @@ export function makeAgenda(React, api, { slot = DEFAULT_SLOT, now } = {}) {
   const fmt = makeFormat(api, now);
   const { t } = fmt;
 
-  // A cancelled event keeps its row, struck through.
-  const titleOf = (ev) => (ev.status === 'cancelled' ? h('del', null, ev.title) : ev.title);
-  const tooltip = (ev) => [ev.title, fmt.when(ev), ev.location].filter(Boolean).join(' · ');
+  // A cancelled event keeps its row, struck through. Fall back to "(No title)" if title is blank.
+  const titleTextOf = (ev) => ev.title || t('event.untitled');
+  const titleOf = (ev) => (ev.status === 'cancelled' ? h('del', null, titleTextOf(ev)) : titleTextOf(ev));
+  const tooltip = (ev) => [titleTextOf(ev), fmt.when(ev), ev.location].filter(Boolean).join(' · ');
 
   function useAgenda() {
     const [events, setEvents] = useState([]);
@@ -167,7 +174,7 @@ export function makeAgenda(React, api, { slot = DEFAULT_SLOT, now } = {}) {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       try {
-        setEvents(await loadAgenda(api, { days, limit, now: now ? now() : new Date(), untitled: t('event.untitled') }));
+        setEvents(await loadAgenda(api, { days, limit, now: now ? now() : new Date() }));
         setState('ready');
       } catch (err) {
         const text = String((err && err.message) || err);
@@ -268,7 +275,7 @@ export function makeAgenda(React, api, { slot = DEFAULT_SLOT, now } = {}) {
     const { events, message } = useAgenda();
     return h(InfoBar, { compact: true, tone: 'primary', icon: 'calendar', eyebrow: t('header.title'), title: message || undefined },
       ...(message ? [] : events.slice(0, BANNER_EVENTS).map((ev) => h(Chip, {
-        key: ev.id, label: h(React.Fragment, null, chipDot(ev), ev.title), detail: fmt.when(ev), title: tooltip(ev),
+        key: ev.id, label: h(React.Fragment, null, chipDot(ev), titleOf(ev)), detail: fmt.when(ev), title: tooltip(ev),
       }))),
       !message && events.length > BANNER_EVENTS ? h(Text, { key: 'more', size: 'xs', tone: 'muted' }, `+${events.length - BANNER_EVENTS}`) : null);
   }
