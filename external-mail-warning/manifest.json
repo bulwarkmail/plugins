@@ -3,7 +3,7 @@
   "name": "External Mail Warning",
   "version": "1.5.1",
   "author": "Bulwark Mail Community",
-  "description": "Warns before sending email to recipients outside your safe-domain list, and flags incoming messages from external senders with a banner. Admins can pre-populate organisation-wide safe domains.",
+  "description": "Replaced by Bulwark: from Bulwark 1.19, admins turn on an External label and a confirm before sending outside the organisation in Organisation > Security, and this plugin does nothing while those are on. On older Bulwark versions it warns before sending to recipients outside your safe-domain list and flags mail from external senders with a banner.",
   "type": "hook",
   "permissions": [
     "email:read",
@@ -20,7 +20,7 @@
     "safeDomains": {
       "type": "string",
       "label": "Safe domains (organisation-wide)",
-      "description": "Comma- or newline-separated list of internal/safe domains. Applies to every user. Subdomains match automatically (example.com also covers eu.example.com).",
+      "description": "Comma- or newline-separated list of internal/safe domains. Applies to every user. Subdomains match automatically (example.com also covers eu.example.com). From Bulwark 1.19, set this in Organisation > Security > External mail instead: Import from the plugin copies this list there, and the plugin does nothing while those warnings are on.",
       "placeholder": "example.com, partner.com",
       "default": ""
     }
@@ -29,7 +29,7 @@
     "safeDomainsCsv": {
       "type": "string",
       "label": "Additional safe domains",
-      "description": "Comma- or newline-separated list of domains you trust (e.g. acme.com, partner.io). Subdomains are matched automatically.",
+      "description": "Comma- or newline-separated list of domains you trust (e.g. acme.com, partner.io). Subdomains are matched automatically. When your organisation turned on Bulwark's own external mail warnings, this plugin does nothing and these settings have no effect.",
       "default": ""
     },
     "treatIdentityDomainAsSafe": {

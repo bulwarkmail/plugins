@@ -11,12 +11,17 @@
 // Every method of every namespace exists: `api.anything.method(...)` records
 // the call and returns what `handlers['anything.method']` returns (undefined
 // without a handler). storage, i18n and plugin.settings work for real.
+//
+// `hostFeatures: { externalMailWarnings: true }` adds api.host as Bulwark
+// 1.19 and later have it; `api.setHostFeatures(next)` changes it like the
+// host does. Without the option api.host is missing, as on older hosts.
 
-export function fakeApi({ id = 'test-plugin', version = '1.0.0', settings = {}, locale = 'en', translations = {}, handlers = {} } = {}) {
+export function fakeApi({ id = 'test-plugin', version = '1.0.0', settings = {}, locale = 'en', translations = {}, handlers = {}, hostFeatures } = {}) {
   const log = [];
   const store = new Map();
   const settingsListeners = [];
   const localeListeners = [];
+  const hostListeners = [];
   let currentLocale = locale;
 
   const call = (method, args) => {
@@ -60,6 +65,13 @@ export function fakeApi({ id = 'test-plugin', version = '1.0.0', settings = {}, 
     },
   };
 
+  if (hostFeatures) {
+    known.host = {
+      features: { ...hostFeatures },
+      onFeaturesChange(fn) { hostListeners.push(fn); return () => {}; },
+    };
+  }
+
   const namespace = (name) => new Proxy({}, {
     get(_t, method) {
       if (typeof method !== 'string') return undefined;
@@ -73,6 +85,7 @@ export function fakeApi({ id = 'test-plugin', version = '1.0.0', settings = {}, 
       if (name === 'setLocale') return (l) => { currentLocale = l; for (const fn of localeListeners) fn(l); };
       if (name === 'changeSettings') return (next) => { Object.assign(target.plugin.settings, next); for (const fn of settingsListeners) fn({ ...target.plugin.settings }); };
       if (name === 'storageSnapshot') return () => Object.fromEntries(store);
+      if (name === 'setHostFeatures') return (next) => { Object.assign(target.host.features, next); for (const fn of hostListeners) fn(target.host.features); };
       if (typeof name !== 'string') return undefined;
       if (name in target) return target[name];
       const ns = namespace(name);

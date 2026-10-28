@@ -1,5 +1,24 @@
 # External Mail Warning
 
+> **Replaced by Bulwark.** From Bulwark 1.19, admins turn on an "External"
+> label for mail from outside the organisation and a confirm before sending
+> outside it in the admin panel, under Organisation > Security > External
+> mail. They can be set per domain or group, and they work in Bulwark Lite.
+> While either is on, this plugin does nothing (version 1.6.0 and later
+> read `api.host.features.externalMailWarnings`; Bulwark also skips the
+> hooks of older copies). To move over:
+>
+> 1. In Organisation > Security, click **Import from the plugin** to copy
+>    the plugin's admin safe-domain list, then save.
+> 2. Turn on the label, the confirm, or both.
+> 3. Remove the plugin in Extensions > Plugins.
+>
+> Two things don't carry over: each user's own safe domains
+> (`safeDomainsCsv`), and the banner for failed SPF, DKIM or DMARC checks.
+> Bulwark shows its own "Unverified sender" warning for those.
+>
+> On Bulwark 1.18 and older the plugin works as described below.
+
 Intercepts outgoing email and asks the user to confirm before delivering to
 addresses outside the safe-domain list. Useful as a guardrail against
 auto-complete mistakes (`alice@compettior.com`) and reply-all leaks.

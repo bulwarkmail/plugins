@@ -26,12 +26,18 @@
  * reads the admin-managed safe-domains list directly via
  * api.admin.getConfig('safeDomains') and computes its "external" set
  * accurately, instead of treating every From: address as external.
+ *
+ * Retired: Bulwark 1.19 and later warn about external mail themselves
+ * (Organisation > Security in the admin panel). While those warnings are on
+ * (api.host.features.externalMailWarnings) every part of this plugin steps
+ * back: no send confirm, no banner, no toast. See src/lib/handover.js.
  */
 
 const { createElement: h, useEffect, useState } = require('react');
 const slotApi = require('@plugin-host');
 
 import { SenderWarning } from './lib/banner.js';
+import { coreHandlesExternalMail } from './lib/handover.js';
 
 // ─── Domain helpers (shared by background + slot) ─────────────
 
@@ -261,6 +267,7 @@ function ExternalSenderBanner(props) {
   const email = props.email;
   const safeDomains = useSafeDomains();
   if (!email) return null;
+  if (coreHandlesExternalMail(slotApi)) return null;
 
   // Until the lists resolve, default to "treat all as external" so we don't
   // flash a false-clean banner. shouldShow already gated us to confirmed-
@@ -279,6 +286,7 @@ function ExternalSenderBanner(props) {
 // domain list and the user's settings.
 function shouldShowBanner(extraProps) {
   if (!pluginApi) return false;
+  if (coreHandlesExternalMail(pluginApi)) return false;
   if (pluginApi.plugin.settings.warnOnIncoming === false) return false;
 
   const email = extraProps?.email;
@@ -311,6 +319,8 @@ export const slots = {
 export const hooks = {
   async onBeforeEmailSend(email) {
     if (!email || !pluginApi) return;
+    // Bulwark asks itself; asking here too would be a second dialog.
+    if (coreHandlesExternalMail(pluginApi)) return;
 
     // Remember the sending address so we recognise our own messages later.
     void rememberMyAddress(email.fromEmail);
@@ -342,6 +352,7 @@ export const hooks = {
 
   onNewEmailReceived(notif) {
     if (!pluginApi) return;
+    if (coreHandlesExternalMail(pluginApi)) return;
     if (pluginApi.plugin.settings.notifyOnIncomingExternal !== true) return;
     if (!notif || !notif.from) return;
 

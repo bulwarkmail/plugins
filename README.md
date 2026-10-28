@@ -23,7 +23,7 @@ with the tools to build and test them:
 | [email-stats](email-stats/) | Counts the mail you open and send during a session, in the sidebar | `email:read` `ui:sidebar-widget` |
 | [email-to-task](email-to-task/) | Turns a message into a task in Bulwark, Vikunja, Todoist or a CalDAV list, with a link back and a due date from the text | `email:read` `email:write` `email:render-takeover` `tasks:read` `tasks:write` `http:proxy` `ui:message-list` `ui:toolbar` `ui:observe` `ui:keyboard` `admin:config` |
 | [external-link-warning](external-link-warning/) | Asks before opening links to domains that aren't on a trusted list | `admin:config` |
-| [external-mail-warning](external-mail-warning/) | Asks before sending outside your safe domains and marks mail from outside with a banner | `email:read` `email:send` `identity:read` `ui:email-banner` `admin:config` |
+| [external-mail-warning](external-mail-warning/) | Retired: Bulwark 1.19 does this itself (Organisation > Security). On older versions, asks before sending outside your safe domains and marks mail from outside with a banner | `email:read` `email:send` `identity:read` `ui:email-banner` `admin:config` |
 | [gravatar](gravatar/) | Sender pictures from Gravatar | `email:read` `http:fetch` |
 | [hello-world](hello-world/) | The smallest example: logs app and mail events to the console | `email:read` |
 | [impersonation-notice](impersonation-notice/) | A banner while an admin is signed in as another user (Stalwart master user), with a way back | `account:read` `auth:emit` `ui:app-top-banner` `admin:config` |
