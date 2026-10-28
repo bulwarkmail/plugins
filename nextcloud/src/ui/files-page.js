@@ -75,6 +75,9 @@ function FilesBrowser({ api, client, connection }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const inputRef = useRef(null);
   const controllers = useRef(new Map());
+  // The proxy can reject simultaneous browser uploads. Keep one in flight.
+  const pendingUploads = useRef(new Set());
+  const uploadQueue = useRef(Promise.resolve());
   const browser = useBrowser({ api, client, path, reloadKey, onError: connection.report });
 
   const fail = (err) => {
@@ -106,10 +109,19 @@ function FilesBrowser({ api, client, connection }) {
     }
   };
 
+  const enqueueUpload = (job) => {
+    if (pendingUploads.current.has(job.id) || controllers.current.has(job.id)) return;
+    pendingUploads.current.add(job.id);
+    uploadQueue.current = uploadQueue.current.catch(() => {}).then(() => {
+      if (!pendingUploads.current.delete(job.id)) return; // Cancelled while waiting.
+      return runJob(job);
+    });
+  };
+
   const addFiles = (files) => {
     const added = [...files].map((file) => ({ id: `${Date.now()}-${Math.random()}`, file, folder: path, state: 'running', loaded: 0, total: file.size }));
     setJobs((list) => [...list.filter((j) => j.state !== 'done'), ...added]);
-    for (const job of added) void runJob(job);
+    for (const job of added) enqueueUpload(job);
   };
 
   const run = async (kind, fn) => {
@@ -165,9 +177,13 @@ function FilesBrowser({ api, client, connection }) {
 
   const uploads = jobs.map((job) => h(UploadRow, {
     key: job.id, api, job,
-    onCancel: (j) => controllers.current.get(j.id)?.abort(),
-    onResume: (j) => void runJob(jobs.find((x) => x.id === j.id) ?? j),
+    onCancel: (j) => {
+      if (pendingUploads.current.delete(j.id)) update(j.id, { state: 'paused' });
+      else controllers.current.get(j.id)?.abort();
+    },
+    onResume: (j) => enqueueUpload(jobs.find((x) => x.id === j.id) ?? j),
     onDiscard: async (j) => {
+      pendingUploads.current.delete(j.id);
       const latest = jobs.find((x) => x.id === j.id) ?? j;
       if (latest.state !== 'done' && latest.target) await discardUpload(api, client, latest.file, latest.target).catch(() => {});
       setJobs((list) => list.filter((x) => x.id !== j.id));
