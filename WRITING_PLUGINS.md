@@ -1333,6 +1333,33 @@ api.i18n.addTranslations(locale, { key: 'text' })
 api.i18n.onLocaleChange(fn)         // fn(locale); returns an unsubscribe function
 ```
 
+### api.host
+
+Features of Bulwark itself that replace what a plugin did. A plugin that
+does the same job should do nothing while one is on, so users aren't warned
+or asked twice. No permission is needed, and the object is the same in the
+background and in slot frames.
+
+```js
+api.host.features.externalMailWarnings   // true while the admin's "External" label or
+                                          // external-recipient confirm is on for this user
+api.host.onFeaturesChange(fn)            // fn(features); returns an unsubscribe function
+```
+
+`api.host.features` is updated in place, like `api.plugin.settings`, so
+`shouldShow` and hooks can read it directly; slot components render again
+when it changes. It changes when the admin's policy changes or the user
+switches to an account in another domain or group.
+
+`externalMailWarnings` follows the admin's Organisation > Security >
+External mail switches (policy.json `organisation.externalMail`). While it
+is true, Bulwark labels external senders and confirms external recipients
+itself, and it skips the `onBeforeEmailSend`, `onNewEmailReceived` and
+`email-banner` handlers of the retired `external-mail-warning` plugin.
+
+`api.host` is new in Bulwark 1.19. Older versions don't have it, so read it
+as `api.host?.features?.externalMailWarnings === true`.
+
 ### api.storage
 
 ```js
