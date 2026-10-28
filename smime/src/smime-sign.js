@@ -71,10 +71,10 @@ function newSignedData(encapContentInfo, signerCertDer, chainCertsDer, contentDi
         }),
         // Signed attributes (RFC 5652 §11 / RFC 8551 §2.5). Without them Outlook
         // finds no signing time (shows 01.01.1601) and reports the message as
-        // modified. Order = DER SET OF order.
+        // modified.
         signedAttrs: new pkijs.SignedAndUnsignedAttributes({
           type: 0,
-          attributes: [
+          attributes: derSorted([
             new pkijs.Attribute({
               type: '1.2.840.113549.1.9.3', // contentType
               values: [new asn1js.ObjectIdentifier({ value: '1.2.840.113549.1.7.1' })],
@@ -91,12 +91,30 @@ function newSignedData(encapContentInfo, signerCertDer, chainCertsDer, contentDi
               type: '1.2.840.113549.1.9.15', // smimeCapabilities
               values: [smimeCapabilities()],
             }),
-          ],
+          ]),
         }),
       }),
     ],
     certificates: [signerCert, ...chainCerts],
   });
+}
+
+/**
+ * The signature covers the DER encoding of signedAttrs (RFC 5652 §5.4), and DER
+ * sorts a SET OF by the encoded bytes, not by OID. pkijs encodes the attributes
+ * in array order, so a verifier that re-encodes them as DER would otherwise
+ * hash a different order than the one that was signed.
+ */
+function derSorted(attributes) {
+  const enc = (a) => new Uint8Array(a.toSchema().toBER(false));
+  const cmp = (x, y) => {
+    for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i] - y[i];
+    return x.length - y.length;
+  };
+  return attributes
+    .map((a) => ({ a, der: enc(a) }))
+    .sort((p, q) => cmp(p.der, q.der))
+    .map((p) => p.a);
 }
 
 /**
