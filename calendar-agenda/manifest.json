@@ -12,7 +12,7 @@
     "ui:app-top-banner"
   ],
   "entrypoint": "index.js",
-  "minAppVersion": "1.18.0",
+  "minAppVersion": "1.15.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
   "settingsSchema": {

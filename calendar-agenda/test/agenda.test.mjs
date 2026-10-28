@@ -268,6 +268,19 @@ describe('regional formatting and locale settings', () => {
     expect(headings.some((h) => h.includes('So.'))).toBe(true);
   });
 
+  // Days are grouped in the browser's zone, so their labels and times must
+  // be too: a zone setting 11 hours behind would put the heading for the
+  // 18th's midnight on the 17th.
+  it('labels days and times in the same zone it groups them in', async () => {
+    const { Agenda } = setup('sidebar-section', {
+      timeZone: 'Pacific/Pago_Pago',
+      getEvents: async () => [allDay('n', 'Future', '2026-10-18'), timed('t', 'Late', new Date(2026, 9, 16, 9, 0), 30)],
+    });
+    await show(Agenda);
+    expect(dayHeadings()).toEqual(['Fri, Oct 16', 'Sun, Oct 18']);
+    expect(document.body.textContent).toContain(`Late${clock(new Date(2026, 9, 16, 9, 0))}`);
+  });
+
   it('resolves untitled fallback dynamically in the active locale', async () => {
     const { Agenda } = setup('sidebar-section', {
       locale: 'de',

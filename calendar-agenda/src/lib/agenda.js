@@ -118,13 +118,17 @@ export function groupByDay(events, now = new Date()) {
 export function makeFormat(api, now = () => new Date()) {
   const t = (key, vars) => api.i18n.t(key, vars);
   const locale = () => api.i18n.dateLocale || api.i18n.locale || (api.i18n.getLocale && api.i18n.getLocale()) || undefined;
+  // Days are grouped by the browser's midnight (startOfDay), so labels use the
+  // browser's zone too. In the host's zone setting a heading or an all-day
+  // event could show the day before or after the one it is grouped under.
+  const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   function dayLabel(date) {
     const diffDays = Math.round((startOfDay(date).getTime() - startOfDay(now()).getTime()) / 86_400_000);
     if (diffDays === 0) return t('day.today');
     if (diffDays === 1) return t('day.tomorrow');
     if (typeof api.i18n?.formatDate === 'function') {
-      return api.i18n.formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' });
+      return api.i18n.formatDate(date, { weekday: 'short', month: 'short', day: 'numeric', timeZone: zone() });
     }
     return date.toLocaleDateString(locale(), { weekday: 'short', month: 'short', day: 'numeric' });
   }
@@ -132,7 +136,7 @@ export function makeFormat(api, now = () => new Date()) {
   function timeLabel(ev) {
     if (ev.allDay) return t('event.all_day');
     if (typeof api.i18n?.formatTime === 'function') {
-      return api.i18n.formatTime(ev.start, { hour: '2-digit', minute: '2-digit' });
+      return api.i18n.formatTime(ev.start, { hour: '2-digit', minute: '2-digit', timeZone: zone() });
     }
     return new Date(ev.start).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
   }
