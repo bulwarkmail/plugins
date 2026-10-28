@@ -4,13 +4,12 @@
 import { detectParcels } from './detect.js';
 import { CARRIERS } from './carriers/index.js';
 import { MANUAL_REFRESH_MS, POLL_INTERVAL_MS, pollDue, rememberParcels } from './parcels.js';
+import { createTracker } from './tracking.js';
+import { notificationFor } from './view.js';
 
 // Avoid a request on every tab focus, while still refreshing when a user
 // returns to webmail. A manual refresh is separate and intentionally faster.
 export const VISIT_REFRESH_MS = 5 * 60_000;
-
-import { createTracker } from './tracking.js';
-import { notificationFor } from './view.js';
 
 const HINT_WORDS = /track|sendung|paket|parcel|package|shipment|shipped|versand|lieferung|delivery|colis|envío|envio|spedizion|zending|verzonden|przesyłk|zásilk|\b1Z[0-9A-Z]{6}|\bJJD\d|\b00340\d/i;
 

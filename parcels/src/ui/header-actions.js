@@ -41,9 +41,10 @@ export function DeliveryHeaderActions() {
   };
 
   const label = busy ? t('card.refreshing') : t('card.refresh');
-  const when = lastChecked ? new Date(lastChecked).toLocaleTimeString(host.i18n.getLocale(), {
-    hour: 'numeric', minute: '2-digit',
-  }) : '';
+  // formatTime follows the 12/24-hour setting (Bulwark 1.18 and later).
+  const when = !lastChecked ? '' : typeof host.i18n.formatTime === 'function'
+    ? host.i18n.formatTime(lastChecked)
+    : new Date(lastChecked).toLocaleTimeString(host.i18n.getLocale(), { hour: 'numeric', minute: '2-digit' });
 
   return h('div', {
     style: { display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', color: 'inherit' },
