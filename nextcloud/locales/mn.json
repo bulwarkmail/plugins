@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Вэб мэйлээс байршуулсан файлуудад зориулсан таны Nextcloud дахь хавтас. Шаардлагатай үед үүснэ.",
   "setting.folderLayout": "Хавтасны бүтэц",
   "setting.folderLayout.help": "Байршуулсан файлууд байршуулах хавтаст хэрхэн эрэмбэлэгдэх.",
+  "setting.talkButton": "Talk уулзалтын товч",
+  "setting.talkButton.help": "Үйл явдлын маягтад нийтийн Nextcloud Talk яриа үүсгэж, түүний холбоосыг үйл явдалд нэмэх товч харуулна.",
+  "talk.add": "Talk уулзалт нэмэх",
+  "talk.added": "Talk уулзалт үүслээ",
+  "talk.error": "Talk уулзалт үүсгэж чадсангүй: {message}",
+  "talk.unavailable": "Таны Nextcloud сервер дээр Nextcloud Talk суулгаагүй байна.",
+  "talk.untitled": "Уулзалт",
   "date": "Өдөр бүрт нэг хавтас",
   "flat": "Бүгд байршуулах хавтаст"
 }

@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "你的 Nextcloud 中用來存放從網頁郵件上傳之檔案的資料夾。需要時會自動建立。",
   "setting.folderLayout": "資料夾結構",
   "setting.folderLayout.help": "上傳的檔案在上傳資料夾中的整理方式。",
+  "setting.talkButton": "Talk 會議按鈕",
+  "setting.talkButton.help": "在活動表單中顯示一個按鈕，用來建立公開的 Nextcloud Talk 對話並把連結加到活動中。",
+  "talk.add": "新增 Talk 會議",
+  "talk.added": "已建立 Talk 會議",
+  "talk.error": "無法建立 Talk 會議：{message}",
+  "talk.unavailable": "你的 Nextcloud 伺服器上沒有安裝 Nextcloud Talk。",
+  "talk.untitled": "會議",
   "date": "每天一個資料夾",
   "flat": "全部放在上傳資料夾"
 }

@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Priečinok vo vašom Nextcloude pre súbory nahrané z webmailu. Vytvorí sa podľa potreby.",
   "setting.folderLayout": "Usporiadanie priečinkov",
   "setting.folderLayout.help": "Ako sa nahrané súbory triedia v priečinku na nahrávanie.",
+  "setting.talkButton": "Tlačidlo stretnutia Talk",
+  "setting.talkButton.help": "Zobrazí vo formulári udalosti tlačidlo, ktoré vytvorí verejnú konverzáciu Nextcloud Talk a vloží jej odkaz do udalosti.",
+  "talk.add": "Pridať stretnutie Talk",
+  "talk.added": "Stretnutie Talk bolo vytvorené",
+  "talk.error": "Stretnutie Talk sa nepodarilo vytvoriť: {message}",
+  "talk.unavailable": "Nextcloud Talk nie je nainštalovaný na vašom serveri Nextcloud.",
+  "talk.untitled": "Stretnutie",
   "date": "Jeden priečinok na deň",
   "flat": "Všetko v priečinku na nahrávanie"
 }

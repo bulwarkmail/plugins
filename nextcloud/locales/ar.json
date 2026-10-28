@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "مجلد في Nextcloud للملفات المرفوعة من البريد. يُنشأ عند الحاجة.",
   "setting.folderLayout": "تنظيم المجلدات",
   "setting.folderLayout.help": "كيف تُرتّب الملفات المرفوعة في مجلد الرفع.",
+  "setting.talkButton": "زر اجتماع Talk",
+  "setting.talkButton.help": "يعرض زرًا في نموذج الحدث ينشئ محادثة Nextcloud Talk عامة ويضيف رابطها إلى الحدث.",
+  "talk.add": "إضافة اجتماع Talk",
+  "talk.added": "تم إنشاء اجتماع Talk",
+  "talk.error": "تعذّر إنشاء اجتماع Talk: {message}",
+  "talk.unavailable": "Nextcloud Talk غير مثبّت على خادم Nextcloud الخاص بك.",
+  "talk.untitled": "اجتماع",
   "date": "مجلد لكل يوم",
   "flat": "الكل في مجلد الرفع"
 }

@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "תיקיה ב-Nextcloud לקבצים שהועלו מהדואר. נוצרת לפי הצורך.",
   "setting.folderLayout": "מבנה תיקיות",
   "setting.folderLayout.help": "איך ההעלאות מסודרות בתיקיית ההעלאות.",
+  "setting.talkButton": "כפתור פגישת Talk",
+  "setting.talkButton.help": "מציג בטופס האירוע כפתור שיוצר שיחת Nextcloud Talk ציבורית ומוסיף את הקישור שלה לאירוע.",
+  "talk.add": "הוספת פגישת Talk",
+  "talk.added": "פגישת Talk נוצרה",
+  "talk.error": "לא ניתן ליצור את פגישת Talk: {message}",
+  "talk.unavailable": "Nextcloud Talk אינו מותקן בשרת ה-Nextcloud שלך.",
+  "talk.untitled": "פגישה",
   "date": "תיקיה אחת לכל יום",
   "flat": "הכול בתיקיית ההעלאות"
 }

@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "웹메일에서 업로드한 파일을 넣을 Nextcloud 폴더입니다. 필요할 때 만들어집니다.",
   "setting.folderLayout": "폴더 구성",
   "setting.folderLayout.help": "업로드 폴더 안에서 업로드한 파일을 정리하는 방식입니다.",
+  "setting.talkButton": "Talk 회의 버튼",
+  "setting.talkButton.help": "일정 양식에 공개 Nextcloud Talk 대화를 만들고 그 링크를 일정에 추가하는 버튼을 표시합니다.",
+  "talk.add": "Talk 회의 추가",
+  "talk.added": "Talk 회의를 만들었습니다",
+  "talk.error": "Talk 회의를 만들 수 없습니다: {message}",
+  "talk.unavailable": "Nextcloud 서버에 Nextcloud Talk가 설치되어 있지 않습니다.",
+  "talk.untitled": "회의",
   "date": "날짜별 폴더",
   "flat": "모두 업로드 폴더에"
 }

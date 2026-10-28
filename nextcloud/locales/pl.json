@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Folder w Twoim Nextcloud na pliki przesłane z poczty. Tworzony w razie potrzeby.",
   "setting.folderLayout": "Układ folderów",
   "setting.folderLayout.help": "Jak przesłane pliki są układane w folderze przesyłania.",
+  "setting.talkButton": "Przycisk spotkania Talk",
+  "setting.talkButton.help": "Pokazuje w formularzu wydarzenia przycisk, który tworzy publiczną rozmowę Nextcloud Talk i dodaje jej link do wydarzenia.",
+  "talk.add": "Dodaj spotkanie Talk",
+  "talk.added": "Utworzono spotkanie Talk",
+  "talk.error": "Nie udało się utworzyć spotkania Talk: {message}",
+  "talk.unavailable": "Nextcloud Talk nie jest zainstalowany na Twoim serwerze Nextcloud.",
+  "talk.untitled": "Spotkanie",
   "date": "Jeden folder na dzień",
   "flat": "Wszystko w folderze przesyłania"
 }

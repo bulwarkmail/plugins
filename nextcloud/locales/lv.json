@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Mape jūsu Nextcloud failiem, kas augšupielādēti no tīmekļa pasta. Tiek izveidota pēc vajadzības.",
   "setting.folderLayout": "Mapju struktūra",
   "setting.folderLayout.help": "Kā augšupielādes tiek kārtotas augšupielādes mapē.",
+  "setting.talkButton": "Talk sapulces poga",
+  "setting.talkButton.help": "Notikuma veidlapā rāda pogu, kas izveido publisku Nextcloud Talk sarunu un pievieno tās saiti notikumam.",
+  "talk.add": "Pievienot Talk sapulci",
+  "talk.added": "Talk sapulce izveidota",
+  "talk.error": "Neizdevās izveidot Talk sapulci: {message}",
+  "talk.unavailable": "Jūsu Nextcloud serverī nav instalēts Nextcloud Talk.",
+  "talk.untitled": "Sapulce",
   "date": "Viena mape katrai dienai",
   "flat": "Viss augšupielādes mapē"
 }

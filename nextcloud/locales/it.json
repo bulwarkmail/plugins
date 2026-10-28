@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Cartella nel tuo Nextcloud per i file caricati dalla webmail. Viene creata quando serve.",
   "setting.folderLayout": "Organizzazione delle cartelle",
   "setting.folderLayout.help": "Come vengono ordinati i file caricati nella cartella di caricamento.",
+  "setting.talkButton": "Pulsante riunione Talk",
+  "setting.talkButton.help": "Mostra nel modulo dell'evento un pulsante che crea una conversazione pubblica di Nextcloud Talk e ne aggiunge il link all'evento.",
+  "talk.add": "Aggiungi riunione Talk",
+  "talk.added": "Riunione Talk creata",
+  "talk.error": "Impossibile creare la riunione Talk: {message}",
+  "talk.unavailable": "Nextcloud Talk non è installato sul tuo server Nextcloud.",
+  "talk.untitled": "Riunione",
   "date": "Una cartella al giorno",
   "flat": "Tutto nella cartella di caricamento"
 }

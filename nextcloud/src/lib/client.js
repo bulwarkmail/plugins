@@ -129,7 +129,7 @@ export function createClient(api, conn) {
       const parts = [];
       let loaded = 0;
       try {
-        for (; ;) {
+        for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
           parts.push(value);
@@ -190,29 +190,18 @@ export function createClient(api, conn) {
       return localPassword();
     },
 
-    async createTalkRoom(eventTitle, eventDescription) {
-      const data = await ocs(
-        api,
-        origin,
-        '/ocs/v2.php/apps/spreed/api/v4/room',
-        {
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            {
-              roomName: eventTitle,
-              description: eventDescription,
-              roomType: 3,
-            }),
-        },
-        { kind: 'room' }
-      );
-
-      const token = data?.token;
-      if (!token) throw new Error("No token in response");
-
-      const url = `${origin}/call/${token}`;
-
-      return url;
+    /**
+     * A public Talk conversation for a calendar event; resolves to its link.
+     * Talk caps conversation names at 255 characters.
+     */
+    async createTalkRoom(name, description = '') {
+      const data = await ocs(api, origin, '/ocs/v2.php/apps/spreed/api/v4/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomType: 3, roomName: name.slice(0, 255), ...(description ? { description } : {}) }),
+      });
+      if (typeof data?.token !== 'string' || !data.token) throw new NcError('bad_answer');
+      return `${origin}/call/${encodeURIComponent(data.token)}`;
     },
 
     /** Where to open a file in the Nextcloud web interface. */

@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Map in je Nextcloud voor bestanden die vanuit de webmail worden geüpload. Wordt aangemaakt als dat nodig is.",
   "setting.folderLayout": "Mapindeling",
   "setting.folderLayout.help": "Hoe uploads in de uploadmap worden geordend.",
+  "setting.talkButton": "Knop voor Talk-vergadering",
+  "setting.talkButton.help": "Toont in het afspraakformulier een knop die een openbaar Nextcloud Talk-gesprek aanmaakt en de link ervan aan de afspraak toevoegt.",
+  "talk.add": "Talk-vergadering toevoegen",
+  "talk.added": "Talk-vergadering aangemaakt",
+  "talk.error": "Kon de Talk-vergadering niet aanmaken: {message}",
+  "talk.unavailable": "Nextcloud Talk is niet geïnstalleerd op je Nextcloud-server.",
+  "talk.untitled": "Vergadering",
   "date": "Eén map per dag",
   "flat": "Alles in de uploadmap"
 }

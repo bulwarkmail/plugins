@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Папка в вашем Nextcloud для файлов, загруженных из веб-почты. Создаётся при необходимости.",
   "setting.folderLayout": "Структура папок",
   "setting.folderLayout.help": "Как загруженные файлы раскладываются в папке загрузок.",
+  "setting.talkButton": "Кнопка встречи Talk",
+  "setting.talkButton.help": "Показывает в форме события кнопку, которая создаёт публичную беседу Nextcloud Talk и добавляет её ссылку в событие.",
+  "talk.add": "Добавить встречу Talk",
+  "talk.added": "Встреча Talk создана",
+  "talk.error": "Не удалось создать встречу Talk: {message}",
+  "talk.unavailable": "Nextcloud Talk не установлен на вашем сервере Nextcloud.",
+  "talk.untitled": "Встреча",
   "date": "Отдельная папка на каждый день",
   "flat": "Всё в папке загрузок"
 }

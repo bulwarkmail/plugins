@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Dosar din Nextcloud pentru fișierele încărcate din webmail. Se creează la nevoie.",
   "setting.folderLayout": "Organizarea dosarelor",
   "setting.folderLayout.help": "Cum sunt ordonate fișierele încărcate în dosarul de încărcare.",
+  "setting.talkButton": "Buton pentru întâlnire Talk",
+  "setting.talkButton.help": "Afișează în formularul evenimentului un buton care creează o conversație publică Nextcloud Talk și adaugă linkul acesteia la eveniment.",
+  "talk.add": "Adaugă întâlnire Talk",
+  "talk.added": "Întâlnirea Talk a fost creată",
+  "talk.error": "Întâlnirea Talk nu a putut fi creată: {message}",
+  "talk.unavailable": "Nextcloud Talk nu este instalat pe serverul tău Nextcloud.",
+  "talk.untitled": "Întâlnire",
   "date": "Un dosar pe zi",
   "flat": "Totul în dosarul de încărcare"
 }

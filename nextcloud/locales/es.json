@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Carpeta de tu Nextcloud para los archivos subidos desde el webmail. Se crea cuando hace falta.",
   "setting.folderLayout": "Organización de carpetas",
   "setting.folderLayout.help": "Cómo se ordenan los archivos subidos en la carpeta de subida.",
+  "setting.talkButton": "Botón de reunión de Talk",
+  "setting.talkButton.help": "Muestra un botón en el formulario del evento que crea una conversación pública de Nextcloud Talk y añade su enlace al evento.",
+  "talk.add": "Añadir reunión de Talk",
+  "talk.added": "Reunión de Talk creada",
+  "talk.error": "No se pudo crear la reunión de Talk: {message}",
+  "talk.unavailable": "Nextcloud Talk no está instalado en tu servidor de Nextcloud.",
+  "talk.untitled": "Reunión",
   "date": "Una carpeta por día",
   "flat": "Todo en la carpeta de subida"
 }

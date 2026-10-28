@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Mappa a Nextcloudodban a webmailből feltöltött fájloknak. Szükség esetén létrejön.",
   "setting.folderLayout": "Mappaszerkezet",
   "setting.folderLayout.help": "Hogyan rendeződnek a feltöltések a feltöltési mappában.",
+  "setting.talkButton": "Talk-értekezlet gomb",
+  "setting.talkButton.help": "Gombot jelenít meg az eseményűrlapon, amely nyilvános Nextcloud Talk-beszélgetést hoz létre, és a hivatkozását hozzáadja az eseményhez.",
+  "talk.add": "Talk-értekezlet hozzáadása",
+  "talk.added": "A Talk-értekezlet létrejött",
+  "talk.error": "Nem sikerült létrehozni a Talk-értekezletet: {message}",
+  "talk.unavailable": "A Nextcloud Talk nincs telepítve a Nextcloud-kiszolgálón.",
+  "talk.untitled": "Értekezlet",
   "date": "Naponta egy mappa",
   "flat": "Minden a feltöltési mappában"
 }

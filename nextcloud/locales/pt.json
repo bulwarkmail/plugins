@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Pasta no seu Nextcloud para arquivos enviados pelo webmail. Criada quando necessário.",
   "setting.folderLayout": "Organização das pastas",
   "setting.folderLayout.help": "Como os arquivos enviados são organizados na pasta de envio.",
+  "setting.talkButton": "Botão de reunião do Talk",
+  "setting.talkButton.help": "Mostra no formulário do evento um botão que cria uma conversa pública do Nextcloud Talk e adiciona o link dela ao evento.",
+  "talk.add": "Adicionar reunião do Talk",
+  "talk.added": "Reunião do Talk criada",
+  "talk.error": "Não foi possível criar a reunião do Talk: {message}",
+  "talk.unavailable": "O Nextcloud Talk não está instalado no seu servidor Nextcloud.",
+  "talk.untitled": "Reunião",
   "date": "Uma pasta por dia",
   "flat": "Tudo na pasta de envio"
 }

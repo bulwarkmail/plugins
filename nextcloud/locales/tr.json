@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Web postadan yüklenen dosyalar için Nextcloud'unuzdaki klasör. Gerektiğinde oluşturulur.",
   "setting.folderLayout": "Klasör düzeni",
   "setting.folderLayout.help": "Yüklemelerin yükleme klasöründe nasıl sıralandığı.",
+  "setting.talkButton": "Talk toplantısı düğmesi",
+  "setting.talkButton.help": "Etkinlik formunda, herkese açık bir Nextcloud Talk sohbeti oluşturup bağlantısını etkinliğe ekleyen bir düğme gösterir.",
+  "talk.add": "Talk toplantısı ekle",
+  "talk.added": "Talk toplantısı oluşturuldu",
+  "talk.error": "Talk toplantısı oluşturulamadı: {message}",
+  "talk.unavailable": "Nextcloud Talk, Nextcloud sunucunuzda kurulu değil.",
+  "talk.untitled": "Toplantı",
   "date": "Her gün için bir klasör",
   "flat": "Hepsi yükleme klasöründe"
 }

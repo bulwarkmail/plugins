@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Složka ve vašem Nextcloudu pro soubory nahrané z webmailu. Vytvoří se podle potřeby.",
   "setting.folderLayout": "Uspořádání složek",
   "setting.folderLayout.help": "Jak se nahrané soubory řadí ve složce pro nahrávání.",
+  "setting.talkButton": "Tlačítko schůzky Talk",
+  "setting.talkButton.help": "Zobrazí ve formuláři události tlačítko, které vytvoří veřejnou konverzaci Nextcloud Talk a vloží její odkaz do události.",
+  "talk.add": "Přidat schůzku Talk",
+  "talk.added": "Schůzka Talk vytvořena",
+  "talk.error": "Schůzku Talk se nepodařilo vytvořit: {message}",
+  "talk.unavailable": "Nextcloud Talk není na vašem serveru Nextcloud nainstalován.",
+  "talk.untitled": "Schůzka",
   "date": "Jedna složka na den",
   "flat": "Vše ve složce pro nahrávání"
 }

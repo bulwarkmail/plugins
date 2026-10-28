@@ -29,7 +29,7 @@ with the tools to build and test them:
 | [impersonation-notice](impersonation-notice/) | A banner while an admin is signed in as another user (Stalwart master user), with a way back | `account:read` `auth:emit` `ui:app-top-banner` `admin:config` |
 | [jitsi-meet](jitsi-meet/) | An "Add Jitsi Meeting" button in the event form | `calendar:read` `calendar:write` `ui:calendar-action` `http:post` |
 | [libravatar](libravatar/) | Sender pictures from Libravatar | `email:read` `http:fetch` |
-| [nextcloud](nextcloud/) | Attach files from Nextcloud, send large files as share links, save attachments and messages there | `http:proxy` `ui:settings-section` `ui:composer-toolbar` `email:read` `email:send` `email:blob-write` `email:blob-read` `ui:toolbar` `ui:app-page` `compose:open` `ui:download-file` |
+| [nextcloud](nextcloud/) | Attach files from Nextcloud, send large files as share links, save attachments and messages there, add Talk meetings to events | `http:proxy` `ui:settings-section` `ui:composer-toolbar` `email:read` `email:send` `email:blob-write` `email:blob-read` `ui:toolbar` `ui:app-page` `compose:open` `ui:download-file` `calendar:read` `ui:calendar-action` |
 | [outlook-style-headers](outlook-style-headers/) | Outlook-style From / Sent / To / Subject block above quoted replies and forwards | `email:send` |
 | [paperless](paperless/) | Send attachments and messages to Paperless-ngx, find documents there and attach them to new mail | `http:proxy` `admin:config` `email:read` `email:blob-read` `email:blob-write` `compose:open` `ui:message-list` `ui:toolbar` `ui:app-page` `ui:settings-section` `ui:notifications` `ui:download-file` |
 | [plugin-template](plugin-template/) | A starting point for a new plugin | `email:read` `ui:sidebar-widget` |

@@ -135,11 +135,13 @@
   "setting.uploadFolder.help": "Ordner in Ihrer Nextcloud für Dateien, die aus dem Webmail hochgeladen werden. Wird bei Bedarf angelegt.",
   "setting.folderLayout": "Ordnerstruktur",
   "setting.folderLayout.help": "Wie hochgeladene Dateien im Upload-Ordner abgelegt werden.",
-  "setting.enableTalkMeetingsButton": "Aktiviere Talk Button",
-  "setting.enableTalkMeetingsButtonHelp": "Aktiviere Button zum hinzufügen eines Nextcloud Talk Meeting Raums in Kalendereinträgen",
-  "talkMeeting.add": "Talk Meeting hinzufügen",
-  "talkMeeting.added": "Talk Meeting hinzugefügt",
-  "talkMeeting.error": "Kann Talk Meeting nicht erstellen: {message}",
+  "setting.talkButton": "Talk-Besprechung",
+  "setting.talkButton.help": "Zeigt im Terminformular eine Schaltfläche, die eine öffentliche Nextcloud-Talk-Unterhaltung anlegt und ihren Link in den Termin einträgt.",
+  "talk.add": "Talk-Besprechung hinzufügen",
+  "talk.added": "Talk-Besprechung erstellt",
+  "talk.error": "Die Talk-Besprechung konnte nicht erstellt werden: {message}",
+  "talk.unavailable": "Nextcloud Talk ist auf Ihrem Nextcloud-Server nicht installiert.",
+  "talk.untitled": "Besprechung",
   "date": "Ein Ordner pro Tag",
   "flat": "Alles direkt im Upload-Ordner"
 }

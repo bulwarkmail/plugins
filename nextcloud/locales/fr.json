@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Dossier de votre Nextcloud pour les fichiers envoyés depuis la messagerie. Créé si besoin.",
   "setting.folderLayout": "Organisation des dossiers",
   "setting.folderLayout.help": "Comment les fichiers envoyés sont rangés dans le dossier d'envoi.",
+  "setting.talkButton": "Bouton de réunion Talk",
+  "setting.talkButton.help": "Affiche dans le formulaire de l'événement un bouton qui crée une conversation Nextcloud Talk publique et ajoute son lien à l'événement.",
+  "talk.add": "Ajouter une réunion Talk",
+  "talk.added": "Réunion Talk créée",
+  "talk.error": "Impossible de créer la réunion Talk : {message}",
+  "talk.unavailable": "Nextcloud Talk n'est pas installé sur votre serveur Nextcloud.",
+  "talk.untitled": "Réunion",
   "date": "Un dossier par jour",
   "flat": "Tout dans le dossier d'envoi"
 }

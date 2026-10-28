@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Carpeta del vostre Nextcloud per als fitxers pujats des del webmail. Es crea quan cal.",
   "setting.folderLayout": "Organització de carpetes",
   "setting.folderLayout.help": "Com s'ordenen els fitxers pujats a la carpeta de pujada.",
+  "setting.talkButton": "Botó de reunió de Talk",
+  "setting.talkButton.help": "Mostra un botó al formulari de l'esdeveniment que crea una conversa pública de Nextcloud Talk i n'afegeix l'enllaç a l'esdeveniment.",
+  "talk.add": "Afegeix una reunió de Talk",
+  "talk.added": "S'ha creat la reunió de Talk",
+  "talk.error": "No s'ha pogut crear la reunió de Talk: {message}",
+  "talk.unavailable": "Nextcloud Talk no està instal·lat al vostre servidor Nextcloud.",
+  "talk.untitled": "Reunió",
   "date": "Una carpeta per dia",
   "flat": "Tot a la carpeta de pujada"
 }

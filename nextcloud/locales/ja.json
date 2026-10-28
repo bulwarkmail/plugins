@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Web メールからアップロードしたファイルを入れる Nextcloud のフォルダーです。必要に応じて作成されます。",
   "setting.folderLayout": "フォルダーの構成",
   "setting.folderLayout.help": "アップロード先フォルダー内でのファイルの整理方法です。",
+  "setting.talkButton": "Talk 会議ボタン",
+  "setting.talkButton.help": "予定のフォームに、公開の Nextcloud Talk 会話を作成してそのリンクを予定に追加するボタンを表示します。",
+  "talk.add": "Talk 会議を追加",
+  "talk.added": "Talk 会議を作成しました",
+  "talk.error": "Talk 会議を作成できませんでした: {message}",
+  "talk.unavailable": "Nextcloud サーバーに Nextcloud Talk がインストールされていません。",
+  "talk.untitled": "会議",
   "date": "日付ごとにフォルダーを作る",
   "flat": "すべてアップロード先フォルダーに入れる"
 }

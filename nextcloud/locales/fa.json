@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "پوشه‌ای در Nextcloud شما برای فایل‌هایی که از ایمیل بارگذاری می‌شوند. در صورت نیاز ساخته می‌شود.",
   "setting.folderLayout": "چیدمان پوشه‌ها",
   "setting.folderLayout.help": "نحوه مرتب شدن فایل‌های بارگذاری‌شده در پوشه بارگذاری.",
+  "setting.talkButton": "دکمه جلسه Talk",
+  "setting.talkButton.help": "دکمه‌ای در فرم رویداد نشان می‌دهد که یک گفتگوی عمومی Nextcloud Talk می‌سازد و پیوند آن را به رویداد اضافه می‌کند.",
+  "talk.add": "افزودن جلسه Talk",
+  "talk.added": "جلسه Talk ساخته شد",
+  "talk.error": "ساخت جلسه Talk ممکن نشد: {message}",
+  "talk.unavailable": "Nextcloud Talk روی سرور Nextcloud شما نصب نیست.",
+  "talk.untitled": "جلسه",
   "date": "یک پوشه برای هر روز",
   "flat": "همه در پوشه بارگذاری"
 }

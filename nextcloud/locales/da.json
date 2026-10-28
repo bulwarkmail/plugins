@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "Mappe i din Nextcloud til filer, der uploades fra webmailen. Oprettes efter behov.",
   "setting.folderLayout": "Mappestruktur",
   "setting.folderLayout.help": "Hvordan uploads sorteres i uploadmappen.",
+  "setting.talkButton": "Knap til Talk-møde",
+  "setting.talkButton.help": "Viser en knap i begivenhedsformularen, der opretter en offentlig Nextcloud Talk-samtale og tilføjer dens link til begivenheden.",
+  "talk.add": "Tilføj Talk-møde",
+  "talk.added": "Talk-møde oprettet",
+  "talk.error": "Talk-mødet kunne ikke oprettes: {message}",
+  "talk.unavailable": "Nextcloud Talk er ikke installeret på din Nextcloud-server.",
+  "talk.untitled": "Møde",
   "date": "Én mappe pr. dag",
   "flat": "Alt i uploadmappen"
 }

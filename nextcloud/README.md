@@ -100,6 +100,14 @@ so "Attach to new message" does that job.
 ![The Nextcloud page on a phone](screenshots/files-page-phone-dark.png)
 ![The Nextcloud page before connecting](screenshots/files-page-disconnected-light.png)
 
+## Talk meetings
+
+With **Talk meeting button** turned on in the settings, the event form shows
+**Add Talk meeting** under the meeting link. It creates a public Nextcloud
+Talk conversation named after the event and puts its link into the event's
+meeting link, so everyone invited can join with it. The button is greyed out
+while the event already has a meeting link. Nextcloud needs the Talk app.
+
 ## Settings
 
 User settings (Settings > Plugins > Nextcloud):
@@ -112,6 +120,7 @@ User settings (Settings > Plugins > Nextcloud):
 | Large attachment size (MB) | 10 |
 | Upload folder | Mail attachments |
 | Folder layout (`date`: a subfolder per day, `flat`) | date |
+| Talk meeting button in the event form | off |
 
 ## For administrators
 
@@ -138,6 +147,8 @@ Nextcloud needs no CORS setup.
 | `ui:app-page` | The Nextcloud page and its entry in the navigation. |
 | `compose:open` | "Attach to new message" on the Nextcloud page. |
 | `ui:download-file` | "Download" on the Nextcloud page. |
+| `ui:calendar-action` | "Add Talk meeting" in the event form (`calendar-event-actions`). |
+| `calendar:read` | The event's title, description and meeting link, which the Talk button reads. |
 
 The server address the administrator set is read with `api.config.get()`,
 which needs no permission.

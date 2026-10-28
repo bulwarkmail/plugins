@@ -135,6 +135,13 @@
   "setting.uploadFolder.help": "你的 Nextcloud 中用于存放从网页邮箱上传的文件的文件夹。需要时会自动创建。",
   "setting.folderLayout": "文件夹结构",
   "setting.folderLayout.help": "上传的文件在上传文件夹中的整理方式。",
+  "setting.talkButton": "Talk 会议按钮",
+  "setting.talkButton.help": "在日程表单中显示一个按钮，用于创建公开的 Nextcloud Talk 对话并把链接加到日程中。",
+  "talk.add": "添加 Talk 会议",
+  "talk.added": "已创建 Talk 会议",
+  "talk.error": "无法创建 Talk 会议：{message}",
+  "talk.unavailable": "你的 Nextcloud 服务器上没有安装 Nextcloud Talk。",
+  "talk.untitled": "会议",
   "date": "每天一个文件夹",
   "flat": "全部放在上传文件夹中"
 }
