@@ -1,6 +1,7 @@
-// While Bulwark's own external mail warnings are on (api.host.features,
-// Bulwark 1.19 and later), the plugin steps back: no confirm on send, no
-// banner, no toast. On hosts without api.host it works as before.
+// Bulwark 1.19 and later say per switch (api.host.features) which of its own
+// external mail warnings are on; the plugin steps back for each: no send
+// confirm with the recipient warning, no banner or toast with the sender
+// label. On hosts without api.host it works as before.
 // The built bundle runs the way the sandbox runs it, against the fake api.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { build } from 'esbuild';
@@ -9,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import * as kit from '../../test-utils/ui-kit.mjs';
-import { coreHandlesExternalMail } from '../src/lib/handover.js';
+import { coreConfirmsRecipients, coreLabelsSenders } from '../src/lib/handover.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -59,32 +60,44 @@ async function started(hostFeatures) {
   return { api, plugin };
 }
 
-describe('coreHandlesExternalMail', () => {
-  it('is true only when the host says its warnings are on', () => {
-    expect(coreHandlesExternalMail(fakeApi({ hostFeatures: { externalMailWarnings: true } }))).toBe(true);
-    expect(coreHandlesExternalMail(fakeApi({ hostFeatures: { externalMailWarnings: false } }))).toBe(false);
+describe('the host flags', () => {
+  it('are true only when the host says that switch is on', () => {
+    const both = fakeApi({ hostFeatures: { externalSenderLabel: true, externalRecipientWarning: false } });
+    expect(coreLabelsSenders(both)).toBe(true);
+    expect(coreConfirmsRecipients(both)).toBe(false);
     // An older host: no api.host (the fake answers any other name with stubs).
-    expect(coreHandlesExternalMail(fakeApi())).toBe(false);
-    expect(coreHandlesExternalMail(undefined)).toBe(false);
+    expect(coreLabelsSenders(fakeApi())).toBe(false);
+    expect(coreConfirmsRecipients(fakeApi())).toBe(false);
+    expect(coreConfirmsRecipients(undefined)).toBe(false);
   });
 });
 
-describe('with Bulwark\'s own warnings on', () => {
-  it('lets the send through without asking and shows no banner or toast', async () => {
-    const { api, plugin } = await started({ externalMailWarnings: true });
+describe("with Bulwark's recipient warning on", () => {
+  it('lets the send through without asking but keeps its banner and toast', async () => {
+    const { api, plugin } = await started({ externalSenderLabel: false, externalRecipientWarning: true });
     expect(await plugin.hooks.onBeforeEmailSend(OUTGOING)).toBeUndefined();
     expect(api.calls('ui.confirm')).toHaveLength(0);
+    expect(plugin.slots['email-banner'].shouldShow(INCOMING)).toBe(true);
+    plugin.hooks.onNewEmailReceived({ from: [{ email: 'dave@org-two.test' }] });
+    expect(api.calls('toast.warning')).toHaveLength(1);
+  });
+
+  it('asks again as soon as the host turns it off', async () => {
+    const { api, plugin } = await started({ externalSenderLabel: false, externalRecipientWarning: true });
+    api.setHostFeatures({ externalRecipientWarning: false });
+    expect(await plugin.hooks.onBeforeEmailSend(OUTGOING)).toBe(false);
+    expect(api.calls('ui.confirm')).toHaveLength(1);
+  });
+});
+
+describe("with Bulwark's sender label on", () => {
+  it('shows no banner or toast but still asks before sending outside', async () => {
+    const { api, plugin } = await started({ externalSenderLabel: true, externalRecipientWarning: false });
     expect(plugin.slots['email-banner'].shouldShow(INCOMING)).toBe(false);
     plugin.hooks.onNewEmailReceived({ from: [{ email: 'dave@org-two.test' }] });
     expect(api.calls('toast.warning')).toHaveLength(0);
-  });
-
-  it('warns again as soon as the host turns its warnings off', async () => {
-    const { api, plugin } = await started({ externalMailWarnings: true });
-    api.setHostFeatures({ externalMailWarnings: false });
     expect(await plugin.hooks.onBeforeEmailSend(OUTGOING)).toBe(false);
     expect(api.calls('ui.confirm')).toHaveLength(1);
-    expect(plugin.slots['email-banner'].shouldShow(INCOMING)).toBe(true);
   });
 });
 

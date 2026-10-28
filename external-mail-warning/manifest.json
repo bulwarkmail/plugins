@@ -3,7 +3,7 @@
   "name": "External Mail Warning",
   "version": "1.5.1",
   "author": "Bulwark Mail Community",
-  "description": "Replaced by Bulwark: from Bulwark 1.19, admins turn on an External label and a confirm before sending outside the organisation in Organisation > Security, and this plugin does nothing while those are on. On older Bulwark versions it warns before sending to recipients outside your safe-domain list and flags mail from external senders with a banner.",
+  "description": "Replaced by Bulwark: from Bulwark 1.19, admins turn on an External label and a confirm before sending outside the organisation in Organisation > Security, and this plugin turns off its own confirm or banner for each of them that is on. On older Bulwark versions it warns before sending to recipients outside your safe-domain list and flags mail from external senders with a banner.",
   "type": "hook",
   "permissions": [
     "email:read",
@@ -20,7 +20,7 @@
     "safeDomains": {
       "type": "string",
       "label": "Safe domains (organisation-wide)",
-      "description": "Comma- or newline-separated list of internal/safe domains. Applies to every user. Subdomains match automatically (example.com also covers eu.example.com). From Bulwark 1.19, set this in Organisation > Security > External mail instead: Import from the plugin copies this list there, and the plugin does nothing while those warnings are on.",
+      "description": "Comma- or newline-separated list of internal/safe domains. Applies to every user. Subdomains match automatically (example.com also covers eu.example.com). From Bulwark 1.19, set this in Organisation > Security > External mail instead: Import from the plugin copies this list there, and the plugin turns off its own confirm or banner for each of those warnings that is on.",
       "placeholder": "example.com, partner.com",
       "default": ""
     }
@@ -29,7 +29,7 @@
     "safeDomainsCsv": {
       "type": "string",
       "label": "Additional safe domains",
-      "description": "Comma- or newline-separated list of domains you trust (e.g. acme.com, partner.io). Subdomains are matched automatically. When your organisation turned on Bulwark's own external mail warnings, this plugin does nothing and these settings have no effect.",
+      "description": "Comma- or newline-separated list of domains you trust (e.g. acme.com, partner.io). Subdomains are matched automatically. When your organisation turned on Bulwark's own external mail warnings, the matching part of this plugin turns off.",
       "default": ""
     },
     "treatIdentityDomainAsSafe": {

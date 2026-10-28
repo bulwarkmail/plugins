@@ -4,9 +4,12 @@
 > label for mail from outside the organisation and a confirm before sending
 > outside it in the admin panel, under Organisation > Security > External
 > mail. They can be set per domain or group, and they work in Bulwark Lite.
-> While either is on, this plugin does nothing (version 1.6.0 and later
-> read `api.host.features.externalMailWarnings`; Bulwark also skips the
-> hooks of older copies). To move over:
+> The plugin steps back per switch: with the confirm on it no longer asks
+> before sending, with the label on it shows no banner and no new-mail
+> toast. Version 1.6.0 and later do this themselves
+> (`api.host.features.externalRecipientWarning` and
+> `externalSenderLabel`); for older copies Bulwark skips those parts. To
+> move over:
 >
 > 1. In Organisation > Security, click **Import from the plugin** to copy
 >    the plugin's admin safe-domain list, then save.

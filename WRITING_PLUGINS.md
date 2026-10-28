@@ -1341,9 +1341,11 @@ or asked twice. No permission is needed, and the object is the same in the
 background and in slot frames.
 
 ```js
-api.host.features.externalMailWarnings   // true while the admin's "External" label or
-                                          // external-recipient confirm is on for this user
-api.host.onFeaturesChange(fn)            // fn(features); returns an unsubscribe function
+api.host.features.externalSenderLabel       // true while the admin's "External" label on mail
+                                             // from outside the organisation is on for this user
+api.host.features.externalRecipientWarning  // true while the confirm before sending outside
+                                             // the organisation is on for this user
+api.host.onFeaturesChange(fn)               // fn(features); returns an unsubscribe function
 ```
 
 `api.host.features` is updated in place, like `api.plugin.settings`, so
@@ -1351,14 +1353,16 @@ api.host.onFeaturesChange(fn)            // fn(features); returns an unsubscribe
 when it changes. It changes when the admin's policy changes or the user
 switches to an account in another domain or group.
 
-`externalMailWarnings` follows the admin's Organisation > Security >
-External mail switches (policy.json `organisation.externalMail`). While it
-is true, Bulwark labels external senders and confirms external recipients
-itself, and it skips the `onBeforeEmailSend`, `onNewEmailReceived` and
-`email-banner` handlers of the retired `external-mail-warning` plugin.
+The two flags follow the admin's Organisation > Security > External mail
+switches (policy.json `organisation.externalMail.senderLabel` and
+`recipientWarning`), one each, so a plugin steps back only from the part
+Bulwark does. For the retired `external-mail-warning` plugin Bulwark also
+skips the handlers itself: `onBeforeEmailSend` while
+`externalRecipientWarning` is true, `onNewEmailReceived` and the
+`email-banner` slot while `externalSenderLabel` is true.
 
-`api.host` is new in Bulwark 1.19. Older versions don't have it, so read it
-as `api.host?.features?.externalMailWarnings === true`.
+`api.host` is new in Bulwark 1.19. Older versions don't have it, so read a
+flag as `api.host?.features?.externalRecipientWarning === true`.
 
 ### api.storage
 
