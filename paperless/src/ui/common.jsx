@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Checkbox, EmptyState, Field, LinkButton, Row, Select, Stack, Text } from '@plugin-host/ui';
+import { Alert, Badge, Button, Combobox, EmptyState, Field, LinkButton, Stack } from '@plugin-host/ui';
 import { getApi, t, hostOf } from './host.js';
 import { clientFor, connectPersonal, resolveConnection } from '../lib/connection.js';
 import { errorText } from '../lib/errors.js';
@@ -73,41 +73,54 @@ export function ConnectEmptyState({ connection, onConnected }) {
   );
 }
 
-/** A select over Paperless objects, with an empty "none" entry. */
-export function PickOne({ label, items, value, onChange, noneLabel, suggested, block = true }) {
+/** A searchable combobox over Paperless objects, with an empty "none" entry. */
+export function PickOne({ label, items, value, onChange, noneLabel, suggested, block = true, placeholder }) {
+  const options = useMemo(() => [
+    { value: '', label: noneLabel || t('common.none') },
+    ...(items || []).map((it) => ({ value: String(it.id), label: it.name })),
+  ], [items, noneLabel]);
+
+  const handleChange = useCallback((v) => {
+    onChange?.(v === '' ? null : Number(v));
+  }, [onChange]);
+
+  const strValue = value == null ? '' : String(value);
+  const fieldLabel = suggested ? <>{label} <Badge tone="success">{t('send.suggested')}</Badge></> : label;
+
   return (
-    <Field label={suggested ? <>{label} <Badge tone="success">{t('send.suggested')}</Badge></> : label}>
-      <Select
+    <Field label={fieldLabel}>
+      <Combobox
         block={block}
-        value={value == null ? '' : String(value)}
-        onChange={(v) => onChange(v === '' ? null : Number(v))}
-        options={[{ value: '', label: noneLabel || t('common.none') }, ...(items || []).map((it) => ({ value: String(it.id), label: it.name }))]}
+        value={strValue}
+        onChange={handleChange}
+        options={options}
+        placeholder={placeholder || noneLabel || t('common.none')}
       />
     </Field>
   );
 }
 
-/** Tags as a row of check boxes. */
-export function TagPicker({ tags, value, onChange, label }) {
-  const on = new Set(value || []);
-  if (!tags?.length) return null;
-  const toggle = (id) => {
-    const next = new Set(on);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    onChange([...next]);
-  };
+
+/** Tags selector using multiselect Combobox. */
+export function TagPicker({ tags, value = [], onChange, label }) {
+  const options = useMemo(() => (tags || []).map((t) => ({ value: String(t.id), label: t.name })), [tags]);
+  const stringValues = useMemo(() => (value || []).map(String), [value]);
+  const handleChange = useCallback((newVals) => {
+    onChange?.(newVals.map(Number));
+  }, [onChange]);
   const name = label || t('field.tags');
+  if (!tags?.length) return null;
   return (
-    <div role="group" aria-label={name}>
-      <Stack gap={2}>
-        <Text weight="medium">{name}</Text>
-        <Row gap={4}>
-          {tags.map((tag) => (
-            <Checkbox key={tag.id} label={tag.name} checked={on.has(tag.id)} onChange={() => toggle(tag.id)} />
-          ))}
-        </Row>
-      </Stack>
-    </div>
+    <Field label={name}>
+      <Combobox
+        multiple
+        block
+        options={options}
+        value={stringValues}
+        onChange={handleChange}
+        placeholder={name}
+      />
+    </Field>
   );
 }
 
