@@ -7,7 +7,9 @@
 import { DialogButtons, Field, Icon, Input, List, ListRow, Stack, Text } from '@plugin-host/ui';
 import { looksLikeAddress } from '../lib/names.js';
 
-const SEARCH_DELAY_MS = 250;
+const SEARCH_DELAY_MS = 400;
+/** Bulwark answers directory searches from 3 characters. */
+const MIN_SEARCH = 3;
 
 export function makeAssignDialog(React, api) {
   const { createElement: h, useEffect, useState } = React;
@@ -21,20 +23,20 @@ export function makeAssignDialog(React, api) {
     const query = text.trim().toLowerCase();
 
     useEffect(() => {
-      if (query.length < 2 || typeof api.user?.findPeople !== 'function') {
+      if (query.length < MIN_SEARCH || typeof api.user?.findPeople !== 'function') {
         setFound([]);
         return undefined;
       }
       let live = true;
       const timer = setTimeout(() => {
-        api.user.findPeople({ text: query }).then((result) => {
+        api.user.findPeople({ text: query, ...(props.accountId ? { accountId: props.accountId } : {}) }).then((result) => {
           if (!live) return;
           setDirectoryOff(result?.complete === false);
           setFound((result?.people ?? []).filter((p) => p.type !== 'group'));
         }).catch(() => { if (live) setFound([]); });
       }, SEARCH_DELAY_MS);
       return () => { live = false; clearTimeout(timer); };
-    }, [query]);
+    }, [query, props.accountId]);
 
     const close = (value) => props.onResult?.(value);
     const listed = choices.filter((c) => !query || c.name.toLowerCase().includes(query) || c.email.includes(query));

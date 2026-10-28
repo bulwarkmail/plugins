@@ -10,9 +10,14 @@
 // Without either, other members' names are unknown and the badge says
 // "Assigned".
 
-/** At most this many people in the shared map; it has 8 KB. */
-export const MAX_SHARED_PEOPLE = 80;
+/**
+ * The shared map stays under this many bytes of JSON. Bulwark gives a
+ * plugin 4 KB per account; the rest of the room is left to other writers.
+ */
+export const MAX_SHARED_BYTES = 3584;
 export const SHARED_VERSION = 1;
+
+const jsonBytes = (value) => new TextEncoder().encode(JSON.stringify(value)).length;
 
 function clean(value, max) {
   return typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '';
@@ -38,10 +43,18 @@ export function readShared(value) {
   return out;
 }
 
-/** The value to store for `people`, the newest last, at most MAX_SHARED_PEOPLE. */
+/**
+ * The value to store for `people` (the newest last): the oldest entries go
+ * until the JSON is under MAX_SHARED_BYTES.
+ */
 export function writeShared(people) {
-  const entries = Object.entries(people).slice(-MAX_SHARED_PEOPLE);
-  return { v: SHARED_VERSION, people: Object.fromEntries(entries.map(([id, p]) => [id, { n: p.name, e: p.email }])) };
+  const entries = Object.entries(people).map(([id, p]) => [id, { n: p.name, e: p.email }]);
+  let value = { v: SHARED_VERSION, people: Object.fromEntries(entries) };
+  while (entries.length > 0 && jsonBytes(value) >= MAX_SHARED_BYTES) {
+    entries.shift();
+    value = { v: SHARED_VERSION, people: Object.fromEntries(entries) };
+  }
+  return value;
 }
 
 /**

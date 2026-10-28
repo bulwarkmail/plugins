@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import manifest from '../manifest.json' with { type: 'json' };
 import { ACTION, BADGE, SURFACES, createWiring, hostSupports } from '../src/lib/wiring.js';
@@ -32,6 +32,11 @@ function setup({ keywords = ['$seen'], accounts = [OWN, GROUP], data = { support
   return { api, state, wiring: createWiring(api) };
 }
 
+/** Lets the background loads (group names, writes) run. */
+const flush = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0)); };
+
+afterEach(() => { vi.useRealTimers(); });
+
 const click = (wiring, actionId, context = { emailId: 'm1', accountId: 'ch' }, surface = 'reader-actions') =>
   wiring.hooks.onAction({ surface, actionId, context });
 
@@ -56,7 +61,8 @@ describe('what the plugin offers', () => {
     const { api, wiring } = setup();
     await wiring.activate(api);
     const actions = Object.fromEntries(api.calls('ui.setActions')[0].args[1].map((a) => [a.id, a]));
-    expect(actions[ACTION.assignMe].notKeyword).toBe('$assigned:ci');
+    // Offered on a message with two assignees, the user one of them.
+    expect(actions[ACTION.assignMe].notKeyword).toBeUndefined();
     expect(actions[ACTION.unassign].hasKeyword).toBe('$assigned:*');
     expect(actions[ACTION.done].notKeyword).toBe('$done');
     expect(actions[ACTION.reopen].hasKeyword).toBe('$done');
@@ -140,18 +146,40 @@ describe('names in the team mailbox (Stalwart 1.0 metadata)', () => {
   it('adds the user to the shared names once, where the server keeps them', async () => {
     const { api, wiring } = setup({ data: { supported: true, value: { v: 1, people: { cj: { n: 'Org Bob', e: 'org-bob@example.org' } } } } });
     await wiring.activate(api);
+    await flush();
     const [set] = api.calls('accountData.set');
     expect(set.args[0]).toBe('ch');
     expect(set.args[1].people).toEqual({
       cj: { n: 'Org Bob', e: 'org-bob@example.org' },
       ci: { n: 'Org Alice', e: 'org-alice@example.org' },
     });
-    expect(api.calls('accountData.get').map((c) => c.args[0])).toEqual(['ch']);
+    // Read, then read again right before the write.
+    expect(api.calls('accountData.get').map((c) => c.args[0])).toEqual(['ch', 'ch']);
     // Opening another folder doesn't read or write it again.
     wiring.hooks.onMailboxChange({});
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     expect(api.calls('accountData.set')).toHaveLength(1);
-    expect(api.calls('accountData.get')).toHaveLength(1);
+    expect(api.calls('accountData.get')).toHaveLength(2);
+  });
+
+  it('keeps what another member added between its read and its write', async () => {
+    let value = { v: 1, people: { cj: { n: 'Org Bob', e: 'org-bob@example.org' } } };
+    let reads = 0;
+    const { api, wiring } = setup({
+      handlers: {
+        'accountData.get': async () => {
+          reads += 1;
+          // Carol adds herself after the first read.
+          if (reads === 2) value = { v: 1, people: { ...value.people, ck: { n: 'Org Carol', e: 'org-carol@example.org' } } };
+          return { supported: true, value };
+        },
+        'accountData.set': async (accountId, next) => { value = next; },
+      },
+    });
+    await wiring.activate(api);
+    await flush();
+    expect(Object.keys(value.people)).toEqual(['cj', 'ck', 'ci']);
+    expect(wiring.people.ck).toEqual({ name: 'Org Carol', email: 'org-carol@example.org' });
   });
 
   it('writes nothing on servers without metadata, and reads no personal account', async () => {
@@ -165,10 +193,23 @@ describe('names in the team mailbox (Stalwart 1.0 metadata)', () => {
     const accounts = [OWN, { ...GROUP, kind: 'shared' }];
     const { api, wiring } = setup({ accounts });
     await wiring.activate(api);
+    await flush();
     expect(api.calls('accountData.get')).toHaveLength(0);
     accounts[1] = GROUP;
     wiring.hooks.onMailboxChange({});
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
+    expect(api.calls('accountData.get').map((c) => c.args[0])).toEqual(['ch']);
+  });
+
+  it('tries again a little later when the server named no group yet', async () => {
+    vi.useFakeTimers();
+    const accounts = [OWN, { ...GROUP, kind: 'shared' }];
+    const { api, wiring } = setup({ accounts });
+    await wiring.activate(api);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(api.calls('accountData.get')).toHaveLength(0);
+    accounts[1] = GROUP;
+    await vi.advanceTimersByTimeAsync(3000);
     expect(api.calls('accountData.get').map((c) => c.args[0])).toEqual(['ch']);
   });
 });
@@ -209,9 +250,105 @@ describe('row badges', () => {
   it('offers recent assignees from the rows in the dialog', async () => {
     const { api, wiring } = setup();
     await wiring.activate(api);
-    wiring.hooks.onEmailListItemRender([], { email: { keywords: ['$assigned:cj'] } });
+    wiring.hooks.onEmailListItemRender([], { email: { id: 'm1', keywords: ['$assigned:cj'] } });
     expect(wiring.choicesFor('ch').map((c) => [c.id, c.kind])).toEqual([['ci', 'me'], ['cj', 'recent']]);
     // An unknown member says their id, so two of them can be told apart.
     expect(wiring.choicesFor('ch')[1]).toMatchObject({ name: 'Unknown team member', note: 'Id cj' });
+  });
+});
+
+describe('two assignees at once (two clients raced)', () => {
+  it('shows both on the badge, the user first', async () => {
+    const { api, wiring } = setup({ data: { supported: true, value: { people: { cj: { n: 'Org Bob', e: 'org-bob@example.org' } } } } });
+    await wiring.activate(api);
+    await flush();
+    const [badge] = wiring.hooks.onEmailListItemRender([], { email: { id: 'm1', keywords: ['$assigned:cj', '$assigned:ck'] } });
+    expect(badge).toMatchObject({ label: 'Org +1', title: 'Assigned to Org Bob, Unknown team member' });
+    const [mine] = wiring.hooks.onEmailListItemRender([], { email: { id: 'm2', keywords: ['$assigned:cj', '$assigned:ci'] } });
+    expect(mine).toMatchObject({ label: 'Me +1', title: 'Assigned to you, Org Bob' });
+  });
+
+  it('"Assign to me" takes it from the other one in one change', async () => {
+    const { api, wiring, state } = setup({ keywords: ['$assigned:ci', '$assigned:cj'] });
+    await wiring.activate(api);
+    await click(wiring, ACTION.assignMe);
+    expect(api.calls('email.updateKeywords')).toHaveLength(1);
+    expect(api.calls('email.updateKeywords')[0].args[1]).toEqual({ '$assigned:cj': false });
+    expect(state.keywords).toEqual(['$assigned:ci']);
+    // Already the only assignee: nothing to change.
+    await click(wiring, ACTION.assignMe);
+    expect(api.calls('email.updateKeywords')).toHaveLength(1);
+    expect(api.calls('toast.info').at(-1).args[0]).toBe("It's already assigned to you");
+  });
+});
+
+describe('names from the directory', () => {
+  it('looks the ids on rows up in batches of at most 20, a while after the rows settle', async () => {
+    vi.useFakeTimers();
+    const asked = [];
+    const { api, wiring } = setup({
+      handlers: {
+        'user.findPeople': async ({ ids }) => {
+          asked.push(ids);
+          return { complete: true, people: ids.map((id) => ({ id, type: 'individual', name: `Person ${id}`, email: `${id}@example.org` })) };
+        },
+      },
+    });
+    await wiring.activate(api);
+    for (let i = 0; i < 25; i++) wiring.hooks.onEmailListItemRender([], { email: { id: `m${i}`, keywords: [`$assigned:p${i}`] } });
+    // The user's own id is never asked for.
+    wiring.hooks.onEmailListItemRender([], { email: { id: 'mine', keywords: ['$assigned:ci'] } });
+    expect(asked).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toHaveLength(20);
+    expect(asked[0]).not.toContain('ci');
+    // The rest waits for the gap the host's 10 lookups a minute leave.
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(asked).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(asked).toHaveLength(2);
+    expect(asked[1]).toHaveLength(5);
+    expect(wiring.people.p3).toEqual({ name: 'Person p3', email: 'p3@example.org' });
+    expect(api.calls('ui.refreshRowBadges').length).toBeGreaterThan(1);
+    // Nobody is asked for twice.
+    wiring.hooks.onEmailListItemRender([], { email: { id: 'x', keywords: ['$assigned:p3'] } });
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(asked).toHaveLength(2);
+  });
+
+  it('stops asking when the plugin may not use the directory', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const { api, wiring } = setup({
+      handlers: { 'user.findPeople': async () => { calls += 1; throw new Error('Plugin "team-inbox" lacks permission "directory:read"'); } },
+    });
+    await wiring.activate(api);
+    wiring.hooks.onEmailListItemRender([], { email: { id: 'a', keywords: ['$assigned:p1'] } });
+    await vi.advanceTimersByTimeAsync(1600);
+    wiring.hooks.onEmailListItemRender([], { email: { id: 'b', keywords: ['$assigned:p2'] } });
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(calls).toBe(1);
+  });
+});
+
+describe('recent assignees and activation', () => {
+  it('counts recent assignees by message, not by how often a row was drawn', async () => {
+    const { api, wiring } = setup();
+    await wiring.activate(api);
+    for (let i = 0; i < 5; i++) wiring.hooks.onEmailListItemRender([], { email: { id: 'm1', keywords: ['$assigned:cj'] } });
+    wiring.hooks.onEmailListItemRender([], { email: { id: 'm2', keywords: ['$assigned:ck'] } });
+    wiring.hooks.onEmailListItemRender([], { email: { id: 'm3', keywords: ['$assigned:ck'] } });
+    expect(wiring.choicesFor('ch').map((c) => c.id)).toEqual(['ci', 'ck', 'cj']);
+  });
+
+  it('listens to language changes once, however often it is activated', async () => {
+    const { api, wiring } = setup();
+    let listeners = 0;
+    const onLocaleChange = api.i18n.onLocaleChange;
+    api.i18n.onLocaleChange = (fn) => { listeners += 1; return onLocaleChange(fn); };
+    await wiring.activate(api);
+    await wiring.activate(api);
+    expect(listeners).toBe(1);
   });
 });

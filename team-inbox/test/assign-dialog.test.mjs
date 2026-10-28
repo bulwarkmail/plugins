@@ -14,11 +14,11 @@ const CHOICES = [
   { id: 'cj', kind: 'recent', name: 'Org Bob', email: 'org-bob@example.org' },
 ];
 
-function open(handlers = {}) {
+function open(handlers = {}, extra = {}) {
   const api = fakeApi({ translations: manifest.locales, handlers });
   const Dialog = makeAssignDialog(React, api);
   const onResult = vi.fn();
-  render(React.createElement(Dialog, { choices: CHOICES, onResult }));
+  render(React.createElement(Dialog, { choices: CHOICES, onResult, ...extra }));
   return { api, onResult };
 }
 
@@ -38,7 +38,7 @@ describe('Assign to…', () => {
       fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bob' } });
       expect(screen.getAllByRole('listitem').map((r) => r.textContent)).toEqual(['Org Boborg-bob@example.org']);
       fireEvent.change(screen.getByRole('textbox'), { target: { value: 'dave@org-two.test' } });
-      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
       expect(screen.getByText(/only people Bulwark already knows/)).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Assign to dave@org-two.test' }));
       expect(onResult).toHaveBeenCalledWith({ address: 'dave@org-two.test' });
@@ -60,10 +60,25 @@ describe('Assign to…', () => {
         }),
       });
       fireEvent.change(screen.getByRole('textbox'), { target: { value: 'org' } });
-      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
       const names = screen.getAllByRole('listitem').map((r) => r.textContent);
       expect(names).toContain('Org Carolorg-carol@example.org');
       expect(names.some((n) => n.startsWith('Org Team'))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("searches the team mailbox's directory from 3 characters on", async () => {
+    vi.useFakeTimers();
+    try {
+      const { api } = open({ 'user.findPeople': async () => ({ people: [], complete: true }) }, { accountId: 'ch' });
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bo' } });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      expect(api.calls('user.findPeople')).toHaveLength(0);
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bob' } });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      expect(api.calls('user.findPeople').map((c) => c.args[0])).toEqual([{ text: 'bob', accountId: 'ch' }]);
     } finally {
       vi.useRealTimers();
     }

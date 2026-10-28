@@ -38,6 +38,7 @@ with the tools to build and test them:
 | [slot-showcase](slot-showcase/) | For plugin authors: a labelled box in every UI slot and a button on every action surface | every `ui:*` permission, plus `account:read` `email:read` `email:send` `compose:open` `calendar:read` `contacts:read` `tasks:read` `files:read` |
 | [smime](smime/) | S/MIME signing and encryption, verifying and decrypting, with keys kept in the browser (privileged tier) | `crypto:full` `email:blob-read` `email:raw-send` `email:render-takeover` `email:read` `email:send` `smime:read` `ui:composer-toolbar` `ui:email-banner` `ui:settings-section` `app:lifecycle` |
 | [spam-score](spam-score/) | A spam analysis section in the message details, from the spam filter's headers | `email:read` `ui:email-details` |
+| [team-inbox](team-inbox/) | Assign messages in team mailboxes to a member and mark them done, with "Assigned to me" and "Open" filters | `email:read` `email:write` `account:read` `directory:read` `ui:message-list` `ui:toolbar` |
 | [translate](translate/) | Translates received mail with MyMemory or LibreTranslate | `email:read` `ui:email-banner` `http:post` |
 
 What each permission allows is listed in

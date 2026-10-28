@@ -45,9 +45,9 @@ The keywords carry ids, so the plugin needs names for them:
 - other people come from the server's directory when the administrator
   allows directory lookups (off by default on Stalwart 1.0);
 - on Stalwart 1.0 and later the plugin keeps a small list of names in the
-  team mailbox's Inbox metadata (`org.bulwarkmail.plugin.team-inbox`): each
-  member who uses the plugin adds themselves, and whoever assigns adds the
-  assignee.
+  team mailbox's Inbox metadata (`org.bulwarkmail.plugin.team-inbox`, under
+  3.5 KB, oldest names dropped first): each member who uses the plugin adds
+  themselves, and whoever assigns adds the assignee.
 
 Without either, another member shows as "Assigned" until a name is known.
 "Assign to…" offers the user, people messages were assigned to lately, the
@@ -68,6 +68,7 @@ the directory or the names list knows it.
 | --- | --- |
 | `email:read` | Row badges, and the message's keywords before a change. |
 | `email:write` | Set and clear the keywords; keep the names list. |
-| `account:read` | The user's own id, which accounts are team mailboxes, directory lookups. |
+| `account:read` | The user's own id, and which accounts are team mailboxes. |
+| `directory:read` | Names for the ids on rows, and finding people in Assign to, where the server allows directory lookups. |
 | `ui:message-list` | The buttons on message rows and the list filters. |
 | `ui:toolbar` | The buttons in the reader toolbar. |

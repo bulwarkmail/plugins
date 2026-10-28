@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_SHARED_PEOPLE, findByEmail, looksLikeAddress, mergeShared, readShared, shortName, writeShared,
+  MAX_SHARED_BYTES, findByEmail, looksLikeAddress, mergeShared, readShared, shortName, writeShared,
 } from '../src/lib/names.js';
 
 describe('the shared name map', () => {
@@ -20,12 +20,17 @@ describe('the shared name map', () => {
     });
   });
 
-  it('keeps the newest people when there are too many for 8 KB', () => {
-    const many = Object.fromEntries(Array.from({ length: MAX_SHARED_PEOPLE + 5 }, (_, i) => [`p${i}`, { name: `Person ${i}`, email: `p${i}@example.org` }]));
+  it('drops the oldest people until the map is under 3.5 KB, however long the names', () => {
+    const bytes = (v) => new TextEncoder().encode(JSON.stringify(v)).length;
+    const many = Object.fromEntries(Array.from({ length: 120 }, (_, i) => [`p${i}`, { name: `Person ${i}`, email: `p${i}@example.org` }]));
     const value = writeShared(many);
-    expect(Object.keys(value.people)).toHaveLength(MAX_SHARED_PEOPLE);
+    expect(bytes(value)).toBeLessThan(MAX_SHARED_BYTES);
     expect(value.people.p0).toBeUndefined();
-    expect(new TextEncoder().encode(JSON.stringify(value)).length).toBeLessThan(8192);
+    expect(value.people.p119).toEqual({ n: 'Person 119', e: 'p119@example.org' });
+    // Long names leave room for fewer people, never more bytes.
+    const long = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`q${i}`, { name: 'Ä'.repeat(80), email: `q${i}@example.org` }]));
+    expect(bytes(writeShared(long))).toBeLessThan(MAX_SHARED_BYTES);
+    expect(Object.keys(writeShared({ a: { name: 'A', email: 'a@x.org' } }).people)).toEqual(['a']);
   });
 });
 
