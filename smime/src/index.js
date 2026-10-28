@@ -272,6 +272,9 @@ async function onComposeSend(req) {
 
     const from = parseAddr(req.fromEmail || req.from || (addrList(req.from)[0] || {}).email || '');
     if (!from.email) throw new Error(t('send.noSender'));
+    // The host passes the identity's display name separately (fromName). Without
+    // it the From header is the bare address and recipients see only the local part.
+    if (!from.name && typeof req.fromName === 'string' && req.fromName.trim()) from.name = req.fromName.trim();
 
     const to = addrList(req.to);
     const cc = addrList(req.cc);

@@ -25,11 +25,17 @@ function messageHeaderLines(input) {
   lines.push(formatHeader('From', formatAddress(input.from)));
   lines.push(formatHeader('To', input.to.map(formatAddress).join(', ')));
   if (input.cc?.length) lines.push(formatHeader('Cc', input.cc.map(formatAddress).join(', ')));
-  lines.push(formatHeader('Subject', encodeHeaderValue(input.subject)));
+  lines.push(formatHeader('Subject', encodeHeaderWords(input.subject)));
   lines.push(formatHeader('Date', formatDate(input.date ?? new Date())));
-  lines.push(formatHeader('Message-ID', input.messageId ?? `<${generateUUID()}@smime.local>`));
-  if (input.inReplyTo) lines.push(formatHeader('In-Reply-To', input.inReplyTo));
-  if (input.references?.length) lines.push(formatHeader('References', input.references.join(' ')));
+  lines.push(formatHeader('Message-ID', input.messageId ?? `<${generateUUID()}@${messageIdDomain(input.from)}>`));
+  // In-Reply-To / References come from the host as bare ids (JMAP strips the
+  // angle brackets) and may carry folding whitespace from the original header.
+  // A stray CRLF here becomes an empty line, which ends the header block: the
+  // recipient then sees Content-Type and everything after it as plain text.
+  const inReplyTo = msgIdList(input.inReplyTo);
+  if (inReplyTo) lines.push(formatHeader('In-Reply-To', inReplyTo));
+  const references = msgIdList(input.references);
+  if (references) lines.push(formatHeader('References', references));
   return lines;
 }
 
@@ -129,28 +135,87 @@ function generateBoundary() {
 
 function formatAddress(addr) {
   if (addr.name) {
-    const escaped = addr.name.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const name = unfold(addr.name);
+    // Raw 8-bit in a header is rejected by some MTAs (e.g. IONOS); encode it.
+    if (!/^[\x20-\x7e]*$/.test(name)) return `${encodeHeaderWords(name)} <${addr.email}>`;
+    const escaped = name.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     return `"${escaped}" <${addr.email}>`;
   }
   return addr.email;
 }
 
+/** Collapse CR/LF/tabs (folding leftovers, user input) to single spaces. */
+function unfold(value) {
+  return String(value ?? '').replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim();
+}
+
+/** Normalise one id or a list of ids to "<a@b> <c@d>"; empty string if none. */
+function msgIdList(value) {
+  const items = Array.isArray(value) ? value : value ? [value] : [];
+  return items
+    .flatMap((v) => unfold(v).split(' '))
+    .map((v) => v.replace(/^<+|>+$/g, ''))
+    .filter((v) => v.includes('@'))
+    .map((v) => `<${v}>`)
+    .join(' ');
+}
+
+function messageIdDomain(from) {
+  const domain = String(from?.email ?? '').split('@')[1];
+  return domain && /^[A-Za-z0-9.-]+$/.test(domain) ? domain : 'smime.local';
+}
+
+/**
+ * Fold a header at whitespace only (RFC 5322 §2.2.3). A word is never split:
+ * message ids and RFC 2047 encoded-words must stay intact, so a single word
+ * longer than the soft limit gets its own (long) line instead.
+ */
 function formatHeader(name, value) {
-  const full = `${name}: ${value}`;
-  if (full.length <= 76) return full;
-  const parts = [];
-  let remaining = full;
-  let first = true;
-  while (remaining.length > 76) {
-    let breakAt = 76;
-    const spaceIdx = remaining.lastIndexOf(' ', 76);
-    if (spaceIdx > (first ? name.length + 2 : 1)) breakAt = spaceIdx;
-    parts.push(remaining.slice(0, breakAt));
-    remaining = ' ' + remaining.slice(breakAt).trimStart();
-    first = false;
+  const words = unfold(value).split(' ').filter(Boolean);
+  const lines = [];
+  let line = `${name}:`;
+  for (const word of words) {
+    if (line.length + 1 + word.length > 76 && line.length > name.length + 1) {
+      lines.push(line);
+      line = ` ${word}`;
+    } else {
+      line += ` ${word}`;
+    }
   }
-  parts.push(remaining);
-  return parts.join(CRLF);
+  lines.push(line);
+  return lines.join(CRLF);
+}
+
+/**
+ * RFC 2047 for header text: one or more Q encoded-words split only between
+ * whole characters, separated by spaces so formatHeader can fold between them.
+ * Each word stays at or below 60 characters so a folded line, including a
+ * header name such as "Subject: ", stays within the 78-character limit.
+ */
+function encodeHeaderWords(value) {
+  const text = unfold(value);
+  if (/^[\x20-\x7e]*$/.test(text)) return text;
+  const prefix = '=?UTF-8?Q?';
+  const words = [];
+  let current = '';
+  for (const ch of text) {
+    const enc = Array.from(new TextEncoder().encode(ch))
+      .map((b) =>
+        (b >= 0x30 && b <= 0x39) || (b >= 0x41 && b <= 0x5a) || (b >= 0x61 && b <= 0x7a)
+          ? String.fromCharCode(b)
+          : b === 0x20
+            ? '_'
+            : '=' + b.toString(16).toUpperCase().padStart(2, '0'),
+      )
+      .join('');
+    if (prefix.length + current.length + enc.length + 2 > 60) {
+      words.push(`${prefix}${current}?=`);
+      current = '';
+    }
+    current += enc;
+  }
+  if (current) words.push(`${prefix}${current}?=`);
+  return words.join(' ');
 }
 
 function encodeHeaderValue(value) {
