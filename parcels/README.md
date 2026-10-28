@@ -10,9 +10,11 @@ Finds tracking numbers in your mail and shows where each parcel is.
   page), *Refresh* and *Mark received*.
 - **Deliveries** section in the mail sidebar, below the folders and tags:
   every parcel you follow that you haven't marked received, newest activity
-  first, one row each with a short status. A row opens the parcel with its
-  full status, *Track* and *Mark received*. *Add tracking number* at the end
-  follows a number by hand.
+  first, one row each with a short status. A small **Refresh** button appears
+  on the same line as the Deliveries heading alongside the most recent check time, so all
+  active parcels can be updated without finding each original email. A row
+  opens the parcel with its full status, *Track* and *Mark received*.
+  *Add tracking number* at the end follows a number by hand.
 - **Notifications** when a parcel's status changes (for example from *In
   transit* to *Out for delivery*), as a system notification when you allowed
   them for the webmail, otherwise as a message in the app.
@@ -90,9 +92,16 @@ status isn't set up.
 
 ### Polling
 
-- A parcel is asked about at most every **30 minutes** in the background
-  (the plugin checks once a minute which parcels are due, at most 20 at a
-  time).
+- A parcel is asked about at most every **30 minutes** by normal background
+  polling (the plugin checks once a minute which parcels are due, at most 20
+  at a time).
+- Opening webmail and returning to its browser tab also checks parcels whose
+  last request is **at least 5 minutes old**. Repeated focus/visit events
+  within five minutes do not cause duplicate lookups.
+- The **Refresh** icon in Deliveries checks all eligible parcels on demand,
+  subject to a **10-second per-parcel minimum**, provider Retry-After backoff
+  and the existing per-round limit. Received, stopped, expired and delivered
+  parcels are never polled.
 - Polling stops when a parcel is **delivered**, when you mark it received,
   and **30 days** after it was found.
 - When a service answers "too many requests", the plugin waits as long as

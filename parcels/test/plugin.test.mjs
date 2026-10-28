@@ -76,7 +76,7 @@ function api17({ settings = {}, locale = 'en', statuses = ['InfoReceived', 'InTr
 describe('the bundle', () => {
   it('offers the reader card, the deliveries section, its dialogs and the hooks', () => {
     const plugin = load(fakeApi());
-    expect(Object.keys(plugin.slots)).toEqual(['email-banner', 'sidebar-section', 'plugin-dialog']);
+    expect(Object.keys(plugin.slots)).toEqual(['email-banner', 'sidebar-section', 'sidebar-section-actions', 'plugin-dialog']);
     for (const slot of Object.values(plugin.slots)) expect(typeof slot.component).toBe('function');
     expect(Object.keys(plugin.hooks).sort()).toEqual(['onInterval', 'onNewEmailReceived']);
   });
