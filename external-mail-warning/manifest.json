@@ -1,7 +1,7 @@
 {
   "id": "external-mail-warning",
   "name": "External Mail Warning",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "author": "Bulwark Mail Community",
   "description": "Replaced by Bulwark: from Bulwark 1.19, admins turn on an External label and a confirm before sending outside the organisation in Organisation > Security, and this plugin turns off its own confirm or banner for each of them that is on. On older Bulwark versions it warns before sending to recipients outside your safe-domain list and flags mail from external senders with a banner.",
   "type": "hook",
