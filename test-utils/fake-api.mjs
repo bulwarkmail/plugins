@@ -16,13 +16,29 @@
 // 1.19 and later have it; `api.setHostFeatures(next)` changes it like the
 // host does. Without the option api.host is missing, as on older hosts.
 
-export function fakeApi({ id = 'test-plugin', version = '1.0.0', settings = {}, locale = 'en', translations = {}, handlers = {}, hostFeatures } = {}) {
+export function fakeApi({
+  id = 'test-plugin',
+  version = '1.0.0',
+  settings = {},
+  locale = 'en',
+  dateLocale,
+  timeFormat,
+  timeZone,
+  firstDayOfWeek = 1,
+  translations = {},
+  handlers = {},
+  hostFeatures,
+} = {}) {
   const log = [];
   const store = new Map();
   const settingsListeners = [];
   const localeListeners = [];
   const hostListeners = [];
   let currentLocale = locale;
+  let currentDateLocale = dateLocale;
+  let currentTimeFormat = timeFormat;
+  let currentTimeZone = timeZone;
+  let currentFirstDayOfWeek = firstDayOfWeek;
 
   const call = (method, args) => {
     log.push({ method, args });
@@ -37,6 +53,20 @@ export function fakeApi({ id = 'test-plugin', version = '1.0.0', settings = {}, 
       if (typeof v === 'string') return v;
     }
     return undefined;
+  };
+
+  const formatIntl = (date, options = {}) => {
+    try {
+      const d = date instanceof Date ? date : new Date(date);
+      if (isNaN(d.getTime())) return '';
+      const opts = {
+        ...(currentTimeZone ? { timeZone: currentTimeZone } : {}),
+        ...options,
+      };
+      return new Intl.DateTimeFormat(currentDateLocale ?? currentLocale, opts).format(d);
+    } catch {
+      return '';
+    }
   };
 
   const known = {
@@ -54,6 +84,19 @@ export function fakeApi({ id = 'test-plugin', version = '1.0.0', settings = {}, 
       keys: async () => [...store.keys()],
     },
     i18n: {
+      get locale() { return currentLocale; },
+      get dateLocale() { return currentDateLocale ?? currentLocale; },
+      get timeFormat() { return currentTimeFormat ?? (new Intl.DateTimeFormat(currentDateLocale ?? currentLocale, { hour: 'numeric' }).resolvedOptions().hour12 ? '12h' : '24h'); },
+      get hour12() { return currentTimeFormat ? currentTimeFormat === '12h' : (new Intl.DateTimeFormat(currentDateLocale ?? currentLocale, { hour: 'numeric' }).resolvedOptions().hour12 ?? false); },
+      get timeZone() { return currentTimeZone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'); },
+      get firstDayOfWeek() { return currentFirstDayOfWeek; },
+      formatTime: (date, options = {}) => formatIntl(date, {
+        hour: '2-digit',
+        minute: '2-digit',
+        ...(currentTimeFormat ? { hour12: currentTimeFormat === '12h' } : {}),
+        ...options,
+      }),
+      formatDate: (date, options = {}) => formatIntl(date, options),
       t(key, vars) {
         const text = lookup(key) ?? key;
         return text.replace(/\{(\w+)\}/g, (m, name) => (vars && name in vars ? String(vars[name]) : m));
@@ -82,7 +125,15 @@ export function fakeApi({ id = 'test-plugin', version = '1.0.0', settings = {}, 
   const api = new Proxy(known, {
     get(target, name) {
       if (name === 'calls') return (method) => (method ? log.filter((c) => c.method === method) : [...log]);
-      if (name === 'setLocale') return (l) => { currentLocale = l; for (const fn of localeListeners) fn(l); };
+      if (name === 'setLocale') return (l, regional = {}) => {
+        currentLocale = l;
+        if (regional.dateLocale !== undefined) currentDateLocale = regional.dateLocale;
+        if (regional.hour12 !== undefined) currentTimeFormat = regional.hour12 ? '12h' : '24h';
+        if (regional.timeFormat !== undefined) currentTimeFormat = regional.timeFormat;
+        if (regional.timeZone !== undefined) currentTimeZone = regional.timeZone;
+        if (regional.firstDayOfWeek !== undefined) currentFirstDayOfWeek = regional.firstDayOfWeek;
+        for (const fn of localeListeners) fn(l);
+      };
       if (name === 'changeSettings') return (next) => { Object.assign(target.plugin.settings, next); for (const fn of settingsListeners) fn({ ...target.plugin.settings }); };
       if (name === 'storageSnapshot') return () => Object.fromEntries(store);
       if (name === 'setHostFeatures') return (next) => { Object.assign(target.host.features, next); for (const fn of hostListeners) fn(target.host.features); };
