@@ -66,7 +66,8 @@ export function makeAssignDialog(React, api) {
             icon: h(Icon, { name: c.kind === 'me' ? 'user-check' : 'user' }),
             title: c.name,
             subtitle: subtitle(c),
-            onClick: () => close({ id: c.id, name: c.name, email: c.email }),
+            // An unknown member's placeholder name isn't handed back as a name.
+            onClick: () => close(c.note ? { id: c.id } : { id: c.id, name: c.name, email: c.email }),
           })))
         : h(Text, { tone: 'muted' }, t('dialog.empty')),
       h(DialogButtons, {

@@ -352,3 +352,14 @@ describe('recent assignees and activation', () => {
     expect(listeners).toBe(1);
   });
 });
+
+describe('a member picked without a name', () => {
+  it('is assigned without learning the placeholder as their name', async () => {
+    const { api, wiring, state } = setup({ handlers: { 'ui.openDialog': async () => ({ id: 'cj' }) } });
+    await wiring.activate(api);
+    await click(wiring, ACTION.assignTo);
+    expect(state.keywords).toContain('$assigned:cj');
+    expect(wiring.people.cj).toBeUndefined();
+    expect(api.calls('toast.success').at(-1).args[0]).toBe('Assigned to cj');
+  });
+});

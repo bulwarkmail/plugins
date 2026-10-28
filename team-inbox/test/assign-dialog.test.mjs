@@ -12,6 +12,7 @@ afterEach(cleanup);
 const CHOICES = [
   { id: 'ci', kind: 'me', name: 'Org Alice', email: 'org-alice@example.org' },
   { id: 'cj', kind: 'recent', name: 'Org Bob', email: 'org-bob@example.org' },
+  { id: 'ck', kind: 'recent', name: 'Unknown team member', email: '', note: 'Id ck' },
 ];
 
 function open(handlers = {}, extra = {}) {
@@ -26,9 +27,12 @@ describe('Assign to…', () => {
   it('lists the user and recent assignees and closes with the one picked', () => {
     const { onResult } = open();
     const rows = screen.getAllByRole('listitem');
-    expect(rows.map((r) => r.textContent)).toEqual(['Org AliceYou', 'Org Boborg-bob@example.org']);
+    expect(rows.map((r) => r.textContent)).toEqual(['Org AliceYou', 'Org Boborg-bob@example.org', 'Unknown team memberId ck']);
     fireEvent.click(rows[1]);
     expect(onResult).toHaveBeenCalledWith({ id: 'cj', name: 'Org Bob', email: 'org-bob@example.org' });
+    // An unknown member comes back by id only.
+    fireEvent.click(rows[2]);
+    expect(onResult).toHaveBeenLastCalledWith({ id: 'ck' });
   });
 
   it('narrows the list as the user types, and offers a typed address nobody listed', async () => {
