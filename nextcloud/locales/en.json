@@ -135,6 +135,11 @@
   "setting.uploadFolder.help": "Folder in your Nextcloud for files uploaded from the webmail. Created when needed.",
   "setting.folderLayout": "Folder layout",
   "setting.folderLayout.help": "How uploads are sorted in the upload folder.",
+  "setting.enableTalkMeetingsButton": "Aktivate Talk button",
+  "setting.enableTalkMeetingsButtonHelp": "Aktivate button to add Nextcloud Talk meeting room in calendard entries",
+  "talkMeeting.add": "Add Talk meeting",
+  "talkMeeting.added": "Talk meeting added",
+  "talkMeeting.error": "Could not create Talk meeting: {message}",
   "date": "One folder per day",
   "flat": "All in the upload folder"
 }

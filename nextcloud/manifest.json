@@ -16,7 +16,10 @@
     "ui:toolbar",
     "ui:app-page",
     "compose:open",
-    "ui:download-file"
+    "ui:download-file",
+    "calendar:read",
+    "calendar:write",
+    "ui:calendar-action"
   ],
   "entrypoint": "index.js",
   "minAppVersion": "1.15.0",
@@ -84,6 +87,12 @@
         "date",
         "flat"
       ]
+    },
+    "enableTalkMeetingsButton": {
+      "type": "boolean",
+      "label": "setting.enableTalkMeetingsButton",
+      "description": "setting.enableTalkMeetingsButtonHelp",
+      "default": false
     }
   },
   "locales": {
@@ -784,6 +793,11 @@
       "setting.uploadFolder.help": "Ordner in Ihrer Nextcloud für Dateien, die aus dem Webmail hochgeladen werden. Wird bei Bedarf angelegt.",
       "setting.folderLayout": "Ordnerstruktur",
       "setting.folderLayout.help": "Wie hochgeladene Dateien im Upload-Ordner abgelegt werden.",
+      "setting.enableTalkMeetingsButton": "Aktiviere Talk Button",
+      "setting.enableTalkMeetingsButtonHelp": "Aktiviere Button zum hinzufügen eines Nextcloud Talk Meeting Raums in Kalendereinträgen",
+      "talkMeeting.add": "Talk Meeting hinzufügen",
+      "talkMeeting.added": "Talk Meeting hinzugefügt",
+      "talkMeeting.error": "Kann Talk Meeting nicht erstellen: {message}",
       "date": "Ein Ordner pro Tag",
       "flat": "Alles direkt im Upload-Ordner"
     },
@@ -924,6 +938,11 @@
       "setting.uploadFolder.help": "Folder in your Nextcloud for files uploaded from the webmail. Created when needed.",
       "setting.folderLayout": "Folder layout",
       "setting.folderLayout.help": "How uploads are sorted in the upload folder.",
+      "setting.enableTalkMeetingsButton": "Activate Talk button",
+      "setting.enableTalkMeetingsButtonHelp": "Activate button to add Nextcloud Talk meeting room in calendar entries",
+      "talkMeeting.add": "Add Talk meeting",
+      "talkMeeting.added": "Talk meeting added",
+      "talkMeeting.error": "Could not create Talk meeting: {message}",
       "date": "One folder per day",
       "flat": "All in the upload folder"
     },
