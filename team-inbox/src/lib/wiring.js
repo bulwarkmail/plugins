@@ -195,7 +195,8 @@ export function createWiring(initialApi) {
     const add = (id, kind) => {
       if (!id || out.some((c) => c.id === id)) return;
       const p = nameOf(id);
-      out.push({ id, kind, name: p?.name || t('choice.unknown'), email: p?.email || '' });
+      // Without a name, the id tells two unknown members apart.
+      out.push({ id, kind, name: p?.name || t('choice.unknown'), email: p?.email || '', ...(p ? {} : { note: t('choice.unknown_id', { id }) }) });
     };
     add(self.accountId, 'me');
     for (const id of recentAssignees(seen, { exclude: [self.accountId] })) add(id, 'recent');

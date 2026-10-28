@@ -211,5 +211,7 @@ describe('row badges', () => {
     await wiring.activate(api);
     wiring.hooks.onEmailListItemRender([], { email: { keywords: ['$assigned:cj'] } });
     expect(wiring.choicesFor('ch').map((c) => [c.id, c.kind])).toEqual([['ci', 'me'], ['cj', 'recent']]);
+    // An unknown member says their id, so two of them can be told apart.
+    expect(wiring.choicesFor('ch')[1]).toMatchObject({ name: 'Unknown team member', note: 'Id cj' });
   });
 });

@@ -43,7 +43,7 @@ export function makeAssignDialog(React, api) {
     }
     const typed = looksLikeAddress(query) && !listed.some((c) => c.email === query) ? query : null;
 
-    const subtitle = (c) => (c.kind === 'me' ? t('dialog.you') : c.email || undefined);
+    const subtitle = (c) => (c.kind === 'me' ? t('dialog.you') : c.email || c.note || undefined);
     return h(Stack, { gap: 3 },
       h(Field, { label: t('dialog.search'), hint: directoryOff ? t('dialog.no_directory') : undefined },
         h(Input, {
