@@ -157,10 +157,18 @@ export function createWiring(initialApi) {
     const cached = await api.storage.get(PEOPLE_KEY);
     if (cached && typeof cached === 'object') learn(cached);
     await publish();
-    await loadGroups();
     // Rows drawn before the plugin knew the user carry no badges; the host
     // keeps that answer until asked again.
     void api.ui.refreshRowBadges?.();
+    // Names come later, and a server that can't answer metadata may take a
+    // while to fail; nothing waits for them.
+    void loadGroups().then(refreshForNames);
+  }
+
+  // The host takes one refresh a second; names learned right after the
+  // first one would be dropped.
+  function refreshForNames(learned) {
+    if (learned) setTimeout(() => { void api.ui.refreshRowBadges?.(); }, 1100);
   }
 
   function ensureStarted() {
@@ -308,9 +316,7 @@ export function createWiring(initialApi) {
     },
 
     onMailboxChange() {
-      void ensureStarted().then(loadGroups).then((learned) => {
-        if (learned) void api.ui.refreshRowBadges?.();
-      });
+      void ensureStarted().then(loadGroups).then(refreshForNames);
     },
 
     onAccountSwitch() {

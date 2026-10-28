@@ -191,6 +191,13 @@ describe('row badges', () => {
     expect(api.calls('ui.refreshRowBadges')).toHaveLength(1);
   });
 
+  it('doesn\'t wait for a server that takes long to answer the shared names', async () => {
+    const { api, wiring } = setup({ handlers: { 'accountData.get': () => new Promise(() => {}) } });
+    await wiring.activate(api);
+    expect(api.calls('ui.refreshRowBadges')).toHaveLength(1);
+    expect(wiring.hooks.onEmailListItemRender([], { email: { keywords: ['$assigned:ci'] } })[0].label).toBe('Me');
+  });
+
   it('says "Me" for the user, "Assigned" for someone unknown, and adds nothing to other mail', async () => {
     const { api, wiring } = setup();
     await wiring.activate(api);
