@@ -184,6 +184,13 @@ describe('row badges', () => {
     ]);
   });
 
+  it('asks for the rows\' badges again once it knows the user, for rows drawn before', async () => {
+    const { api, wiring } = setup();
+    expect(wiring.hooks.onEmailListItemRender([], { email: { keywords: ['$assigned:cj'] } })).toBeUndefined();
+    await wiring.activate(api);
+    expect(api.calls('ui.refreshRowBadges')).toHaveLength(1);
+  });
+
   it('says "Me" for the user, "Assigned" for someone unknown, and adds nothing to other mail', async () => {
     const { api, wiring } = setup();
     await wiring.activate(api);

@@ -120,7 +120,8 @@ export function createWiring(initialApi) {
   /**
    * Read the shared names of the group accounts not read yet, and add the
    * user to each. Runs again when a folder opens: which accounts are groups
-   * is known only once the server said so.
+   * is known only once the server said so. Resolves to whether a name was
+   * learned.
    */
   async function loadGroups() {
     if (!self) return;
@@ -139,10 +140,8 @@ export function createWiring(initialApi) {
       if (learn(map)) learned = true;
       await share(account.accountId, { [self.accountId]: selfPerson() });
     }
-    if (learned) {
-      await saveLocal();
-      void api.ui.refreshRowBadges?.();
-    }
+    if (learned) await saveLocal();
+    return learned;
   }
 
   async function start() {
@@ -159,6 +158,9 @@ export function createWiring(initialApi) {
     if (cached && typeof cached === 'object') learn(cached);
     await publish();
     await loadGroups();
+    // Rows drawn before the plugin knew the user carry no badges; the host
+    // keeps that answer until asked again.
+    void api.ui.refreshRowBadges?.();
   }
 
   function ensureStarted() {
@@ -306,7 +308,9 @@ export function createWiring(initialApi) {
     },
 
     onMailboxChange() {
-      void ensureStarted().then(loadGroups);
+      void ensureStarted().then(loadGroups).then((learned) => {
+        if (learned) void api.ui.refreshRowBadges?.();
+      });
     },
 
     onAccountSwitch() {
