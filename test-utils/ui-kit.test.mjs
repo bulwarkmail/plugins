@@ -14,7 +14,9 @@ const haveWebmail = fs.existsSync(KIT);
 
 function realExports() {
   const names = new Set();
-  for (const file of ['components.tsx', 'dialog-buttons.tsx', 'index.ts']) {
+  // KIT_VERSION moved to names.ts in Bulwark 1.18.
+  for (const file of ['components.tsx', 'dialog-buttons.tsx', 'index.ts', 'names.ts']) {
+    if (!fs.existsSync(path.join(KIT, file))) continue;
     const text = fs.readFileSync(path.join(KIT, file), 'utf8');
     for (const m of text.matchAll(/^export (?:const|function) ([A-Z][A-Za-z]*|use[A-Z][A-Za-z]*|KIT_VERSION)\b/gm)) names.add(m[1]);
   }
