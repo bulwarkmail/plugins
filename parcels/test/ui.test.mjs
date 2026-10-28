@@ -162,8 +162,10 @@ describe('deliveries section', () => {
   it('lists parcels as rows with a short status, and opens one in a dialog', async () => {
     const openDialog = vi.fn(async () => null);
     const api = makeApi({ openDialog });
-    await api.storage.set('parcel:00340434161094042557', parcel('00340434161094042557', { subject: 'Your order has shipped', status: 'out_for_delivery' }));
-    await api.storage.set('parcel:JJD000390007878901234', parcel('JJD000390007878901234', { error: 'timeout' }));
+    // Just polled, so the refresh on opening the section leaves them alone.
+    const lastPolledAt = Date.now();
+    await api.storage.set('parcel:00340434161094042557', parcel('00340434161094042557', { subject: 'Your order has shipped', status: 'out_for_delivery', lastPolledAt }));
+    await api.storage.set('parcel:JJD000390007878901234', parcel('JJD000390007878901234', { error: 'timeout', lastPolledAt }));
     const { component: Section } = load(api).slots['sidebar-section'];
     await show(React.createElement(Section));
     const row = await screen.findByRole('button', { name: /Your order has shipped/ });
