@@ -354,7 +354,7 @@ High-risk permissions are listed first in the consent dialog and marked.
 | `security:read` | **See your account security.** See whether two-factor sign-in and encryption are on, without access to secrets. |  |
 | `auth:observe` | **Know when you sign in.** Be told when you sign in, switch accounts or your session is renewed. |  |
 | `auth:emit` | **Sign you out.** Sign you out of the webmail. |  |
-| `account:read` | **See your accounts.** See the accounts you added, with their addresses and servers. |  |
+| `account:read` | **See your accounts.** See the accounts you added with their addresses and servers, which mail accounts are team mailboxes, and look up people in your organisation's directory. |  |
 | `http:post` | **Use the webmail server for you.** Call these server endpoints with your login: | yes |
 | `http:fetch` | **Connect to other websites.** Send requests to these sites. Anything the plugin can read may be sent there: | yes |
 | `ui:observe` | **Follow where you are in the app.** Know which page is open and react to links you click. Always granted; not shown in the dialog. |  |
@@ -548,7 +548,7 @@ declared with `api.ui.setActions`, and each entry of `shortcuts` runs its
 |---|---|---|---|---|
 | `onSearch` | transform | `email:read` | `{ query, filters: SearchFilters }` | before a search runs; may change the query and filters |
 | `onSearchResults` | transform | `email:read` | `string[], { query, filters, emailIds }` | after search results arrived; return ids of further messages to add to them (at most 100) |
-| `onProvideSearchResults` | transform | `email:read` | `ExternalSearchResult[], { query, filters }` | to add results from elsewhere to a search |
+| `onProvideSearchResults` | transform | `email:read` | `ExternalSearchResult[], { query, filters }` | to add results from elsewhere to a search; drawn above its message list; an entry naming a message (email) opens it on a click, any other click comes back as onAction with surface "search-results" and the entry's key |
 
 #### Mail: attachments
 
@@ -965,6 +965,16 @@ its buttons. At most 8 actions per surface. An action has:
   roles, such as `inbox` or `sent` (message surfaces);
 - `mimeTypes` (optional): show it only for attachments or files of these
   types; `image/` or `image/*` matches all images;
+- `accounts` (optional, message surfaces): show the action only on messages
+  in these kinds of mail account: `personal` (the user's own), `group` (a
+  team mailbox, a Stalwart group account the user is a member of) or
+  `shared` (a mailbox another person shared). On `message-bulk-actions` the
+  open folder's account counts. Surfaces that aren't about messages never
+  show such an action;
+- `hasKeyword` / `notKeyword` (optional, `message-row-actions` and
+  `reader-actions`): show the action only when the message has, or lacks,
+  this keyword. A trailing `*` matches any keyword that starts with the
+  rest (`"$assigned:*"`). Case doesn't matter;
 - `danger` (optional): draw it in red;
 - `checked` (optional, the composer's Options and Send menus): draw the entry
   as a check item, ticked or not, like the menu's own options; it stays open
@@ -976,6 +986,24 @@ its buttons. At most 8 actions per surface. An action has:
   such as `Alt+A` that runs the action while the composer has focus. It needs
   Alt, Ctrl/Cmd+Shift or Ctrl/Cmd+Alt, shows in the button's tooltip and is
   listed in the keyboard help.
+
+A click on `message-row-actions` or `reader-actions` carries `emailId` and,
+for a message in a team or shared mailbox, `accountId`, the JMAP account
+the message is in. Pass it on to `api.email.get` and
+`api.email.updateKeywords`; without it they work on the user's own account.
+
+```js
+await api.ui.setActions('reader-actions', [
+  { id: 'done', label: 'Mark done', icon: 'circle-check', accounts: ['group'], notKeyword: '$done' },
+  { id: 'reopen', label: 'Reopen', icon: 'arrow-back-up', accounts: ['group'], hasKeyword: '$done' },
+]);
+// onAction({ actionId: 'done', context: { emailId: 'm1', accountId: 'ch' } })
+await api.email.updateKeywords(context.emailId, { $done: true }, context.accountId);
+```
+
+`accounts`, `hasKeyword` and `notKeyword` are new in Bulwark 1.19; older
+versions ignore them and show the action everywhere, so set
+`minAppVersion` to `1.19.0` when you rely on them.
 
 Clicks on the composer's surfaces (its toolbar, Options, Attach and Send
 menus) carry `composerId`, which the [`api.composer`](#apicomposer) methods
@@ -1023,16 +1051,63 @@ the `app-page` slot fills the content area.
 ### Badges on message rows
 
 The `onEmailListItemRender` hook returns badges for a row:
-`[{ key, label, color, title }]`. The host caches them per message, so call
-`api.ui.refreshRowBadges()` (at most once a second) when your answer
-changes for another reason.
+`[{ key, label, color, title, icon }]`, at most 3 per row, labels up to 32
+characters. `icon` (Bulwark 1.19 and later) is a Tabler icon name drawn
+before the label, such as `check` or `user`. The host caches the badges per
+message and keyword state, so call `api.ui.refreshRowBadges()` (at most
+once a second) when your answer changes for another reason.
+
+```js
+export const hooks = {
+  onEmailListItemRender(badges, { email }) {
+    if (!email.keywords.includes('$done')) return undefined;
+    return [...badges, { key: 'done', label: 'Done', icon: 'check', color: 'var(--color-success)' }];
+  },
+};
+```
+
+### List filters
+
+```js
+await api.ui.setListFilters([
+  { id: 'mine', label: 'Assigned to me', icon: 'user', hasKeyword: '$assigned:cj', accounts: ['group'] },
+  { id: 'open', label: 'Open', notKeyword: '$done', accounts: ['group'] },
+]);
+```
+
+Keyword filters for the message list (permission `ui:message-list`,
+Bulwark 1.19 and later). The host draws each as a chip in the list header
+of the folders it applies to. A chip the user turns on adds its condition to
+the folder's query, together with the folder, an inbox tab and the other
+chips that are on; the chip then shows a cross and turns off again with one
+click. Which chips are on lasts until the page is reloaded, across folders;
+a chip that doesn't apply to a folder is neither shown nor applied there.
+When a message changes a keyword an active filter tests (through the app or
+`api.email.updateKeywords`), the list loads again, so a message marked done
+leaves an "Open" list.
+
+At most 4 filters per plugin, and each call replaces the plugin's earlier
+ones (`[]` removes them). A filter has:
+
+- `id`: 1 to 40 letters, digits, `-`, `_` or `.`;
+- `label`: 1 to 40 characters;
+- `hasKeyword` and/or `notKeyword`: the keyword messages must have or lack
+  (at least one of the two);
+- `icon` (optional): a Tabler icon name;
+- `accounts` (optional): `personal`, `group` and/or `shared`, as for
+  actions;
+- `mailboxRoles` (optional): only in folders with these roles;
+- `order` (optional): lower comes first, default 100.
+
+Filters apply to a folder's own list, not to searches, tag views or the
+merged views of several accounts.
 
 ### Surface reference
 
 <!-- generated:surfaces -->
 <!-- Generated by scripts/gen-docs.mjs; edit the webmail catalogues, not this table. -->
 
-52 surfaces. A plugin may use a surface with any one of the listed permissions; a prop or context key with a permission in brackets is only passed when the plugin holds that permission too.
+54 surfaces. A plugin may use a surface with any one of the listed permissions; a prop or context key with a permission in brackets is only passed when the plugin holds that permission too.
 
 #### App
 
@@ -1072,6 +1147,7 @@ changes for another reason.
 | `navigation-rail-bottom` | frame | `ui:navigation-rail` |  | the bottom of the navigation rail |
 | `sidebar-widget` | frame | `ui:sidebar-widget` |  | a widget at the bottom of the mail sidebar |
 | `sidebar-section` | frame | `ui:sidebar-widget` | `mailboxId` | a collapsible section in the mail sidebar, below the folders |
+| `sidebar-section-actions` | frame, inline | `ui:sidebar-widget` |  | compact controls beside a collapsible plugin sidebar-section heading |
 | `top-bar-actions` | action, inline | `ui:toolbar` |  | buttons in the top bar, next to search |
 | `app-page` | frame | `ui:app-page` | `pageId`, `path` | a full page of its own, with an entry in the navigation rail (api.ui.setPages) |
 
@@ -1103,10 +1179,11 @@ changes for another reason.
 |---|---|---|---|---|
 | `message-list-header` | frame | `ui:message-list` | `mailboxId`, `mailboxRole` | above the message list |
 | `message-list-empty` | frame | `ui:message-list` | `mailboxId`, `mailboxRole`, `searching` | in an empty message list, below the "no messages" text |
-| `message-row-actions` | action, inline | `ui:message-list` | `emailId` (`email:read`) | hover buttons on a message row, and the row menu on phones |
+| `message-row-actions` | action, inline | `ui:message-list` | `emailId` (`email:read`), `accountId` (`email:read`) | hover buttons on a message row, and its right-click menu (the row menu on phones); the click's `accountId` names the message's account when it is not the user's own (a team or shared mailbox) |
 | `message-bulk-actions` | action, inline | `ui:message-list` | `emailIds` (`email:read`) | buttons in the toolbar shown while messages are selected |
 | `context-menu-email` | frame | `ui:context-menu` |  | the right-click menu of a message |
 | `toolbar-actions` | frame, inline | `ui:toolbar` |  | the message toolbar |
+| `search-results` | data | `email:read` | `query` (`email:read`) | entries a plugin returns from onProvideSearchResults, in a block above a search's message list; a click opens the message an entry names, any other reaches the plugin as onAction with the entry's key as actionId |
 
 <p>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/message-list-dark.png"><img src="docs/screenshots/message-list-light.png" alt="message-list-header and message-row-actions (hover)" width="640"></picture>
@@ -1136,7 +1213,7 @@ changes for another reason.
 | `reader-above-quote` | frame | `ui:email-banner` | `email` (`email:read`) | between the new text of a message and the quoted text below it |
 | `email-footer` | frame | `ui:email-footer` | `emailId` (`email:read`) | below the message body |
 | `thread-summary` | frame | `ui:email-banner` | `threadId` (`email:read`), `emailIds` (`email:read`), `deviceType` | above the messages of an open conversation (the phone conversation view and Mountain View; the default desktop layout opens one message at a time and has no conversation view) |
-| `reader-actions` | action, inline | `ui:toolbar` | `emailId` (`email:read`) | buttons in the open message's toolbar |
+| `reader-actions` | action, inline | `ui:toolbar` | `emailId` (`email:read`), `accountId` (`email:read`) | buttons in the open message's toolbar (its More menu on phones); `accountId` as on message-row-actions |
 | `email-detail-sidebar` | frame | `ui:email-details` | `email` (`email:read`), `selection` (`email:read`), `focusRequest` | a side panel next to the open message; `selection` is the text selected in the message as the user changes it ({ text }); `focusRequest` counts up when the plugin opened the panel with api.ui.openPanel |
 | `email-details-section` | frame | `ui:email-details` | `email` (`email:read`), `category` | a section in the message details |
 | `attachment-actions` | frame, inline | `email:read` | `attachment` | buttons on each attachment |
@@ -1416,6 +1493,7 @@ await api.ui.openPanel(slot, { composerId })   // composer-sidebar(-right) or em
 await api.ui.closePanel(slot, { composerId })
 await api.ui.togglePanel(slot, { composerId })
 await api.ui.refreshRowBadges()
+await api.ui.setListFilters(filters)    // keyword filter chips in the list header, see "List filters"
 await api.ui.rerenderEmail()            // run onRenderEmailBody again for the open message
 await api.ui.rerenderFetchedEmails()    // run onEmailsFetched again for the list
 ```
@@ -1466,6 +1544,7 @@ await api.email.getAttachment(emailId, blobId)   // { name, type, size, data: Ar
 await api.email.getRaw(emailId)              // the RFC 5322 source as ArrayBuffer, at most 25 MB
 await api.email.setKeyword(emailId, keyword, accountId?)
 await api.email.removeKeyword(emailId, keyword, accountId?)
+await api.email.updateKeywords(emailId, { '$assigned:ck': true, '$assigned:cj': false }, accountId?)   // true, or false if a plugin stopped it
 await api.mailboxes.list()                   // [{ id, name, role, parentId, totalEmails, unreadEmails }]
 await api.drafts.create({ to, cc, bcc, subject, body, isHtml, attachments })   // the draft's email id
 await api.compose.open({ to, cc, bcc, subject, body, isHtml, attachments })    // 'opened' or 'navigating'
@@ -1484,6 +1563,34 @@ least one. The plugin gets summaries and reads one with `get`.
 `getAttachment` only accepts a `blobId` that is an attachment of that
 message. Keywords are JMAP keywords such as `$flagged` or `$label:work`
 (letters, digits and `$ _ . : -`, up to 128 characters).
+
+`updateKeywords` (Bulwark 1.19 and later) sets (`true`) and clears
+(`false`) up to 20 keywords of a message in one change, so a swap never
+leaves both or neither. A message in the open list changes the way the
+app's own actions change it: the row shows the new keywords at once, the
+keyword hooks run, and a list filter or list order on one of the keywords
+loads the list again. `accountId` names the message's account; the click
+context of message actions carries it for team and shared mailboxes.
+
+In a team mailbox (a Stalwart group account) keywords are the same for
+every member, `$seen` included: whoever opens a message marks it read for
+the whole team. Don't use read state for team status.
+
+### api.accountData
+
+```js
+await api.accountData.get(accountId?)          // { supported, value }; value is null when there is none
+await api.accountData.set(accountId, value)    // replaces it; null removes it
+```
+
+A small JSON value, at most 8 KB, that the plugin keeps in a mail account's
+Inbox (Bulwark 1.19 and later): `get` needs `email:read`, `set`
+`email:write`. Everyone who can open the account reads the same value, so
+in a team mailbox it is shared by the team. It lives in Stalwart's mailbox
+metadata under `org.bulwarkmail.plugin.<plugin id>` and needs Stalwart
+1.0 or later; elsewhere `get` answers `{ supported: false, value: null }`
+and `set` throws. Only JMAP clients that know the name see it. Without
+`accountId` it is the user's own account. At most 20 changes a minute.
 
 `compose.open` and `drafts.create` take addresses as `a@example.com` or
 `Name <a@example.com>`, at most 100 recipients, a subject up to 998
@@ -1586,12 +1693,33 @@ await api.identities.update(id, { name, replyTo, textSignature, htmlSignature })
 await api.vacation.get()
 await api.vacation.set({ isEnabled, subject, textBody, htmlBody, fromDate, toDate })   // or null if stopped
 await api.user.getAccounts()      // [{ id, label, serverUrl, username, displayName, email, avatarColor, isConnected, isDefault, isActive }]
+await api.user.getSelf()          // { accountId, email, name }
+await api.user.getMailAccounts()  // [{ accountId, name, kind: 'personal' | 'group' | 'shared', isReadOnly, isOpen }]
+await api.user.findPeople({ text } | { ids })   // { people: [{ id, type, name, email }], complete }
 await api.user.getIdentities()    // the user's sender identities
 await api.user.logout()
 await api.app.getInfo()           // { product: 'Bulwark Mail', name, version, edition: 'full' | 'lite', stalwartFeatures, demoMode }
 await api.app.searchSettings('undo send', { limit })   // [{ pageId, page, label, description }], in the user's language
 await api.app.getSettings()       // { mailLayout: 'focus', sendDelaySeconds: 10, markAsReadDelay: 0, theme, language, ... }
 ```
+
+`getSelf`, `getMailAccounts` and `findPeople` need `account:read` and are
+new in Bulwark 1.19. `getSelf().accountId` is the user's own JMAP account
+id, which Stalwart also uses as their principal id: it names the user the
+same way for every member of a team mailbox, so it can go in a keyword
+(`$assigned:<accountId>`) where an address can't. `getMailAccounts` lists
+the mail accounts of the signed-in login: the user's own (`personal`),
+team mailboxes they are a member of (`group`, a Stalwart group account)
+and mailboxes another person shared with them (`shared`); `isOpen` marks
+the account of the open folder. Which accounts are groups is known once the
+server answered, a moment after sign-in, so ask again on `onMailboxChange`.
+
+`findPeople` looks people up in the server's directory by a part of their
+name or address, or by principal id, and returns at most 20. With directory
+lookups off, which is Stalwart 1.0's default, `complete` is false and only
+the people the user shares an account with are found (themselves and their
+groups); an administrator turns lookups on in Stalwart. Bulwark notifies
+nobody: a plugin can't send push notifications to other users.
 
 `api.app.getInfo` needs no permission: `name` is what the administrator
 called this installation (`APP_NAME`), `version` the app's version. It is
@@ -1727,6 +1855,11 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.addressBooks.list` | `contacts:read` |
 | `api.addressBooks.create` | `contacts:write` |
 | `api.user.getAccounts` | `account:read` |
+| `api.user.getSelf` | `account:read` |
+| `api.user.getMailAccounts` | `account:read` |
+| `api.user.findPeople` | `account:read` |
+| `api.accountData.get` | `email:read` |
+| `api.accountData.set` | `email:write` |
 | `api.user.getIdentities` | `identity:read` |
 | `api.user.getTimeZone` | none |
 | `api.app.getInfo` | none |
@@ -1748,8 +1881,11 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.ui.downloadFile` | `ui:download-file` |
 | `api.email.setKeyword` | `email:write` |
 | `api.email.removeKeyword` | `email:write` |
+| `api.email.updateKeywords` | `email:write` |
 | `api.keywords.list` | `settings:read` |
 | `api.keywords.add` | `settings:write` |
+| `api.keywords.update` | `settings:write` |
+| `api.keywords.remove` | `settings:write` |
 | `api.keywords.reorder` | `settings:write` |
 | `api.keywords.discover` | `email:read` |
 | `api.keywords.getCounts` | `email:read` |
@@ -1768,6 +1904,7 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.proxy.disconnect` | `http:proxy` |
 | `api.ui.setActions` | none |
 | `api.ui.refreshRowBadges` | none |
+| `api.ui.setListFilters` | `ui:message-list` |
 | `api.ui.setDayLabels` | `ui:calendar-action` |
 | `api.ui.setPages` | `ui:app-page` |
 | `api.ui.setSectionTitle` | `ui:sidebar-widget` |
