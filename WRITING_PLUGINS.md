@@ -323,7 +323,7 @@ High-risk permissions are listed first in the consent dialog and marked.
 | Permission | What the consent dialog says | High risk |
 |---|---|---|
 | `email:read` | **Read your email.** See senders, recipients, subjects and the full text of any message in your account, and your folders. | yes |
-| `email:write` | **Change and organise your email.** Add or remove tags, flags and other keywords on your messages, move them between your folders and to the archive, and save drafts. |  |
+| `email:write` | **Change and organise your email.** Add or remove tags, flags and other keywords on your messages, move them between your folders and to the archive, and save drafts. It can also store a small value that every member of a team mailbox can read. |  |
 | `email:send` | **Change mail before it is sent.** Read and change the recipients, subject, text and attachments of messages you write, and stop a message from being sent. | yes |
 | `crypto:full` | **Full access to this app.** Runs with the same rights as the webmail itself. It can read all your mail and stored keys and act for you. Only allow this for plugins you fully trust. | yes |
 | `email:raw-send` | **Send messages it built itself.** Send complete messages, for example signed or encrypted ones, from your account. | yes |
@@ -354,7 +354,8 @@ High-risk permissions are listed first in the consent dialog and marked.
 | `security:read` | **See your account security.** See whether two-factor sign-in and encryption are on, without access to secrets. |  |
 | `auth:observe` | **Know when you sign in.** Be told when you sign in, switch accounts or your session is renewed. |  |
 | `auth:emit` | **Sign you out.** Sign you out of the webmail. |  |
-| `account:read` | **See your accounts.** See the accounts you added with their addresses and servers, which mail accounts are team mailboxes, and look up people in your organisation's directory. |  |
+| `account:read` | **See your accounts.** See the accounts you added with their addresses and servers, and which mail accounts are team mailboxes. |  |
+| `directory:read` | **Look up people.** Look up people in your organisation's directory. |  |
 | `http:post` | **Use the webmail server for you.** Call these server endpoints with your login: | yes |
 | `http:fetch` | **Connect to other websites.** Send requests to these sites. Anything the plugin can read may be sent there: | yes |
 | `ui:observe` | **Follow where you are in the app.** Know which page is open and react to links you click. Always granted; not shown in the dialog. |  |
@@ -1053,7 +1054,8 @@ the `app-page` slot fills the content area.
 The `onEmailListItemRender` hook returns badges for a row:
 `[{ key, label, color, title, icon }]`, at most 3 per row, labels up to 32
 characters. `icon` (Bulwark 1.19 and later) is a Tabler icon name drawn
-before the label, such as `check` or `user`. The host caches the badges per
+before the label, such as `check` or `user`, by the same rule as an
+action's icon (letters, digits and `-`, up to 40). The host caches the badges per
 message and keyword state, so call `api.ui.refreshRowBadges()` (at most
 once a second) when your answer changes for another reason.
 
@@ -1562,7 +1564,10 @@ without body, headers or source.
 least one. The plugin gets summaries and reads one with `get`.
 `getAttachment` only accepts a `blobId` that is an attachment of that
 message. Keywords are JMAP keywords such as `$flagged` or `$label:work`
-(letters, digits and `$ _ . : -`, up to 128 characters).
+(letters, digits and `$ _ . : -`, up to 128 characters). `setKeyword`,
+`removeKeyword` and `updateKeywords` refuse `$draft`, `$junk`,
+`$notjunk` and `$phishing`: those change what the app and the server do
+with a message, and stay with the app's own actions.
 
 `updateKeywords` (Bulwark 1.19 and later) sets (`true`) and clears
 (`false`) up to 20 keywords of a message in one change, so a swap never
@@ -1583,14 +1588,20 @@ await api.accountData.get(accountId?)          // { supported, value }; value is
 await api.accountData.set(accountId, value)    // replaces it; null removes it
 ```
 
-A small JSON value, at most 8 KB, that the plugin keeps in a mail account's
+A small JSON value, at most 4 KB, that the plugin keeps in a mail account's
 Inbox (Bulwark 1.19 and later): `get` needs `email:read`, `set`
 `email:write`. Everyone who can open the account reads the same value, so
 in a team mailbox it is shared by the team. It lives in Stalwart's mailbox
 metadata under `org.bulwarkmail.plugin.<plugin id>` and needs Stalwart
 1.0 or later; elsewhere `get` answers `{ supported: false, value: null }`
 and `set` throws. Only JMAP clients that know the name see it. Without
-`accountId` it is the user's own account. At most 20 changes a minute.
+`accountId` it is the user's own account. At most 30 reads and 20 changes
+a minute.
+
+The value counts against the mailbox's metadata room: Stalwart keeps at
+most 64 KB of shared metadata per mailbox, which Bulwark's shared tags and
+team templates use too. Keep it small, and read it again right before a
+change so you don't overwrite what another member wrote.
 
 `compose.open` and `drafts.create` take addresses as `a@example.com` or
 `Name <a@example.com>`, at most 100 recipients, a subject up to 998
@@ -1695,7 +1706,7 @@ await api.vacation.set({ isEnabled, subject, textBody, htmlBody, fromDate, toDat
 await api.user.getAccounts()      // [{ id, label, serverUrl, username, displayName, email, avatarColor, isConnected, isDefault, isActive }]
 await api.user.getSelf()          // { accountId, email, name }
 await api.user.getMailAccounts()  // [{ accountId, name, kind: 'personal' | 'group' | 'shared', isReadOnly, isOpen }]
-await api.user.findPeople({ text } | { ids })   // { people: [{ id, type, name, email }], complete }
+await api.user.findPeople({ text, ids, accountId })   // { people: [{ id, type, name, email }], complete }
 await api.user.getIdentities()    // the user's sender identities
 await api.user.logout()
 await api.app.getInfo()           // { product: 'Bulwark Mail', name, version, edition: 'full' | 'lite', stalwartFeatures, demoMode }
@@ -1703,20 +1714,23 @@ await api.app.searchSettings('undo send', { limit })   // [{ pageId, page, label
 await api.app.getSettings()       // { mailLayout: 'focus', sendDelaySeconds: 10, markAsReadDelay: 0, theme, language, ... }
 ```
 
-`getSelf`, `getMailAccounts` and `findPeople` need `account:read` and are
-new in Bulwark 1.19. `getSelf().accountId` is the user's own JMAP account
+`getSelf` and `getMailAccounts` need `account:read`, `findPeople`
+`directory:read`; all three are new in Bulwark 1.19. `getSelf().accountId` is the user's own JMAP account
 id, which Stalwart also uses as their principal id: it names the user the
 same way for every member of a team mailbox, so it can go in a keyword
 (`$assigned:<accountId>`) where an address can't. `getMailAccounts` lists
 the mail accounts of the signed-in login: the user's own (`personal`),
 team mailboxes they are a member of (`group`, a Stalwart group account)
 and mailboxes another person shared with them (`shared`); `isOpen` marks
-the account of the open folder. Which accounts are groups is known once the
-server answered, a moment after sign-in, so ask again on `onMailboxChange`.
+the account of the open folder. An account is `group` only when the
+server confirmed it is a group principal; when it can't say, the account
+is `shared`. The call waits for that answer.
 
-`findPeople` looks people up in the server's directory by a part of their
-name or address, or by principal id, and returns at most 20. With directory
-lookups off, which is Stalwart 1.0's default, `complete` is false and only
+`findPeople` looks people up in the server's directory as the account
+named in the query (`{ text, accountId }`; the user's own without it): by a
+part of their name or address, 3 characters or more, or by principal id, at
+most 20 ids. It returns at most 20 people, and a plugin may look up 10
+times a minute. With directory lookups off, which is Stalwart 1.0's default, `complete` is false and only
 the people the user shares an account with are found (themselves and their
 groups); an administrator turns lookups on in Stalwart. Bulwark notifies
 nobody: a plugin can't send push notifications to other users.
@@ -1857,7 +1871,7 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.user.getAccounts` | `account:read` |
 | `api.user.getSelf` | `account:read` |
 | `api.user.getMailAccounts` | `account:read` |
-| `api.user.findPeople` | `account:read` |
+| `api.user.findPeople` | `directory:read` |
 | `api.accountData.get` | `email:read` |
 | `api.accountData.set` | `email:write` |
 | `api.user.getIdentities` | `identity:read` |
