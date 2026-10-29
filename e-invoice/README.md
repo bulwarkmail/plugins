@@ -17,7 +17,7 @@ Since 2025, businesses in Germany have to be able to receive e-invoices. An e-in
 
 Formats: XRechnung (UBL and CII, any version), ZUGFeRD 1.0, ZUGFeRD 2.x and Factur-X in every profile, Peppol BIS Billing 3.0, and EN 16931 invoices in UBL or CII in general. Credit notes are shown as such.
 
-The plugin was run against the 72 invoices of the KoSIT XRechnung test suite and the 125 hybrid PDFs and 33 XML files of the ZUGFeRD corpus: all were read, and the only sums it flagged are wrong in the files themselves.
+The plugin was run against the 72 invoices of the KoSIT XRechnung test suite and the ZUGFeRD corpus (68 XML files, 126 PDFs). It read all of them except two PDFs in a draft format from before ZUGFeRD 1.0, and a PDF that holds no invoice. What it flagged there is really in the files: line amounts that include VAT, corrections whose amount due doesn't match the total, sellers without a tax number, and the MINIMUM and BASIC WL samples.
 
 ## Setting it up
 
