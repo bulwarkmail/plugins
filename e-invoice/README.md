@@ -24,7 +24,7 @@ The plugin was run against the 72 invoices of the KoSIT XRechnung test suite and
 The accounting address comes from, in this order:
 
 1. the administrator's address, when "Use this address for everyone" is on (admin dashboard > Plugins > E-Invoices);
-2. the user's own address in Settings > Plugins > E-Invoices;
+2. the user's own address in Settings > Add-ons > E-Invoices;
 3. the administrator's address;
 4. what the user typed when they first clicked "Forward to accounting" without an address.
 
@@ -36,7 +36,7 @@ Bookkeeping services with a receipt inbox, such as DATEV Unternehmen online, lex
 | --- | --- |
 | `email:read` | Sees the open message and its attachment list; reads new mail when tagging or forwarding on its own. |
 | `email:blob-read` | Reads the XML or PDF attachment to find the invoice. |
-| `email:forward` | Forwards the message to the accounting address. Bulwark asks before the first forward to an address and lists allowed addresses in Settings > Plugins, where you can remove them. |
+| `email:forward` | Forwards the message to the accounting address. Bulwark asks before the first forward to an address and lists allowed addresses in Settings > Add-ons, where you can remove them. |
 | `email:write` | Marks e-invoices with the `$einvoice` keyword for the badge and the filter. |
 | `ui:email-banner` | The bar above the message. |
 | `ui:message-list` | The "E-invoices" filter in the list header. |

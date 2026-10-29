@@ -101,7 +101,7 @@
       "forward.goes_to": "\"Forward to accounting\" sends it to {address}.",
 
       "ask.title": "Where should invoices go?",
-      "ask.message": "Enter the address of your accounting, for example the receipt inbox of your bookkeeping software. You can change it later in Settings > Plugins.",
+      "ask.message": "Enter the address of your accounting, for example the receipt inbox of your bookkeeping software. You can change it later in Settings > Add-ons.",
       "ask.label": "Accounting address",
       "ask.save": "Save and forward",
       "ask.invalid": "That is not an email address.",
@@ -323,7 +323,7 @@
       "forward.goes_to": "„An Buchhaltung weiterleiten“ schickt sie an {address}.",
 
       "ask.title": "Wohin sollen Rechnungen gehen?",
-      "ask.message": "Geben Sie die Adresse Ihrer Buchhaltung ein, zum Beispiel den Belegeingang Ihrer Buchhaltungssoftware. Sie können sie später unter Einstellungen > Plugins ändern.",
+      "ask.message": "Geben Sie die Adresse Ihrer Buchhaltung ein, zum Beispiel den Belegeingang Ihrer Buchhaltungssoftware. Sie können sie später unter Einstellungen > Erweiterungen ändern.",
       "ask.label": "Adresse der Buchhaltung",
       "ask.save": "Speichern und weiterleiten",
       "ask.invalid": "Das ist keine E-Mail-Adresse.",
