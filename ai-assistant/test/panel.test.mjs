@@ -123,7 +123,10 @@ describe('the composer panel', () => {
   it('writes an empty message from a description and sends the earlier turns along', async () => {
     const api = makeApi({ body: '', answers: ['<text>Dear Anna,\nthank you for the offer.</text>', '<text>Dear Anna,\nthanks a lot for the offer!</text>'] });
     await mount(api, { composerId: 'c1', selection: { text: '', empty: true }, focusRequest: 0 });
-    expect(screen.getByText('Empty message')).toBeTruthy();
+    // Nothing to work on yet: no chip, a placeholder that asks for a description.
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Message to the assistant' }).getAttribute('placeholder')).toBe('Describe what the email should say…'));
+    expect(screen.queryByText('Empty message')).toBeNull();
+    expect(document.querySelector('[data-context-chip]')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Shorten' })).toBeNull();
 
     await click(screen.getByRole('button', { name: 'Thank Anna for the offer and propose a call on Tuesday at 10' }));
@@ -322,6 +325,47 @@ describe('actions in the reader panel', () => {
   });
 });
 
+describe('the input box', () => {
+  it('shows focus on the box, not as a second frame around the text field', async () => {
+    const api = makeApi();
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const field = screen.getByRole('textbox', { name: 'Message to the assistant' });
+    const box = document.querySelector('[data-assistant-input]');
+    // The kit's focus outline is !important; only an inline !important beats it.
+    expect(field.style.getPropertyValue('outline')).toBe('none');
+    expect(field.style.getPropertyPriority('outline')).toBe('important');
+    field.blur();
+    await act(async () => { fireEvent.blur(field); });
+    expect(box.hasAttribute('data-focused')).toBe(false);
+    await act(async () => { fireEvent.focus(field); });
+    expect(box.hasAttribute('data-focused')).toBe(true);
+    expect(box.getAttribute('style')).toContain('border: 1px solid var(--color-ring)');
+  });
+
+  it('puts the cursor in the text field on a click on the box, but not on its buttons', async () => {
+    const api = makeApi();
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const field = screen.getByRole('textbox', { name: 'Message to the assistant' });
+    const box = document.querySelector('[data-assistant-input]');
+    field.blur();
+    await act(async () => { fireEvent.mouseDown(box); });
+    expect(document.activeElement).toBe(field);
+    field.blur();
+    await act(async () => { fireEvent.mouseDown(button('Actions')); });
+    expect(document.activeElement).not.toBe(field);
+  });
+
+  it('keeps Send off until there is text', async () => {
+    const api = makeApi();
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    expect(button('Send').disabled).toBe(true);
+    await type('  ');
+    expect(button('Send').disabled).toBe(true);
+    await type('when?');
+    expect(button('Send').disabled).toBe(false);
+  });
+});
+
 describe('taking context out', () => {
   const OTHER = { id: 'M2', subject: 'Invoice 42', receivedAt: '2026-10-13T09:00:00Z', from: [{ name: 'Dan', email: 'dan@example.org' }], text: 'Please pay invoice 42.' };
   const removeButton = () => screen.getByRole('button', { name: 'Remove from context' });
@@ -427,7 +471,8 @@ describe('the reader panel across messages', () => {
   it('works with no message open: chat yes, actions no', async () => {
     const api = makeApi();
     await mount(api, { email: null, selection: null, focusRequest: 0 });
-    expect(screen.getByText('No message open')).toBeTruthy();
+    expect(screen.queryByText('No message open')).toBeNull();
+    expect(document.querySelector('[data-context-chip]')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull();
     expect(screen.getByRole('textbox', { name: 'Message to the assistant' }).getAttribute('placeholder')).toBe('Ask anything, or search your mail…');
   });

@@ -6,7 +6,7 @@
 // The frame fills the panel (slots[...].fill), so the input stays at the
 // bottom and the transcript scrolls.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert, Badge, Button, DiffView, Icon, LinkButton, List, ListRow, Row, RowAction, Select, Spinner, Stack, Text, Textarea,
 } from '@plugin-host/ui';
@@ -27,6 +27,9 @@ import { defaultTarget, languageOptions } from '../lib/languages.js';
 import { acceptAll, applySuggestions, diffSuggestions, pendingSuggestions, reviewParts, reviewStep } from '../lib/grammar.js';
 import { diffWords, plainParts } from '../lib/diff.js';
 import { COMPOSER_CONTEXT_KEY, COMPOSER_PANEL, DRAFT_KEY, READER_CHAT_KEY, chatKey, pendingKey } from '../lib/background.js';
+
+/** Tallest the chat input grows before it scrolls, in px (about eight lines). */
+const INPUT_MAX_HEIGHT = 200;
 
 /** Quick actions on text in the composer. */
 export const COMPOSER_ACTIONS = [...REWRITE_STYLES, 'grammar', 'translate'];
@@ -159,6 +162,21 @@ export function AssistantPanel(props) {
   const [translating, setTranslating] = useState(false);
   const languages = useMemo(() => languageOptions(locale), [locale]);
   const inputRef = useRef(null);
+  const [inputFocused, setInputFocused] = useState(false);
+  // The box around the text field shows its focus, so the field drops the
+  // kit's own outline, which would draw a second frame inside the box. In
+  // forced colours the box's border colour is lost, so the outline stays.
+  const setInputEl = useCallback((el) => {
+    inputRef.current = el;
+    if (el && !window.matchMedia?.('(forced-colors: active)').matches) el.style.setProperty('outline', 'none', 'important');
+  }, []);
+  // The text field grows with its text up to INPUT_MAX_HEIGHT, then scrolls.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    if (el.scrollHeight > 0) el.style.height = `${Math.min(el.scrollHeight, INPUT_MAX_HEIGHT)}px`;
+  }, [input]);
   const scrollRef = useRef(null);
   const controller = useRef(null);
   const turnsRef = useRef(turns);
@@ -607,32 +625,36 @@ export function AssistantPanel(props) {
         </Stack>
       </div>
 
-      {/* The input: what the assistant works on, the text field, the quick actions and Send. */}
+      {/* The input: one box with the text field on top and, under it, what
+          the assistant works on, the quick actions and Send. A click on the
+          box outside its buttons goes to the text field. */}
       <div style={{ padding: '8px 12px 12px', flexShrink: 0 }}>
-        <div data-assistant-input style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: '8px 8px 6px', background: 'var(--color-background)' }}>
-        <Stack gap={1}>
-          <Row gap={1} wrap={false} className="min-w-0">
-            {source.removed && email ? (
-              <ContextChip icon="plus" label={t('panel.context.add_message')} title={email.subject || contextLabel} dashed onClick={restoreContext} />
-            ) : (
-              <ContextChip
-                icon={contextIcon}
-                label={contextLabel}
-                detail={contextDetail || undefined}
-                title={contextTitle}
-                removeLabel={t('panel.context.remove')}
-                onRemove={source.scope === 'message' || source.scope === 'passage' || source.scope === 'selection' ? removeContext : undefined}
-              />
-            )}
-          </Row>
+        <div
+          data-assistant-input
+          data-focused={inputFocused ? '' : undefined}
+          onMouseDown={(e) => {
+            if (e.target.closest('button, select, textarea, [data-context-chip], [role="menu"]')) return;
+            e.preventDefault();
+            inputRef.current?.focus();
+          }}
+          style={{
+            display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 8px 8px 12px', cursor: 'text',
+            borderRadius: 16, background: 'var(--color-muted)',
+            border: `1px solid ${inputFocused ? 'var(--color-ring)' : 'var(--color-border)'}`,
+            boxShadow: inputFocused ? '0 0 0 1px var(--color-ring)' : 'none',
+            transition: 'border-color 120ms, box-shadow 120ms',
+          }}
+        >
           <Textarea
-            ref={inputRef}
-            rows={Math.min(6, Math.max(2, input.split('\n').length))}
+            ref={setInputEl}
+            rows={1}
             value={input}
             placeholder={placeholder}
             aria-label={t('panel.input_label')}
             title={t('panel.enter_hint')}
-            style={{ border: 0, boxShadow: 'none', outline: 'none', background: 'transparent', padding: '4px 4px', resize: 'none' }}
+            style={{ border: 0, borderRadius: 0, boxShadow: 'none', background: 'transparent', padding: '2px 4px 2px 0', minHeight: 24, maxHeight: INPUT_MAX_HEIGHT, overflowY: 'auto', resize: 'none', lineHeight: 1.5 }}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) {
@@ -645,8 +667,20 @@ export function AssistantPanel(props) {
               }
             }}
           />
-          <Row justify="between" wrap={false}>
-            <Row gap={1} wrap={false}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
+              {source.removed && email ? (
+                <ContextChip icon="plus" label={t('panel.context.add_message')} title={email.subject || contextLabel} dashed onClick={restoreContext} />
+              ) : source.scope !== 'none' && source.scope !== 'empty' && (
+                <ContextChip
+                  icon={contextIcon}
+                  label={contextLabel}
+                  detail={contextDetail || undefined}
+                  title={contextTitle}
+                  removeLabel={t('panel.context.remove')}
+                  onRemove={source.scope === 'message' || source.scope === 'passage' || source.scope === 'selection' ? removeContext : undefined}
+                />
+              )}
               {actions.length > 0 && (translating ? (
                 <Row gap={1} wrap={false}>
                   <Select
@@ -671,12 +705,11 @@ export function AssistantPanel(props) {
                   onPick={(action) => (action === 'translate' ? setTranslating(true) : quick(action))}
                 />
               ))}
-            </Row>
+            </div>
             {running
-              ? <Button variant="secondary" size="sm" icon="player-stop" onClick={stop}>{t('common.stop')}</Button>
-              : <Button size="icon" icon="arrow-up" disabled={!input.trim()} title={t('panel.send')} aria-label={t('panel.send')} onClick={submit} />}
-          </Row>
-        </Stack>
+              ? <Button variant="secondary" size="icon" icon="player-stop" className="h-8 w-8 shrink-0 rounded-full" title={t('common.stop')} aria-label={t('common.stop')} onClick={stop} />
+              : <Button variant={input.trim() ? 'primary' : 'secondary'} size="icon" icon="arrow-up" className="h-8 w-8 shrink-0 rounded-full" disabled={!input.trim()} title={t('panel.send')} aria-label={t('panel.send')} onClick={submit} />}
+          </div>
         </div>
       </div>
     </div>
@@ -738,8 +771,9 @@ function ContextChip({ icon, label, detail, title, onRemove, removeLabel, onClic
   const [focus, setFocus] = useState(false);
   const box = {
     position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', minWidth: 0,
-    padding: '4px 10px', borderRadius: 6, border: `1px ${dashed ? 'dashed' : 'solid'} var(--color-border)`,
-    background: dashed ? 'transparent' : 'var(--color-muted)', color: 'var(--color-foreground)', font: 'inherit', fontSize: '0.875rem',
+    // Sits on the input box (muted): outlined, with the box's colour inside.
+    height: 28, padding: '0 10px', borderRadius: 999, border: `1px ${dashed ? 'dashed' : 'solid'} var(--color-border)`,
+    background: 'transparent', color: 'var(--color-foreground)', font: 'inherit', fontSize: '0.8125rem',
   };
   const content = (
     <>
@@ -773,7 +807,7 @@ function ContextChip({ icon, label, detail, title, onRemove, removeLabel, onClic
           style={{
             position: 'absolute', insetInlineEnd: 4, top: '50%', transform: 'translateY(-50%)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20,
-            border: 0, borderRadius: 4, padding: 0, cursor: 'pointer',
+            border: 0, borderRadius: 999, padding: 0, cursor: 'pointer',
             background: 'var(--color-muted)', color: 'var(--color-foreground)',
             boxShadow: '-8px 0 8px var(--color-muted)',
             opacity: shown ? 1 : 0, pointerEvents: shown ? 'auto' : 'none', transition: 'opacity 120ms',

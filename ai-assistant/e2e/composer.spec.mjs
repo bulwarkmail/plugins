@@ -221,7 +221,8 @@ test('write an empty message from a description, then keep talking', async ({ pa
     await start(page, api);
     await composeWith(page, '');
     const { frame } = await openAssistant(page);
-    await expect(frame.getByText('Empty message')).toBeVisible();
+    await expect(chatInput(frame)).toHaveAttribute('placeholder', 'Describe what the email should say…');
+    await expect(frame.locator('[data-context-chip]')).toHaveCount(0);
     await expect(frame.getByRole('button', { name: 'Actions' })).toHaveCount(0);
     await shoot(page, ID, 'composer-write', 'light');
     await ask(frame, 'thank Anna for the workshop');
