@@ -1,0 +1,13 @@
+{
+  "name": "bulwark-plugin-e-invoice",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=cjs --platform=browser --target=es2020 --charset=utf8 --jsx=automatic --outfile=dist/index.js --external:react --external:react-dom --external:react-dom/client --external:react/jsx-runtime --external:@plugin-host --external:@plugin-host/ui",
+    "test": "node ../node_modules/vitest/vitest.mjs run e-invoice"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}
