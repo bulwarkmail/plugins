@@ -38,8 +38,10 @@ describe('cards of the lookups', () => {
   });
 
   it('lists contacts per address and messages with their ids', () => {
-    expect(contactsWidget([{ fullName: 'Anna', emails: ['a@e.org', 'b@e.org'] }, { firstName: 'Bo', lastName: 'Li', emails: [] }]))
-      .toEqual({ type: 'contacts', items: [{ name: 'Anna', email: 'a@e.org' }, { name: 'Anna', email: 'b@e.org' }, { name: 'Bo Li', email: '' }] });
+    expect(contactsWidget([
+      { name: { full: 'Anna' }, emails: { work: { address: 'b@e.org', pref: 2 }, home: { address: 'a@e.org', pref: 1 } } },
+      { name: { components: [{ kind: 'given', value: 'Bo' }, { kind: 'surname', value: 'Li' }] } },
+    ])).toEqual({ type: 'contacts', items: [{ name: 'Anna', email: 'a@e.org' }, { name: 'Anna', email: 'b@e.org' }, { name: 'Bo Li', email: '' }] });
     expect(emailsWidget([
       { id: 'M1', subject: 'Hi', from: [{ name: 'Carol', email: 'c@e.org' }], receivedAt: '2026-10-12T09:00:00Z' },
       // The same newsletter delivered twice shows once.

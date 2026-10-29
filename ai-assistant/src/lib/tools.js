@@ -6,7 +6,7 @@
 // contact data in them is untrusted like everything else.
 
 import { clip } from './prompts.js';
-import { calendarWidget, contactsWidget, emailsWidget } from './widgets.js';
+import { calendarWidget, contactParts, contactsWidget, emailsWidget } from './widgets.js';
 
 /** Longest tool result handed to the model, in characters. */
 export const MAX_TOOL_RESULT = 8000;
@@ -129,9 +129,8 @@ export function formatEvents(events, { from, to, locale = 'en' } = {}) {
 /** Contacts as lines the model reads. */
 export function formatContacts(contacts, query) {
   const list = contacts.slice(0, 5).map((c) => {
-    const name = c.fullName || [c.firstName, c.lastName].filter(Boolean).join(' ') || '(no name)';
-    const emails = (c.emails ?? []).join(', ') || 'no email address';
-    return `- ${name}: ${emails}${c.company ? ` (${c.company})` : ''}`;
+    const { name, emails, company } = contactParts(c);
+    return `- ${name || '(no name)'}: ${emails.join(', ') || 'no email address'}${company ? ` (${company})` : ''}`;
   });
   return list.length ? `Contacts matching "${query}":\n${list.join('\n')}` : `No contact matches "${query}".`;
 }

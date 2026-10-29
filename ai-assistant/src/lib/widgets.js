@@ -93,13 +93,28 @@ export function calendarWidget(events, { from, to }) {
   return normalizeWidget({ type: 'calendar', from, to, days });
 }
 
+/**
+ * Name, addresses and company of a JSContact card (api.contacts.search):
+ * name { full, components }, emails and organizations keyed by id.
+ */
+export function contactParts(c) {
+  const components = Array.isArray(c?.name?.components) ? c.name.components : [];
+  const part = (kind) => components.filter((p) => p?.kind === kind).map((p) => p.value).join(' ');
+  const name = c?.name?.full || [part('given'), part('surname')].filter(Boolean).join(' ');
+  const emails = Object.values(c?.emails ?? {})
+    .filter((e) => e?.address)
+    .sort((a, b) => (a.pref ?? 100) - (b.pref ?? 100))
+    .map((e) => e.address);
+  const company = Object.values(c?.organizations ?? {}).map((o) => o?.name).filter(Boolean).join(', ');
+  return { name, emails, company };
+}
+
 export function contactsWidget(contacts) {
   return normalizeWidget({
     type: 'contacts',
     items: contacts.slice(0, 8).flatMap((c) => {
-      const name = c.fullName || [c.firstName, c.lastName].filter(Boolean).join(' ');
-      const emails = c.emails?.length ? c.emails : [''];
-      return emails.map((email) => ({ name, email }));
+      const { name, emails } = contactParts(c);
+      return (emails.length ? emails : ['']).map((email) => ({ name, email }));
     }),
   });
 }

@@ -74,7 +74,13 @@ describe('runTool', () => {
   });
 
   it('finds contacts and keeps the list short', async () => {
-    const many = Array.from({ length: 8 }, (_, i) => ({ fullName: `Person ${i}`, emails: [`p${i}@example.org`], company: i === 0 ? 'ACME' : '' }));
+    // JSContact cards, as api.contacts.search returns them
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      id: `c${i}`,
+      name: { full: `Person ${i}` },
+      emails: { e1: { address: `p${i}@example.org` } },
+      ...(i === 0 ? { organizations: { o1: { name: 'ACME' } } } : {}),
+    }));
     const api = fakeApi({ handlers: { 'contacts.search': async () => many } });
     const { text, widget } = await runTool(api, 'find_contact', { query: 'Person' });
     expect(text.split('\n')).toHaveLength(6);
