@@ -99,7 +99,8 @@ function permissionsTable(cat, locale) {
   ];
   for (const perm of cat.ALL_PERMISSIONS) {
     const text = texts[cat.permissionKey(perm)];
-    let said = text && typeof text === 'object' ? `**${text.title}.** ${text.body}` : '';
+    // The consent dialog fills in the installation's name; the docs say Bulwark.
+    let said = text && typeof text === 'object' ? `**${text.title}.** ${text.body}`.replace(/\{appName\}/g, 'Bulwark') : '';
     if (implicit.has(perm)) said = `${said} Always granted; not shown in the dialog.`.trim();
     rows.push(`| ${code(perm)} | ${cell(said)} | ${cat.HIGH_RISK_PERMISSIONS.has(perm) ? 'yes' : ''} |`);
   }

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The same made-up invoice as xrechnung-ubl.xml, as a ZUGFeRD 2 / Factur-X
+     EN 16931 CII document, with unusual prefixes on purpose. -->
+<x:CrossIndustryInvoice xmlns:x="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+    xmlns:r="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
+    xmlns:q="urn:un:unece:uncefact:data:standard:QualifiedDataType:100"
+    xmlns:u="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+  <x:ExchangedDocumentContext>
+    <r:GuidelineSpecifiedDocumentContextParameter><r:ID>urn:cen.eu:en16931:2017</r:ID></r:GuidelineSpecifiedDocumentContextParameter>
+  </x:ExchangedDocumentContext>
+  <x:ExchangedDocument>
+    <r:ID>RE-2026-117</r:ID>
+    <r:TypeCode>380</r:TypeCode>
+    <r:IssueDateTime><u:DateTimeString format="102">20261029</u:DateTimeString></r:IssueDateTime>
+    <r:IncludedNote><r:Content>Vielen Dank für Ihren Auftrag.</r:Content></r:IncludedNote>
+  </x:ExchangedDocument>
+  <x:SupplyChainTradeTransaction>
+    <r:IncludedSupplyChainTradeLineItem>
+      <r:AssociatedDocumentLineDocument><r:LineID>1</r:LineID></r:AssociatedDocumentLineDocument>
+      <r:SpecifiedTradeProduct><r:SellerAssignedID>B-100</r:SellerAssignedID><r:Name>Beratung</r:Name><r:Description>Vor-Ort-Termin am 27.10.</r:Description></r:SpecifiedTradeProduct>
+      <r:SpecifiedLineTradeAgreement><r:NetPriceProductTradePrice><r:ChargeAmount>100.00</r:ChargeAmount></r:NetPriceProductTradePrice></r:SpecifiedLineTradeAgreement>
+      <r:SpecifiedLineTradeDelivery><r:BilledQuantity unitCode="HUR">8</r:BilledQuantity></r:SpecifiedLineTradeDelivery>
+      <r:SpecifiedLineTradeSettlement>
+        <r:ApplicableTradeTax><r:TypeCode>VAT</r:TypeCode><r:CategoryCode>S</r:CategoryCode><r:RateApplicablePercent>19</r:RateApplicablePercent></r:ApplicableTradeTax>
+        <r:SpecifiedTradeSettlementLineMonetarySummation><r:LineTotalAmount>800.00</r:LineTotalAmount></r:SpecifiedTradeSettlementLineMonetarySummation>
+      </r:SpecifiedLineTradeSettlement>
+    </r:IncludedSupplyChainTradeLineItem>
+    <r:IncludedSupplyChainTradeLineItem>
+      <r:AssociatedDocumentLineDocument><r:LineID>2</r:LineID></r:AssociatedDocumentLineDocument>
+      <r:SpecifiedTradeProduct><r:Name>Fachbuch</r:Name></r:SpecifiedTradeProduct>
+      <r:SpecifiedLineTradeAgreement><r:NetPriceProductTradePrice><r:ChargeAmount>25.00</r:ChargeAmount></r:NetPriceProductTradePrice></r:SpecifiedLineTradeAgreement>
+      <r:SpecifiedLineTradeDelivery><r:BilledQuantity unitCode="C62">2</r:BilledQuantity></r:SpecifiedLineTradeDelivery>
+      <r:SpecifiedLineTradeSettlement>
+        <r:ApplicableTradeTax><r:TypeCode>VAT</r:TypeCode><r:CategoryCode>S</r:CategoryCode><r:RateApplicablePercent>7</r:RateApplicablePercent></r:ApplicableTradeTax>
+        <r:SpecifiedTradeSettlementLineMonetarySummation><r:LineTotalAmount>50.00</r:LineTotalAmount></r:SpecifiedTradeSettlementLineMonetarySummation>
+      </r:SpecifiedLineTradeSettlement>
+    </r:IncludedSupplyChainTradeLineItem>
+    <r:ApplicableHeaderTradeAgreement>
+      <r:BuyerReference>04011000-12345-34</r:BuyerReference>
+      <r:SellerTradeParty>
+        <r:Name>Musterlieferant GmbH</r:Name>
+        <r:DefinedTradeContact><r:PersonName>Erika Muster</r:PersonName><r:EmailURIUniversalCommunication><r:URIID>erika@musterlieferant.example</r:URIID></r:EmailURIUniversalCommunication></r:DefinedTradeContact>
+        <r:PostalTradeAddress><r:PostcodeCode>31134</r:PostcodeCode><r:LineOne>Hauptstraße 1</r:LineOne><r:CityName>Hildesheim</r:CityName><r:CountryID>DE</r:CountryID></r:PostalTradeAddress>
+        <r:SpecifiedTaxRegistration><r:ID schemeID="FC">30/123/45678</r:ID></r:SpecifiedTaxRegistration>
+        <r:SpecifiedTaxRegistration><r:ID schemeID="VA">DE123456789</r:ID></r:SpecifiedTaxRegistration>
+      </r:SellerTradeParty>
+      <r:BuyerTradeParty>
+        <r:Name>Beispielkunde AG</r:Name>
+        <r:PostalTradeAddress><r:PostcodeCode>30159</r:PostcodeCode><r:LineOne>Marktplatz 5</r:LineOne><r:CityName>Hannover</r:CityName><r:CountryID>DE</r:CountryID></r:PostalTradeAddress>
+      </r:BuyerTradeParty>
+      <r:BuyerOrderReferencedDocument><r:IssuerAssignedID>PO-4711</r:IssuerAssignedID></r:BuyerOrderReferencedDocument>
+    </r:ApplicableHeaderTradeAgreement>
+    <r:ApplicableHeaderTradeDelivery>
+      <r:ActualDeliverySupplyChainEvent><r:OccurrenceDateTime><u:DateTimeString format="102">20261027</u:DateTimeString></r:OccurrenceDateTime></r:ActualDeliverySupplyChainEvent>
+    </r:ApplicableHeaderTradeDelivery>
+    <r:ApplicableHeaderTradeSettlement>
+      <r:PaymentReference>RE-2026-117</r:PaymentReference>
+      <r:InvoiceCurrencyCode>EUR</r:InvoiceCurrencyCode>
+      <r:SpecifiedTradeSettlementPaymentMeans>
+        <r:TypeCode>58</r:TypeCode>
+        <r:PayeePartyCreditorFinancialAccount><r:IBANID>DE02120300000000202051</r:IBANID><r:AccountName>Musterlieferant GmbH</r:AccountName></r:PayeePartyCreditorFinancialAccount>
+        <r:PayeeSpecifiedCreditorFinancialInstitution><r:BICID>BYLADEM1001</r:BICID></r:PayeeSpecifiedCreditorFinancialInstitution>
+      </r:SpecifiedTradeSettlementPaymentMeans>
+      <r:ApplicableTradeTax><r:CalculatedAmount>142.50</r:CalculatedAmount><r:TypeCode>VAT</r:TypeCode><r:BasisAmount>750.00</r:BasisAmount><r:CategoryCode>S</r:CategoryCode><r:RateApplicablePercent>19</r:RateApplicablePercent></r:ApplicableTradeTax>
+      <r:ApplicableTradeTax><r:CalculatedAmount>3.50</r:CalculatedAmount><r:TypeCode>VAT</r:TypeCode><r:BasisAmount>50.00</r:BasisAmount><r:CategoryCode>S</r:CategoryCode><r:RateApplicablePercent>7</r:RateApplicablePercent></r:ApplicableTradeTax>
+      <r:SpecifiedTradeAllowanceCharge>
+        <r:ChargeIndicator><u:Indicator>false</u:Indicator></r:ChargeIndicator>
+        <r:ActualAmount>50.00</r:ActualAmount>
+        <r:Reason>Treuerabatt</r:Reason>
+        <r:CategoryTradeTax><r:TypeCode>VAT</r:TypeCode><r:CategoryCode>S</r:CategoryCode><r:RateApplicablePercent>19</r:RateApplicablePercent></r:CategoryTradeTax>
+      </r:SpecifiedTradeAllowanceCharge>
+      <r:SpecifiedTradePaymentTerms>
+        <r:Description>Zahlbar innerhalb von 30 Tagen ohne Abzug.</r:Description>
+        <r:DueDateDateTime><u:DateTimeString format="102">20261128</u:DateTimeString></r:DueDateDateTime>
+      </r:SpecifiedTradePaymentTerms>
+      <r:SpecifiedTradeSettlementHeaderMonetarySummation>
+        <r:LineTotalAmount>850.00</r:LineTotalAmount>
+        <r:ChargeTotalAmount>0.00</r:ChargeTotalAmount>
+        <r:AllowanceTotalAmount>50.00</r:AllowanceTotalAmount>
+        <r:TaxBasisTotalAmount>800.00</r:TaxBasisTotalAmount>
+        <r:TaxTotalAmount currencyID="EUR">146.00</r:TaxTotalAmount>
+        <r:GrandTotalAmount>946.00</r:GrandTotalAmount>
+        <r:TotalPrepaidAmount>100.00</r:TotalPrepaidAmount>
+        <r:DuePayableAmount>846.00</r:DuePayableAmount>
+      </r:SpecifiedTradeSettlementHeaderMonetarySummation>
+    </r:ApplicableHeaderTradeSettlement>
+  </x:SupplyChainTradeTransaction>
+</x:CrossIndustryInvoice>

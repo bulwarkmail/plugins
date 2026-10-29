@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A test invoice made up for these tests: two VAT rates, a discount, a
+     prepayment and an embedded document. Lines 850.00, discount 50.00,
+     net 800.00, VAT 146.00, total 946.00, prepaid 100.00, due 846.00. -->
+<ubl:Invoice xmlns:ubl="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+             xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+             xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0</cbc:CustomizationID>
+  <cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>
+  <cbc:ID>RE-2026-117</cbc:ID>
+  <cbc:IssueDate>2026-10-29</cbc:IssueDate>
+  <cbc:DueDate>2026-11-28</cbc:DueDate>
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+  <cbc:Note>Vielen Dank für Ihren Auftrag.
+Bitte geben Sie die Rechnungsnummer an.</cbc:Note>
+  <cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>
+  <cbc:BuyerReference>04011000-12345-34</cbc:BuyerReference>
+  <cac:InvoicePeriod>
+    <cbc:StartDate>2026-10-01</cbc:StartDate>
+    <cbc:EndDate>2026-10-31</cbc:EndDate>
+  </cac:InvoicePeriod>
+  <cac:OrderReference><cbc:ID>PO-4711</cbc:ID></cac:OrderReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>Stundennachweis</cbc:ID>
+    <cbc:DocumentDescription>Stunden Oktober</cbc:DocumentDescription>
+    <cac:Attachment>
+      <cbc:EmbeddedDocumentBinaryObject mimeCode="application/pdf" filename="stundennachweis.pdf">JVBERi0xLjQKJSVFT0YK</cbc:EmbeddedDocumentBinaryObject>
+    </cac:Attachment>
+  </cac:AdditionalDocumentReference>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cbc:EndpointID schemeID="EM">rechnung@musterlieferant.example</cbc:EndpointID>
+      <cac:PartyName><cbc:Name>Musterlieferant</cbc:Name></cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Hauptstraße 1</cbc:StreetName>
+        <cbc:CityName>Hildesheim</cbc:CityName>
+        <cbc:PostalZone>31134</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>DE</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>DE123456789</cbc:CompanyID>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>Musterlieferant GmbH</cbc:RegistrationName>
+        <cbc:CompanyID>HRB 1234</cbc:CompanyID>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:Name>Erika Muster</cbc:Name>
+        <cbc:Telephone>+49 5121 0000</cbc:Telephone>
+        <cbc:ElectronicMail>erika@musterlieferant.example</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cbc:EndpointID schemeID="EM">einkauf@kunde.example</cbc:EndpointID>
+      <cac:PostalAddress>
+        <cbc:StreetName>Marktplatz 5</cbc:StreetName>
+        <cbc:CityName>Hannover</cbc:CityName>
+        <cbc:PostalZone>30159</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>DE</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyLegalEntity><cbc:RegistrationName>Beispielkunde AG</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:PaymentMeans>
+    <cbc:PaymentMeansCode>58</cbc:PaymentMeansCode>
+    <cbc:PaymentID>RE-2026-117</cbc:PaymentID>
+    <cac:PayeeFinancialAccount>
+      <cbc:ID>DE02120300000000202051</cbc:ID>
+      <cbc:Name>Musterlieferant GmbH</cbc:Name>
+      <cac:FinancialInstitutionBranch><cbc:ID>BYLADEM1001</cbc:ID></cac:FinancialInstitutionBranch>
+    </cac:PayeeFinancialAccount>
+  </cac:PaymentMeans>
+  <cac:PaymentTerms><cbc:Note>Zahlbar innerhalb von 30 Tagen ohne Abzug.</cbc:Note></cac:PaymentTerms>
+  <cac:AllowanceCharge>
+    <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReason>Treuerabatt</cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="EUR">50.00</cbc:Amount>
+    <cac:TaxCategory>
+      <cbc:ID>S</cbc:ID>
+      <cbc:Percent>19</cbc:Percent>
+      <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+    </cac:TaxCategory>
+  </cac:AllowanceCharge>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="EUR">146.00</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="EUR">750.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="EUR">142.50</cbc:TaxAmount>
+      <cac:TaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>19</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:TaxCategory>
+    </cac:TaxSubtotal>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="EUR">50.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="EUR">3.50</cbc:TaxAmount>
+      <cac:TaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>7</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="EUR">850.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="EUR">800.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="EUR">946.00</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="EUR">50.00</cbc:AllowanceTotalAmount>
+    <cbc:PrepaidAmount currencyID="EUR">100.00</cbc:PrepaidAmount>
+    <cbc:PayableAmount currencyID="EUR">846.00</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="HUR">8</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="EUR">800.00</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Vor-Ort-Termin am 27.10.</cbc:Description>
+      <cbc:Name>Beratung</cbc:Name>
+      <cac:SellersItemIdentification><cbc:ID>B-100</cbc:ID></cac:SellersItemIdentification>
+      <cac:ClassifiedTaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>19</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price><cbc:PriceAmount currencyID="EUR">100.00</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>2</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="C62">2</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="EUR">50.00</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Name>Fachbuch &lt;E-Rechnung&gt;</cbc:Name>
+      <cac:ClassifiedTaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>7</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price><cbc:PriceAmount currencyID="EUR">25.00</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>
+</ubl:Invoice>

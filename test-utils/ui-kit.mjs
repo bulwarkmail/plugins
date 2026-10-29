@@ -10,7 +10,7 @@ import * as React from 'react';
 const h = React.createElement;
 const cls = (name) => `bk-${name}`;
 
-export const KIT_VERSION = 2;
+export const KIT_VERSION = 3;
 
 export function Icon({ name }) {
   return h('span', { 'data-icon': name ?? 'puzzle', 'aria-hidden': 'true' });
@@ -531,6 +531,15 @@ export function Panel({ children }) { return h('div', { className: cls('panel') 
 export function DetailHeading({ children }) { return h('div', null, children); }
 export function DetailList({ children }) { return h('dl', null, children); }
 export function DetailRow({ label, children }) { return h(React.Fragment, null, h('dt', null, label), h('dd', null, children)); }
+export function Table({ columns, rows, summary, label, empty }) {
+  return h('table', { 'aria-label': label },
+    h('thead', null, h('tr', null, columns.map((c) => h('th', { key: c.key, scope: 'col' }, c.label)))),
+    h('tbody', null, rows.length === 0 && empty !== undefined
+      ? h('tr', null, h('td', { colSpan: columns.length }, empty))
+      : rows.map((row, i) => h('tr', { key: row.key ?? i }, columns.map((c) => h('td', { key: c.key }, row[c.key]))))),
+    summary && summary.length > 0 ? h('tfoot', null, summary.map((s, i) => h('tr', { key: i, 'data-strong': s.strong ? 'true' : undefined },
+      h('th', { scope: 'row', colSpan: columns.length - 1 }, s.label), h('td', null, s.value)))) : null);
+}
 export function ColorDot({ color, label }) {
   return h('span', { 'data-color': color, role: label ? 'img' : undefined, 'aria-label': label, 'aria-hidden': label ? undefined : true });
 }
