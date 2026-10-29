@@ -143,8 +143,9 @@ settings. Set up one or both services:
 
 Without a model the defaults are `gpt-4o-mini` and `claude-haiku-4-5`.
 Lookups need a model that supports tool calls; small local models often
-answer without them. The instructions field is one line in the admin
-dashboard; separate several instructions with semicolons.
+answer without them. The instructions field takes several lines from
+webmail 1.20 on; older versions show one line, so separate instructions
+with semicolons there.
 
 The keys stay on the webmail server. The plugin asks the webmail's server
 proxy to send each request "with the OpenAI key" or "with the Anthropic

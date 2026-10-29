@@ -271,7 +271,9 @@ Settings for the admin, shown on the plugin's page in the admin dashboard.
 
 Field types are `string`, `secret`, `boolean`, `number` and `select`; each
 needs a `label`, and may set `description`, `required`, `default` and
-`placeholder`. `select` options are `{ label, value }` objects. Admin labels
+`placeholder`. `select` options are `{ label, value }` objects. A `string`
+field with `"multiline": true` gets a full-width text box that keeps line
+breaks (webmail 1.20 and later; older versions show one line). Admin labels
 are shown as written, not translated.
 
 Any user's plugin can read the non-secret values with `api.config.get()`.

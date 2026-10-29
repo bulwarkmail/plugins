@@ -86,9 +86,10 @@
     },
     "instructions": {
       "type": "string",
+      "multiline": true,
       "label": "Instructions for the assistant",
       "description": "Standing instructions for everyone, added to every request: the organisation's tone, sign-offs, languages, things never to say. Users add their own in their settings.",
-      "placeholder": "For example: write in British English; sign off with \"Kind regards\"; never promise delivery dates."
+      "placeholder": "For example:\nWrite in British English.\nSign off with \"Kind regards\".\nNever promise delivery dates."
     },
     "actions": {
       "type": "select",
