@@ -333,6 +333,7 @@ High-risk permissions are listed first in the consent dialog and marked.
 | `compose:open` | **Open the composer for you.** Open a new message with recipients, text or attachments filled in. You still decide whether to send it. |  |
 | `compose:read` | **Read the message you are writing.** Read the text of a message while you write it, when you use the plugin in the composer. Not the signature or the quoted message. |  |
 | `compose:write` | **Change the message you are writing.** Replace or add text in a message while you write it, when you use the plugin in the composer. You can undo each change, and you still decide whether to send. |  |
+| `email:forward` | **Forward your mail.** Forward messages from your account with their attachments, without opening the composer. You are asked before the first forward to each address. | yes |
 | `calendar:read` | **Read your calendar.** See your calendars and their events. |  |
 | `calendar:write` | **Change your calendar.** Create, change and delete events. |  |
 | `contacts:read` | **Read your contacts.** Search and read your address books. |  |
@@ -921,6 +922,7 @@ stylesheet, so lay out with `Stack` and `Row` instead of class names.
 | `SidebarRow`, `SidebarEmpty` | rows and the "nothing here" line of a sidebar section |
 | `DiffView` | a text with removed and added words marked, for previews |
 | `Panel`, `DetailHeading`, `DetailList`, `DetailRow` | the padding of side panels; the message details' small caps headings and label/value rows |
+| `Table` | a data table: `columns` (`key`, `label`, `align: 'end'` for amounts, `hideNarrow`, `width`), `rows` keyed by column, `summary` rows under the last column for totals (`strong` for the one that matters); Bulwark 1.20 and later |
 | `ColorDot` | a dot in a colour the data carries (a calendar's colour); `#rgb` or `#rrggbb` only |
 | `Icon` | an app icon by name (the names `setActions` takes) |
 | `DialogButtons` | the buttons of a plugin dialog, drawn by the host in the dialog's footer |
@@ -1151,7 +1153,7 @@ merged views of several accounts.
 | `sidebar-section` | frame | `ui:sidebar-widget` | `mailboxId` | a collapsible section in the mail sidebar, below the folders |
 | `sidebar-section-actions` | frame, inline | `ui:sidebar-widget` |  | compact controls beside a collapsible plugin sidebar-section heading |
 | `top-bar-actions` | action, inline | `ui:toolbar` |  | buttons in the top bar, next to search |
-| `app-page` | frame | `ui:app-page` | `pageId`, `path` | a full page of its own, with an entry in the navigation rail (api.ui.setPages) |
+| `app-page` | frame | `ui:app-page` | `pageId`, `path` | a full page of its own, with an entry in the navigation rail (api.ui.setPages); api.ui.openPage moves the tab there |
 
 <p>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/navigation-dark.png"><img src="docs/screenshots/navigation-light.png" alt="app-top-banner, navigation-rail-bottom (&quot;slot: rail&quot;), sidebar-section, sidebar-widget, top-bar-actions (flask icon next to Refresh), the page entry in the rail" width="640"></picture>
@@ -1486,6 +1488,7 @@ await api.ui.prompt({ title, message, confirmLabel, cancelLabel,
   fields: [{ name, label, type: 'text' | 'password', placeholder, required }] })  // { name: value } or null
 await api.ui.openDialog({ title, slot, extraProps, width })   // the value given to onResult, or null
 await api.ui.openExternalUrl(url)       // http(s) only, always a new tab
+await api.ui.print({ title, html })     // the browser's print dialog for a page the plugin made
 await api.ui.downloadFile({ content, filename, contentType })
 await api.ui.setActions(surface, actions)
 await api.ui.setDayLabels(labels)
@@ -1499,6 +1502,12 @@ await api.ui.setListFilters(filters)    // keyword filter chips in the list head
 await api.ui.rerenderEmail()            // run onRenderEmailBody again for the open message
 await api.ui.rerenderFetchedEmails()    // run onEmailsFetched again for the list
 ```
+
+`print` (Bulwark 1.20 and later) prints `html` from a hidden frame of the
+host's: sanitised like a message body (a `<style>` element is kept, scripts,
+forms and frames are not), under the reader's strict CSP, so the page loads
+nothing; images have to be `data:` URLs. The user can save a PDF from the
+print dialog. Three times a minute; it waits until the dialog closes.
 
 The host draws `confirm`, `alert` and `prompt` dialogs itself and names the
 plugin in them. `downloadFile` takes text or bytes the plugin made, and
@@ -1551,7 +1560,25 @@ await api.mailboxes.list()                   // [{ id, name, role, parentId, tot
 await api.drafts.create({ to, cc, bcc, subject, body, isHtml, attachments })   // the draft's email id
 await api.compose.open({ to, cc, bcc, subject, body, isHtml, attachments })    // 'opened' or 'navigating'
 await api.compose.reply(emailId, { text, all })   // reply to the open message, starting with text; true
+await api.email.forward(emailId, { to, text, attachments, accountId })   // forward it, no composer
 ```
+
+`email.forward` (permission `email:forward`, Bulwark 1.20 and later) sends
+the message to 1 to 10 addresses from the user's default address: the
+subject gets the forward prefix, `text` (plain text) comes first, then the
+original's From, Date, Subject and To lines and its text. `attachments`
+names which of the original's attachments go along, by `blobId`; without
+it every attachment that isn't an inline image does. The first forward to
+an address asks the user in a dialog Bulwark draws, naming the plugin, the
+message and the address; Settings > Add-ons lists the allowed addresses
+and takes them back. The forward goes through the same checks as a reply
+(the external-recipient question, the organisation's disclaimer, other
+plugins' `onBeforeEmailSend`), is held for the user's undo delay, lands in
+Sent, and marks the original `$forwarded`. It resolves to `{ sent: true,
+emailId, to, scheduledFor }`, or `{ sent: false, reason }` with `declined`
+(the user said no) or `stopped` (a check stopped it). 10 a minute; it waits
+as long as the user takes to answer. Approvals are kept in the browser, so
+a new device asks again.
 
 `EmailReadView` has `id, threadId, mailboxIds, from, to, cc, subject,
 receivedAt, isRead, isFlagged, hasAttachment, attachments, preview,
@@ -1892,6 +1919,7 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.ui.rerenderEmail` | none |
 | `api.ui.rerenderFetchedEmails` | none |
 | `api.ui.openExternalUrl` | none |
+| `api.ui.print` | none |
 | `api.ui.downloadFile` | `ui:download-file` |
 | `api.email.setKeyword` | `email:write` |
 | `api.email.removeKeyword` | `email:write` |
@@ -1921,6 +1949,7 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.ui.setListFilters` | `ui:message-list` |
 | `api.ui.setDayLabels` | `ui:calendar-action` |
 | `api.ui.setPages` | `ui:app-page` |
+| `api.ui.openPage` | `ui:app-page` |
 | `api.ui.setSectionTitle` | `ui:sidebar-widget` |
 | `api.ui.setPanel` | none |
 | `api.sieve.isSupported` | `filters:read` |
@@ -1955,6 +1984,7 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.email.getRaw` | `email:blob-read` |
 | `api.email.move` | `email:write` |
 | `api.email.archive` | `email:write` |
+| `api.email.forward` | `email:forward` |
 | `api.compose.open` | `compose:open` |
 | `api.compose.reply` | `compose:open` |
 | `api.drafts.create` | `email:write` |
