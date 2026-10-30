@@ -28,9 +28,10 @@ const manifest = (extra = {}) => JSON.stringify({ id: 'demo', name: 'Demo', vers
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'plugin-release-'));
   // No user or system git config: no signing, no line-end conversion, a fixed identity.
+  // Not on GitHub either, even in CI: the scripts then print annotations instead.
   writeFileSync(path.join(dir, '.gitconfig-empty'), '');
   env = {
-    ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, '.gitconfig-empty'), GIT_CONFIG_NOSYSTEM: '1',
+    ...process.env, GITHUB_ACTIONS: '', GIT_CONFIG_GLOBAL: path.join(dir, '.gitconfig-empty'), GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@example.org', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@example.org',
   };
   for (const f of ['changelog-lib.mjs', 'changelog.mjs', 'check.mjs', 'release.mjs']) {
