@@ -6,13 +6,19 @@
 //
 // For each plugin: sets the version in manifest.json, package.json and
 // package-lock.json, rebuilds the committed <plugin>.zip, runs the checks,
+// turns the Unreleased section of CHANGELOG.md into the version's notes,
 // commits only those files as "chore: release <plugin> <version>" and tags
 // the commit <plugin>@<version>. Pushing the tag starts the publish workflow.
+//
+// Draft the notes first with `npm run changelog -- <plugin>` and edit them;
+// they may be uncommitted. Without notes the release still goes ahead, with
+// a warning, and the directory shows the version without a changelog.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { newChangelog, releaseUnreleased } from './changelog-lib.mjs';
 import { checkPlugin, readList } from './check.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -83,11 +89,15 @@ for (let i = 0; i < args.length; i += 2) {
     .filter((f) => existsSync(path.join(ROOT, f)));
   const dirty = git('status', '--porcelain', '--', ...files);
   if (dirty) fail(`${plugin}: commit or undo these changes first:\n${dirty}`);
-  releases.push({ plugin, version, tag, files });
+  // CHANGELOG.md is left out of that: its edited draft goes into this commit.
+  releases.push({ plugin, version, tag, files, changelog: `${plugin}/CHANGELOG.md` });
 }
 
+const d = new Date();
+const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const withoutNotes = [];
 const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
-for (const { plugin, version, tag, files } of releases) {
+for (const { plugin, version, tag, files, changelog } of releases) {
   try {
     setVersion(path.join(ROOT, plugin, 'manifest.json'), version, 1);
     if (files.includes(`${plugin}/package.json`)) setVersion(path.join(ROOT, plugin, 'package.json'), version, 1);
@@ -101,12 +111,25 @@ for (const { plugin, version, tag, files } of releases) {
     git('checkout', '--', ...files);
     fail(`${plugin}: ${err.message}\nNothing was committed for ${plugin}; its files are back as they were.`);
   }
-  // Only these files, whatever else is staged.
-  git('commit', '--quiet', '--only', '-m', `chore: release ${plugin} ${version}`, '--', ...files);
+  const changelogPath = path.join(ROOT, changelog);
+  const notes = releaseUnreleased(existsSync(changelogPath) ? readFileSync(changelogPath, 'utf8') : newChangelog(), version, today);
+  writeFileSync(changelogPath, notes.text);
+  if (!notes.released) {
+    withoutNotes.push(plugin);
+    console.warn(`warning: ${plugin} ${version} has no notes: the Unreleased section of ${changelog} is empty`);
+  }
+  // Only these files, whatever else is staged. A new CHANGELOG.md has to be
+  // known to git before --only takes it.
+  git('add', '--', changelog);
+  git('commit', '--quiet', '--only', '-m', `chore: release ${plugin} ${version}`, '--', ...files, changelog);
   git('tag', '-a', tag, '-m', `${plugin} ${version}`);
   console.log(`committed and tagged ${tag}`);
 }
 
+if (withoutNotes.length) {
+  console.warn(`\nReleased without notes: ${withoutNotes.join(', ')}. Next time run`);
+  console.warn(`npm run changelog -- ${withoutNotes.join(' ')} first and edit the draft.`);
+}
 console.log('\nNothing is pushed yet. Push the commits first, then each tag on its own');
 console.log('(GitHub starts no workflow for tags pushed more than three at a time):\n');
 console.log(`  git push origin ${branch === 'HEAD' ? '<branch>' : branch}`);

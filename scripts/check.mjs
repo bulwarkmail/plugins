@@ -8,6 +8,9 @@
 //                                           in publish.json and its manifest
 //                                           must have that version
 //
+// A published plugin without a CHANGELOG.md, and a tag whose version has no
+// notes in it, get a warning; warnings never fail the check.
+//
 // publish.json lists the plugins the publish workflow sends to the
 // directory ("publish") and the ones it never sends ("skip", with the
 // reason). Every plugin folder has to be in one of the two.
@@ -22,6 +25,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hasNotes, sectionBody } from './changelog-lib.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -182,6 +186,22 @@ export function checkPlugin(dir) {
   return errors;
 }
 
+/**
+ * Warnings about a published plugin's CHANGELOG.md as { where, message }:
+ * there is none, or (with a version) it has no notes for that version.
+ */
+export function checkChangelog(dir, version) {
+  const file = path.join(ROOT, dir, 'CHANGELOG.md');
+  const where = `${dir}/CHANGELOG.md`;
+  if (!existsSync(file)) {
+    return [{ where, message: `there is no CHANGELOG.md; run npm run changelog -- ${dir} before the next release` }];
+  }
+  if (version && !hasNotes(sectionBody(readFileSync(file, 'utf8'), version))) {
+    return [{ where, message: `${version} has no notes in CHANGELOG.md, so the directory shows it without a changelog` }];
+  }
+  return [];
+}
+
 /** Problems with publish.json itself and the folders it does or doesn't name. */
 export function checkList(folders) {
   const errors = [];
@@ -209,17 +229,19 @@ export function parseTag(tag) {
   return { plugin: tag.slice(0, at), version: tag.slice(at + 1) };
 }
 
-function report(problems) {
+function report(problems, level = 'error') {
   const annotate = process.env.GITHUB_ACTIONS === 'true';
   for (const { where, message } of problems) {
-    if (annotate) console.log(`::error file=${where}::${message.replace(/\r?\n/g, ' ')}`);
-    else console.error(`${where}: ${message}`);
+    if (annotate) console.log(`::${level} file=${where}::${message.replace(/\r?\n/g, ' ')}`);
+    else console.error(`${level === 'warning' ? 'warning: ' : ''}${where}: ${message}`);
   }
 }
 
 function main() {
   const args = process.argv.slice(2);
   const problems = [];
+  const warnings = [];
+  let tagVersion = null;
   const tagAt = args.indexOf('--tag');
   let wanted = args.filter((a, i) => !a.startsWith('--') && i !== tagAt + 1);
 
@@ -243,6 +265,7 @@ function main() {
       appendFileSync(process.env.GITHUB_OUTPUT, `plugin=${parsed.plugin}\nversion=${parsed.version}\n`);
     }
     wanted = [parsed.plugin];
+    tagVersion = parsed.version;
   }
 
   const folders = pluginFolders();
@@ -254,8 +277,10 @@ function main() {
   const { publish } = readList();
   for (const dir of dirs.filter((d) => publish.includes(d))) {
     problems.push(...checkPlugin(dir));
+    warnings.push(...checkChangelog(dir, tagVersion));
   }
 
+  report(warnings, 'warning');
   report(problems);
   if (problems.length) {
     console.error(`${problems.length} problem${problems.length === 1 ? '' : 's'} found`);

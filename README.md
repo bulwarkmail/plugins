@@ -105,7 +105,20 @@ through a tag `<plugin>@<version>`. The directory builds the plugin from the
 tagged commit, and a reviewer approves each version before it is published.
 
 1. Merge the changes into main.
-2. On main, raise the version, commit and tag:
+2. Draft the notes and edit them in `<plugin>/CHANGELOG.md`:
+
+   ```
+   npm run changelog -- smime                    # or several: smime gravatar
+   ```
+
+   This adds the plugin's commits since its last release to the Unreleased
+   section, sorted under Breaking, Security, Added, Changed and Fixed, and
+   leaves out chore, test, ci, docs, style and build commits. With the GitHub
+   CLI signed in, entries get their pull request number, and those from
+   outside contributors thank the author. The admins who install the plugin read these notes
+   before they update, so say what changes for them. There's no need to
+   commit the edits.
+3. On main, raise the version, commit and tag:
 
    ```
    npm run release -- smime 1.4.0                # or smime minor, smime patch
@@ -113,9 +126,12 @@ tagged commit, and a reviewer approves each version before it is published.
    ```
 
    This sets the version in manifest.json, package.json and
-   package-lock.json, rebuilds the ZIP, runs the checks, commits
+   package-lock.json, rebuilds the ZIP, runs the checks, renames the
+   Unreleased section to `## 1.4.0 (<date>)`, commits
    `chore: release smime 1.4.0` and tags it `smime@1.4.0`. It pushes nothing.
-3. Push main, then each tag it printed on its own. GitHub starts no workflow
+   With an empty Unreleased section it still releases, with a warning, and
+   the version has no notes in the directory.
+4. Push main, then each tag it printed on its own. GitHub starts no workflow
    when a push brings more than three tags.
 
    ```
@@ -127,7 +143,9 @@ The Publish workflow then checks that the plugin is in publish.json, that the
 manifest has the tag's version and that the commit is on main, runs the
 plugin's tests and build, and submits it. The job fails when the directory's
 build or checks fail. When a submission fails, fix it and release the next
-patch version rather than moving the tag.
+patch version rather than moving the tag. The directory takes the version's
+section of CHANGELOG.md as its changelog; a tag without notes gets a warning
+on the run but is still submitted.
 
 publish.json lists the folders that are published and the ones that are not,
 with the reason. A new plugin goes into one of the two, or CI fails. Before

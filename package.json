@@ -6,6 +6,7 @@
     "build": "node scripts/build.mjs",
     "build:check": "node scripts/build.mjs --check",
     "build:isolated": "node scripts/build-isolated.mjs",
+    "changelog": "node scripts/changelog.mjs",
     "check": "node scripts/check.mjs",
     "release": "node scripts/release.mjs",
     "test": "vitest run",
