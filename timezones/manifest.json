@@ -1,7 +1,7 @@
 {
   "id": "timezones",
   "name": "Time zone helper",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "author": "Bulwark",
   "description": "Shows the time where the people you write to are: participants' local times in the event form, the sender's local time in a message, a time in several zones for the composer and an optional world clock.",
   "type": "ui-extension",
