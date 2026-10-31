@@ -273,7 +273,7 @@ Field types are `string`, `secret`, `boolean`, `number` and `select`; each
 needs a `label`, and may set `description`, `required`, `default` and
 `placeholder`. `select` options are `{ label, value }` objects. A `string`
 field with `"multiline": true` gets a full-width text box that keeps line
-breaks (webmail 1.20 and later; older versions show one line). Admin labels
+breaks (webmail 1.19.1 and later; older versions show one line). Admin labels
 are shown as written, not translated.
 
 Any user's plugin can read the non-secret values with `api.config.get()`.
@@ -924,7 +924,7 @@ stylesheet, so lay out with `Stack` and `Row` instead of class names.
 | `SidebarRow`, `SidebarEmpty` | rows and the "nothing here" line of a sidebar section |
 | `DiffView` | a text with removed and added words marked, for previews |
 | `Panel`, `DetailHeading`, `DetailList`, `DetailRow` | the padding of side panels; the message details' small caps headings and label/value rows |
-| `Table` | a data table: `columns` (`key`, `label`, `align: 'end'` for amounts, `hideNarrow`, `width`), `rows` keyed by column, `summary` rows under the last column for totals (`strong` for the one that matters); Bulwark 1.20 and later |
+| `Table` | a data table: `columns` (`key`, `label`, `align: 'end'` for amounts, `hideNarrow`, `width`), `rows` keyed by column, `summary` rows under the last column for totals (`strong` for the one that matters); Bulwark 1.19.1 and later |
 | `ColorDot` | a dot in a colour the data carries (a calendar's colour); `#rgb` or `#rrggbb` only |
 | `Icon` | an app icon by name (the names `setActions` takes) |
 | `DialogButtons` | the buttons of a plugin dialog, drawn by the host in the dialog's footer |
@@ -1505,7 +1505,7 @@ await api.ui.rerenderEmail()            // run onRenderEmailBody again for the o
 await api.ui.rerenderFetchedEmails()    // run onEmailsFetched again for the list
 ```
 
-`print` (Bulwark 1.20 and later) prints `html` from a hidden frame of the
+`print` (Bulwark 1.19.1 and later) prints `html` from a hidden frame of the
 host's: sanitised like a message body (a `<style>` element is kept, scripts,
 forms and frames are not), under the reader's strict CSP, so the page loads
 nothing; images have to be `data:` URLs. The user can save a PDF from the
@@ -1565,7 +1565,7 @@ await api.compose.reply(emailId, { text, all })   // reply to the open message, 
 await api.email.forward(emailId, { to, text, attachments, accountId })   // forward it, no composer
 ```
 
-`email.forward` (permission `email:forward`, Bulwark 1.20 and later) sends
+`email.forward` (permission `email:forward`, Bulwark 1.19.1 and later) sends
 the message to 1 to 10 addresses from the user's default address: the
 subject gets the forward prefix, `text` (plain text) comes first, then the
 original's From, Date, Subject and To lines and its text. `attachments`
