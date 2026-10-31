@@ -35,6 +35,20 @@ describe('translations', () => {
     expect(Object.keys(manifest.locales).sort()).toEqual([...WEBMAIL_LOCALES].sort());
   });
 
+  // The webmail's settings.tabs.addons in each language: the key import is a
+  // page under Settings → Add-ons (it used to be Settings → Plugins).
+  const ADDONS = {
+    ar: 'الإضافات', ca: 'Complements', cs: 'Doplňky', da: 'Tilføjelser', de: 'Erweiterungen', en: 'Add-ons',
+    es: 'Complementos', fa: 'افزونه‌ها', fr: 'Extensions', he: 'תוספים', hu: 'Bővítmények', it: 'Componenti aggiuntivi',
+    ja: 'アドオン', ko: '추가 기능', lv: 'Papildinājumi', mn: 'Нэмэлтүүд', nb: 'Tillegg', nl: 'Add-ons', pl: 'Dodatki',
+    pt: 'Extras', ro: 'Suplimente', ru: 'Дополнения', sk: 'Doplnky', tr: 'Eklentiler', uk: 'Додатки', zh: '附加组件', 'zh-TW': '附加元件',
+  };
+  it.each(WEBMAIL_LOCALES)('%s sends people to the S/MIME page under Add-ons', (locale) => {
+    for (const key of ['compose.noKey', 'send.noKey']) {
+      expect(manifest.locales[locale][key], `${locale} ${key}`).toContain(`→ ${ADDONS[locale]} → S/MIME`);
+    }
+  });
+
   it.each(WEBMAIL_LOCALES)('%s has every key with the same placeholders', (locale) => {
     const table = manifest.locales[locale];
     expect(Object.keys(table).sort()).toEqual(Object.keys(en).sort());
