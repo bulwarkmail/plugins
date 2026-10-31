@@ -1,7 +1,7 @@
 {
   "id": "email-stats",
   "name": "Email Stats",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "author": "Bulwark Mail Community",
   "description": "Sidebar section showing email activity statistics",
   "type": "sidebar-app",
