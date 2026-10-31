@@ -113,6 +113,10 @@ function SignatureDetails({ status, t, locale }) {
 
 const BANNER_TONE = { success: 'success', warning: 'warning', destructive: 'danger', info: 'info' };
 
+// How long the banner waits between looks for the render hook's result:
+// often at first, then less often, giving up after about 30 seconds.
+const VERIFY_WAIT_MS = [100, 150, 250, 400, 600, 1000, 1500, 2000, 2000, 2000, 2000, 3000, 3000, 3000, 3000, 3000, 3000];
+
 /** The info bars for a stored verify status. Exported for tests. */
 export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
   const rows = [];
@@ -210,16 +214,31 @@ export function makeUi(host, deps) {
       let alive = true;
       (async () => {
         if (!email || !email.id) { setLoaded(true); return; }
-        let s = await host.storage.get(deps.VERIFY_PREFIX + email.id);
-        if (!s) {
-          // No render-hook result yet — best-effort detect from headers.
-          const ct = email.headers && (email.headers['Content-Type'] || email.headers['content-type']);
-          const det = deps.detectSmime(Array.isArray(ct) ? ct[0] : ct, undefined, undefined);
-          if (det.type === 'enveloped-data') s = { isEncrypted: true };
-          else if (det.type === 'signed-data') s = { isSigned: true };
-          else if (det.type === 'detached-sig') s = { isSigned: true };
+        const key = deps.VERIFY_PREFIX + email.id;
+        const stored = await host.storage.get(key);
+        if (!alive) return;
+        if (stored) { setStatus(stored); setLoaded(true); return; }
+        // No render-hook result yet: best-effort detect from headers.
+        const ct = email.headers && (email.headers['Content-Type'] || email.headers['content-type']);
+        const det = deps.detectSmime(Array.isArray(ct) ? ct[0] : ct, undefined, undefined);
+        const guess = det.type === 'enveloped-data' ? { isEncrypted: true }
+          : det.type === 'signed-data' || det.type === 'detached-sig' ? { isSigned: true }
+          : null;
+        setStatus(guess);
+        setLoaded(true);
+        if (!guess) return;
+        // The first time a message opens, the render hook is still verifying
+        // or decrypting in the background instance when this banner mounts.
+        // Wait for the result it stores, so the banner turns from "Signed
+        // message" into the verdict without opening the message again.
+        for (const ms of VERIFY_WAIT_MS) {
+          await new Promise((resolve) => setTimeout(resolve, ms));
+          if (!alive) return;
+          let next = null;
+          try { next = await host.storage.get(key); } catch { /* try again */ }
+          if (!alive) return;
+          if (next) { setStatus(next); return; }
         }
-        if (alive) { setStatus(s || null); setLoaded(true); }
       })();
       return () => { alive = false; };
     }, [email && email.id]);

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import * as React from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fakeApi as bareFakeApi } from '../../test-utils/fake-api.mjs';
@@ -87,6 +87,18 @@ describe('reader banner', () => {
     fireEvent.click(screen.getByRole('button', { name: /Show certificate details/ }));
     expect(screen.getByText(/Certificate is for the sender's address/)).toBeTruthy();
     expect(document.querySelector('[style]')).toBeNull();
+  });
+
+  it('turns into the verdict when verification finishes after the banner opened', async () => {
+    const api = fakeApi();
+    const { EmailBanner } = makeUi(api, deps({ detectSmime: () => ({ type: 'detached-sig' }) }));
+    const email = { id: 'm2', headers: { 'Content-Type': 'multipart/signed; protocol="application/pkcs7-signature"' } };
+    await act(async () => { render(React.createElement(EmailBanner, { email })); });
+    expect(document.querySelector('.bk-infobar').textContent).toMatch(/Signed message/);
+    // The render hook in the background instance stores its result later.
+    await api.storage.set('verify:m2', { isSigned: true, signatureValid: true, signerCert: { email: 'a@x.org', notAfter: '2999-01-01', notBefore: '2000-01-01' }, signerEmailMatch: true });
+    await waitFor(() => expect(document.querySelector('.bk-infobar').textContent).toMatch(/Valid signature by a@x.org/));
+    expect(document.querySelector('.bk-infobar').getAttribute('data-tone')).toBe('success');
   });
 
   it('offers Unlock now on a locked message', () => {
