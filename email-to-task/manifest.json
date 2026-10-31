@@ -1,7 +1,7 @@
 {
   "id": "email-to-task",
   "name": "Email to task",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Bulwark Mail Community",
   "description": "Turn a message into a task in Bulwark's own tasks, Vikunja, Todoist, Donetick or a CalDAV task list, with a link back to the message and a due date taken from the text.",
   "type": "ui-extension",
