@@ -10,6 +10,8 @@ create it in one of these:
   mail server. Only offered when the server has them.
 - **Vikunja**, with an API token.
 - **Todoist**, with an API token (API v1).
+- **Donetick**, with an access token. Its API has no projects and no
+  priority, so the dialog asks for neither.
 - **A CalDAV task list** (Nextcloud, Stalwart, Radicale, Baïkal, ...), with
   your user name and password or an app password.
 
@@ -30,7 +32,8 @@ create it in one of these:
 
 Messages that have a task get a "Task" badge in the list, and opening the
 dialog again for such a message says so (with a link to the task when the
-service has one). Tasks deleted in the service are forgotten the next time.
+service has one). Tasks deleted in the service are forgotten the next time,
+except in Donetick, whose API can't tell a deleted chore from a finished one.
 
 ![The badge in the list](screenshots/badge-light.png)
 
@@ -57,8 +60,8 @@ subject is read first, then the message's own text; quoted replies are
 skipped, so an old "by Monday" further down doesn't count. The dialog shows
 the words it used ("Found in the message: “by Friday”").
 
-Vikunja has no date-only due dates; the plugin sets 12:00 local time, as
-Vikunja's own quick add does.
+Vikunja and Donetick have no date-only due dates; the plugin sets 12:00
+local time, as Vikunja's own quick add does.
 
 ## Priority
 
@@ -67,6 +70,7 @@ is suggested for messages marked urgent (`X-Priority: 1`/`2`,
 `Importance: high`) or with urgent, ASAP, important, dringend, eilig or wichtig
 in the subject; "low" for `X-Priority: 4`/`5` or `Importance: low`. Mapped to
 each service: Bulwark and CalDAV 1/5/9, Vikunja 3/2/1, Todoist p1/p2/p3.
+Donetick's API takes no priority.
 
 ## Setup
 
@@ -81,6 +85,7 @@ Optional admin settings:
 | `vikunjaUrl` | Suggested Vikunja address, e.g. `https://tasks.example.com` (a sub-path works) |
 | `todoistApiUrl` | Todoist API address; only for a proxy or a test server. Default `https://api.todoist.com/api/v1` |
 | `caldavUrl` | Suggested CalDAV address: the server, a principal or a task list |
+| `donetickUrl` | Suggested Donetick address, e.g. `https://donetick.example.com` |
 
 CalDAV task lists are found automatically (current user principal, calendar
 home, calendars that take tasks). Lists made only for tasks come first. If
@@ -94,15 +99,15 @@ nothing is found, the dialog asks for the address of a task list.
 | `email:write` | Mark the message afterwards (keyword `$task` or read) |
 | `email:render-takeover` | The "Task" badge on message rows (the host gates its row-badge hook with this permission) |
 | `tasks:read`, `tasks:write` | Find out whether the server has tasks, and create them there |
-| `http:proxy` | Talk to Vikunja, Todoist and CalDAV through the webmail's server, which adds the token or password |
+| `http:proxy` | Talk to Vikunja, Todoist, Donetick and CalDAV through the webmail's server, which adds the token or password |
 | `ui:message-list`, `ui:toolbar` | The buttons on rows, the selection toolbar and the message toolbar |
 | `ui:observe` | The dialog |
 | `ui:keyboard` | Alt+Shift+T |
 | `admin:config` | Read the admin settings above |
 
 Credentials (`credentials` in the manifest): `vikunja` (bearer token),
-`todoist` (bearer token) and `caldav` (basic auth), all per user, server
-chosen by the user.
+`todoist` (bearer token), `caldav` (basic auth) and `donetick` (the token in
+the `secretkey` header), all per user, server chosen by the user.
 
 Nothing leaves the webmail until you press "Create". Then the title,
 description (by default the sender, the date, the link and the first 600

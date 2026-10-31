@@ -215,7 +215,14 @@ export function TaskDialog({ api, emailIds, onResult }) {
       block: true,
       value: target ?? '',
       disabled: !!busy,
-      onChange: (value) => { setTarget(value); setError(null); },
+      // Drop the last service's projects at once, not after they reload.
+      onChange: (value) => {
+        setError(null);
+        if (value === target) return;
+        setTarget(value);
+        setContainers({ status: 'idle', list: [], error: null });
+        setContainerId('');
+      },
       options: state.targets.map((x) => ({ value: x.id, label: x.connected ? x.name : t('dialog.service_not_connected', { service: x.name }) })),
     }));
 
@@ -263,6 +270,8 @@ export function TaskDialog({ api, emailIds, onResult }) {
     ? t('existing.single', { service: state.targets.find((x) => x.id === existing[0].target)?.name ?? existing[0].target, title: existing[0].title })
     : t('existing.many', { count: new Set(existing.map((e) => e.emailId)).size }));
 
+  // Hidden for services that don't keep a priority.
+  const withPriority = targetInfo?.priority !== false;
   const priorityOptions = (withAuto) => [
     ...(withAuto ? [{ value: 'auto', label: t('priority.auto') }] : []),
     ...PRIORITIES.map((p) => ({ value: p, label: t(`priority.${p}`) })),
@@ -277,7 +286,7 @@ export function TaskDialog({ api, emailIds, onResult }) {
         h(Textarea, { value: item.description, rows: 4, maxLength: 10000, onChange: (e) => update(item.emailId, { description: e.target.value }) })),
       h(Field, { key: 'due', label: t('dialog.due'), hint: item.dueMatch ? t('dialog.due_found', { words: item.dueMatch }) : undefined },
         h(Input, { type: 'date', value: item.due, onChange: (e) => update(item.emailId, { due: e.target.value, dueMatch: '' }) })),
-      h(Field, { key: 'priority', label: t('dialog.priority') },
+      withPriority && h(Field, { key: 'priority', label: t('dialog.priority') },
         h(Select, { block: true, value: item.priority, onChange: (value) => update(item.emailId, { priority: value }), options: priorityOptions(false) })),
     ];
   })() : [
@@ -306,7 +315,7 @@ export function TaskDialog({ api, emailIds, onResult }) {
           onChange: (e) => update(item.emailId, { due: e.target.value }),
         })),
       failures[item.emailId] ? h(Text, { tone: 'danger', size: 'xs' }, errorText(t, failures[item.emailId], serviceName)) : null)),
-    h(Field, { key: 'priority', label: t('dialog.priority') },
+    withPriority && h(Field, { key: 'priority', label: t('dialog.priority') },
       h(Select, { block: true, value: bulkPriority, onChange: (value) => setBulkPriority(value), options: priorityOptions(true) })),
   ];
 

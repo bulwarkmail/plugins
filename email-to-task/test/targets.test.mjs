@@ -4,6 +4,7 @@ import { vikunja } from '../src/lib/targets/vikunja.js';
 import { todoist } from '../src/lib/targets/todoist.js';
 import { caldav, discoverTaskLists } from '../src/lib/targets/caldav.js';
 import { bulwark } from '../src/lib/targets/bulwark.js';
+import { donetick } from '../src/lib/targets/donetick.js';
 import { errorForResponse, errorText, request, toTaskError } from '../src/lib/errors.js';
 
 const TASK = { title: 'Pay invoice', description: 'From: Bob\nOpen the message: https://m/mail/message/M1', due: '2026-10-20', priority: 'high', containerId: '2', link: 'https://m/mail/message/M1' };
@@ -57,6 +58,46 @@ describe('Vikunja', () => {
     expect(await vikunja.exists(ctx(proxyApi(() => proxyResponse({ message: 'nope' }, { status: 404 }))), { taskId: '1' })).toBe(false);
     expect(await vikunja.exists(ctx(proxyApi(() => proxyResponse('', { status: 502 }))), { taskId: '1' })).toBeNull();
     expect(await vikunja.exists(ctx(proxyApi(() => proxyResponse({ id: 1 }))), { taskId: '1' })).toBe(true);
+  });
+});
+
+describe('Donetick', () => {
+  const ctx = (api, config = {}) => ({ api, origin: 'http://localhost:18021', config: { donetickUrl: '', ...config } });
+
+  it('posts a chore to the external API with an HTML description and a noon due date', async () => {
+    let sent;
+    const api = proxyApi((id, url, init) => { sent = { id, url, init }; return proxyResponse({ id: 9, name: 'Pay invoice' }, { status: 201 }); });
+    const out = await donetick.create(ctx(api), TASK);
+    expect(sent.id).toBe('donetick');
+    expect(sent.url).toBe('http://localhost:18021/eapi/v1/chore');
+    expect(sent.init.method).toBe('POST');
+    const body = JSON.parse(sent.init.body);
+    expect(Object.keys(body).sort()).toEqual(['description', 'dueDate', 'name']);
+    expect(body.name).toBe('Pay invoice');
+    expect(body.description).toContain('<a href="https://m/mail/message/M1">');
+    const due = new Date(body.dueDate);
+    expect([due.getFullYear(), due.getMonth() + 1, due.getDate(), due.getHours()]).toEqual([2026, 10, 20, 12]);
+    expect(out).toEqual({ taskId: '9', url: 'http://localhost:18021/chores/9' });
+  });
+
+  it('leaves the due date out when there is none, and keeps a sub-path of the administrator\'s address', async () => {
+    let sent;
+    const api = proxyApi((id, url, init) => { sent = { url, body: JSON.parse(init.body) }; return proxyResponse({ id: 3 }); });
+    const out = await donetick.create({ api, origin: 'https://example.com', config: { donetickUrl: 'https://example.com/donetick/' } }, { ...TASK, due: null });
+    expect(sent.url).toBe('https://example.com/donetick/eapi/v1/chore');
+    expect('dueDate' in sent.body).toBe(false);
+    expect(out.url).toBe('https://example.com/donetick/chores/3');
+  });
+
+  it('reports a rejected token as auth and an answer without an id as a server error', async () => {
+    await expect(donetick.create(ctx(proxyApi(() => proxyResponse({ error: 'Invalid API token' }, { status: 401 }))), TASK)).rejects.toMatchObject({ code: 'auth' });
+    await expect(donetick.create(ctx(proxyApi(() => proxyResponse({}))), TASK)).rejects.toMatchObject({ code: 'server' });
+  });
+
+  it('has no projects and never claims a chore was deleted', async () => {
+    const api = proxyApi(() => { throw new Error('no request expected'); });
+    expect(await donetick.containers(ctx(api))).toEqual([]);
+    expect(await donetick.exists(ctx(api), { taskId: '1' })).toBeNull();
   });
 });
 

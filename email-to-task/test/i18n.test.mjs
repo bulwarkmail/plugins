@@ -35,7 +35,7 @@ describe('translations', () => {
     for (const code of ['auth', 'not_connected', 'forbidden', 'not_found', 'conflict', 'too_large', 'rate_limited', 'quota', 'timeout', 'bad_request', 'server', 'unreachable', 'blocked', 'wrong_server', 'permission', 'no_task_list', 'no_project', 'no_title', 'stopped', 'unknown']) used.add(`error.${code}`);
     for (const p of ['none', 'low', 'medium', 'high']) used.add(`priority.${p}`);
     for (const a of ['keyword', 'read', 'both', 'none']) used.add(`after.${a}`);
-    for (const target of ['vikunja', 'todoist', 'caldav']) used.add(`connect.needed.${target}`);
+    for (const target of ['vikunja', 'todoist', 'caldav', 'donetick']) used.add(`connect.needed.${target}`);
     expect(used.size).toBeGreaterThan(40);
     for (const lang of LOCALES) {
       const missing = [...used].filter((k) => typeof manifest.locales[lang][k] !== 'string' || !manifest.locales[lang][k].trim());

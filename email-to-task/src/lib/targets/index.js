@@ -2,9 +2,10 @@ import { bulwark } from './bulwark.js';
 import { vikunja } from './vikunja.js';
 import { todoist } from './todoist.js';
 import { caldav } from './caldav.js';
+import { donetick } from './donetick.js';
 
 /** In the order the dialog lists them. */
-export const TARGETS = [bulwark, vikunja, todoist, caldav];
+export const TARGETS = [bulwark, vikunja, todoist, caldav, donetick];
 
 export function targetById(id) {
   return TARGETS.find((t) => t.id === id) ?? null;
@@ -21,9 +22,10 @@ export async function loadConfig(api) {
       vikunjaUrl: typeof all.vikunjaUrl === 'string' ? all.vikunjaUrl.trim() : '',
       todoistApiUrl: typeof all.todoistApiUrl === 'string' ? all.todoistApiUrl.trim() : '',
       caldavUrl: typeof all.caldavUrl === 'string' ? all.caldavUrl.trim() : '',
+      donetickUrl: typeof all.donetickUrl === 'string' ? all.donetickUrl.trim() : '',
     };
   } catch {
-    return { vikunjaUrl: '', todoistApiUrl: '', caldavUrl: '' };
+    return { vikunjaUrl: '', todoistApiUrl: '', caldavUrl: '', donetickUrl: '' };
   }
 }
 

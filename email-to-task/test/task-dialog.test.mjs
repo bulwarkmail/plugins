@@ -79,6 +79,29 @@ describe('TaskDialog', () => {
     expect(screen.queryByRole('button', { name: 'Connect Todoist' })).toBeNull();
   });
 
+  it('creates a Donetick chore without a project or priority field', async () => {
+    const api = makeApi({
+      accounts: [
+        { credentialId: 'vikunja', origin: 'http://localhost:18456', connected: true },
+        { credentialId: 'donetick', origin: 'http://localhost:18021', connected: true },
+      ],
+      fetch: async (id, url) => (url.includes('/projects?') ? proxyResponse([{ id: 2, title: 'Bulwark inbox' }]) : proxyResponse({ id: 5 }, { status: 201 })),
+    });
+    const onResult = await open(api);
+    // Vikunja first: it has a priority.
+    await screen.findByRole('option', { name: 'Bulwark inbox' });
+    expect(screen.getByLabelText('Priority')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Add to'), { target: { value: 'donetick' } });
+    await waitFor(() => expect(screen.queryByLabelText('Priority')).toBeNull());
+    expect(screen.queryByLabelText('Project')).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Create task' })); });
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith({ created: ['M1'] }));
+    const post = api.calls('proxy.fetch').find((c) => c.args[2]?.method === 'POST');
+    expect(post.args.slice(0, 2)).toEqual(['donetick', 'http://localhost:18021/eapi/v1/chore']);
+    expect(JSON.parse(post.args[2].body).name).toBe('Quarterly report');
+    expect(api.calls('toast.success')[0].args[0]).toBe('Task created in Donetick');
+  });
+
   it('shows a rejected token in plain words with a way to connect again', async () => {
     const api = makeApi({
       fetch: async (id, url) => (url.includes('/projects?') ? proxyResponse([{ id: 2, title: 'P' }]) : proxyResponse({ message: 'invalid token' }, { status: 401 })),

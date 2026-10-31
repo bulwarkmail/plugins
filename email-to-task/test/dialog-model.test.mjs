@@ -36,13 +36,13 @@ describe('prepareDialog', () => {
   });
 
   it('offers Bulwark tasks only when the server has them', async () => {
-    expect((await prepareDialog(api(), { emailIds: ['M1'], location: LOCATION })).targets.map((x) => x.id)).toEqual(['bulwark', 'vikunja', 'todoist', 'caldav']);
-    expect((await prepareDialog(api({ tasks: false }), { emailIds: ['M1'], location: LOCATION })).targets.map((x) => x.id)).toEqual(['vikunja', 'todoist', 'caldav']);
+    expect((await prepareDialog(api(), { emailIds: ['M1'], location: LOCATION })).targets.map((x) => x.id)).toEqual(['bulwark', 'vikunja', 'todoist', 'caldav', 'donetick']);
+    expect((await prepareDialog(api({ tasks: false }), { emailIds: ['M1'], location: LOCATION })).targets.map((x) => x.id)).toEqual(['vikunja', 'todoist', 'caldav', 'donetick']);
   });
 
   it('marks which services are connected and picks the last one used', async () => {
     const s = await prepareDialog(api({ store: { prefs: { target: 'todoist' } } }), { emailIds: ['M1'], location: LOCATION });
-    expect(Object.fromEntries(s.targets.map((x) => [x.id, x.connected]))).toEqual({ bulwark: true, vikunja: true, todoist: false, caldav: false });
+    expect(Object.fromEntries(s.targets.map((x) => [x.id, x.connected]))).toEqual({ bulwark: true, vikunja: true, todoist: false, caldav: false, donetick: false });
     expect(s.target).toBe('todoist');
   });
 

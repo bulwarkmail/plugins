@@ -1,5 +1,5 @@
 // End to end: the plugin in the running webmail, against Vikunja, the
-// Todoist mock, Stalwart's CalDAV task list and Stalwart's own tasks.
+// Todoist mock, Donetick, Stalwart's CalDAV task list and Stalwart's own tasks.
 //
 // Each test imports its own messages into alice's inbox over JMAP (so the
 // seeded mail other plugins rely on stays untouched), creates tasks through
@@ -7,15 +7,26 @@
 
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { BASE, adminApi, installPlugin, preparePage, setPluginConfig, shoot, signIn, uninstallPlugin, waitForPlugin } from '../../e2e/helpers.mjs';
+import path from 'node:path';
+import { BASE, REPO, adminApi, installPlugin, preparePage, setPluginConfig, shoot, signIn, uninstallPlugin, waitForPlugin } from '../../e2e/helpers.mjs';
 
 const ID = 'email-to-task';
-const SECRETS = 'C:/Users/info/worktrees/plugins-audit/test-env/.secrets';
-const vikunjaSecrets = JSON.parse(fs.readFileSync(`${SECRETS}/vikunja.json`, 'utf8'));
-const caldavSecrets = JSON.parse(fs.readFileSync(`${SECRETS}/caldav.json`, 'utf8'));
+/** A seed's secrets file: this checkout's test-env first, then the shared rig's. */
+function secrets(name) {
+  const found = [
+    path.join(REPO, 'test-env', '.secrets', `${name}.json`),
+    `C:/Users/info/worktrees/plugins-audit/test-env/.secrets/${name}.json`,
+  ].find((p) => fs.existsSync(p));
+  if (!found) throw new Error(`test-env/.secrets/${name}.json not found; run test-env/up`);
+  return JSON.parse(fs.readFileSync(found, 'utf8'));
+}
+const vikunjaSecrets = secrets('vikunja');
+const caldavSecrets = secrets('caldav');
+const donetickSecrets = secrets('donetick');
 const STALWART = 'http://localhost:18025';
 const VIKUNJA = 'http://localhost:18456';
 const TODOIST = 'http://localhost:18099/todoist/api/v1';
+const DONETICK = 'http://localhost:18021';
 const ALICE = 'Basic ' + Buffer.from('alice@example.org:test-pass-123').toString('base64');
 const RUN = Date.now().toString(36);
 
@@ -94,6 +105,12 @@ async function caldavTasks() {
   return [...xml.matchAll(/<D:response><D:href>([^<]+)<\/D:href>[\s\S]*?calendar-data>([\s\S]*?)<\//g)].map((m) => ({ href: m[1], ics: m[2] }));
 }
 
+async function donetick(path, init = {}) {
+  const res = await fetch(`${DONETICK}/eapi/v1${path}`, { ...init, headers: { secretkey: donetickSecrets.token, 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
+  if (!res.ok) throw new Error(`Donetick ${path}: HTTP ${res.status}`);
+  return res.json();
+}
+
 async function bulwarkTasks() {
   const { accountId } = await accountAndInbox();
   const using = ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:calendars'];
@@ -132,6 +149,11 @@ async function openMessage(page, subject) {
   await expect(page.getByRole('heading', { name: subject }).first()).toBeVisible({ timeout: 30_000 });
 }
 
+/** A toast. The host also repeats it in a screen-reader live region, so look in the toast list. */
+function toast(page, text) {
+  return page.getByRole('region', { name: 'Notifications' }).getByText(text);
+}
+
 /** A button in the dialog's footer, which the host draws for the plugin. */
 function footerButton(page, name) {
   return page.locator('[data-plugin-dialog-buttons]').getByRole('button', { name, exact: true });
@@ -157,7 +179,7 @@ async function connectInHost(page, { server, username, secret }) {
 }
 
 async function disconnectAll(page) {
-  for (const credential of ['vikunja', 'todoist', 'caldav']) {
+  for (const credential of ['vikunja', 'todoist', 'caldav', 'donetick']) {
     await page.request.delete(`${BASE}/api/plugin-secrets?plugin=${ID}&credential=${credential}`).catch(() => {});
   }
 }
@@ -182,6 +204,7 @@ test.beforeAll(async () => {
   await setPluginConfig(admin, ID, 'vikunjaUrl', VIKUNJA);
   await setPluginConfig(admin, ID, 'todoistApiUrl', TODOIST);
   await setPluginConfig(admin, ID, 'caldavUrl', `${STALWART}/`);
+  await setPluginConfig(admin, ID, 'donetickUrl', DONETICK);
 });
 
 test.afterAll(async () => {
@@ -216,7 +239,7 @@ test('reader: a message becomes a Vikunja task with a link back, and the row get
     await expect(frame.getByRole('button', { name: 'Create task' })).toHaveCount(0);
     await shoot(page, ID, 'dialog', 'light');
     await footerButton(page, 'Create task').click();
-    await expect(page.getByText('Task created in Vikunja')).toBeVisible();
+    await expect(toast(page, 'Task created in Vikunja')).toBeVisible();
 
     const tasks = await vikunja(`/projects/${vikunjaSecrets.projectId}/tasks?s=${encodeURIComponent(RUN)}`);
     const task = tasks.find((x) => x.title === `Quarterly report ${RUN}`);
@@ -241,6 +264,55 @@ test('reader: a message becomes a Vikunja task with a link back, and the row get
     await expect(page.getByRole('dialog')).toBeHidden();
   } finally {
     if (taskId) await vikunja(`/tasks/${taskId}`, { method: 'DELETE' });
+    await disconnectAll(page).catch(() => {});
+    await destroyMail([emailId]);
+  }
+});
+
+test('reader: a message becomes a Donetick chore with its due date and a link back', async ({ page }) => {
+  const subject = `Server invoice ${RUN}`;
+  const emailId = await importMail({ subject, body: 'Hello Alice,\n\nplease pay the server invoice by 2026-11-20.\n\nThanks, Carol' });
+  let choreId = null;
+  try {
+    await startApp(page, admin);
+    await disconnectAll(page);
+    await openMessage(page, subject);
+
+    await readerButton(page).click();
+    const frame = dialogFrame(page);
+    await expect(frame.getByLabel('Due date')).toHaveValue('2026-11-20');
+    await frame.getByLabel('Add to').selectOption('donetick');
+    await frame.getByRole('button', { name: 'Connect Donetick' }).click();
+    // The administrator's Donetick address is suggested; the user adds the token.
+    await expect(page.getByRole('dialog').locator('input[inputmode="url"]')).toHaveValue(DONETICK);
+    await connectInHost(page, { secret: donetickSecrets.token });
+
+    // Donetick's API has no projects and no priority, so neither is asked for.
+    await expect(frame.getByLabel('Title')).toHaveValue(subject);
+    await expect(frame.getByLabel('Priority')).toHaveCount(0);
+    await expect(frame.getByLabel('Project')).toHaveCount(0);
+    await footerButton(page, 'Create task').click();
+    await expect(toast(page, 'Task created in Donetick')).toBeVisible();
+
+    const chore = (await donetick('/chore')).find((c) => c.name === subject);
+    expect(chore).toBeTruthy();
+    choreId = chore.id;
+    expect(chore.description).toContain(`/mail/message/${emailId}`);
+    expect(chore.description).toContain('server invoice by 2026-11-20');
+    const due = new Date(chore.nextDueDate);
+    expect([due.getFullYear(), due.getMonth() + 1, due.getDate(), due.getHours()]).toEqual([2026, 11, 20, 12]);
+    expect(await emailKeywords(emailId)).toMatchObject({ $task: true });
+
+    // Asking again links to the chore in Donetick.
+    await readerButton(page).click();
+    await expect(frame.getByText(`This message already has a task in Donetick: “${subject}”.`)).toBeVisible();
+    await expect(frame.getByRole('button', { name: 'Open task' })).toBeVisible();
+    await footerButton(page, 'Cancel').click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+  } finally {
+    // By name too: a run that failed early may have made the chore without reading it back.
+    const ids = choreId ? [choreId] : (await donetick('/chore').catch(() => [])).filter((c) => c.name === subject).map((c) => c.id);
+    for (const id of ids) await donetick(`/chore/${id}`, { method: 'DELETE' }).catch(() => {});
     await disconnectAll(page).catch(() => {});
     await destroyMail([emailId]);
   }
@@ -276,7 +348,7 @@ test('row menu: a German message becomes a Todoist task with its German deadline
     await shoot(page, ID, 'error', 'dark');
     await page.unroute(isCreate);
     await footerButton(page, 'Create task').click();
-    await expect(page.getByText('Task created in Todoist')).toBeVisible();
+    await expect(toast(page, 'Task created in Todoist')).toBeVisible();
 
     const { results } = await todoist('/tasks');
     created = results.filter((x) => x.content === subject);
@@ -325,7 +397,7 @@ test('selection toolbar: two messages become two tasks in the CalDAV task list',
     await expect(frame.getByLabel(`Due date for “${subjects[1]}”`)).toHaveValue('2026-11-02');
     await shoot(page, ID, 'bulk', 'light');
     await footerButton(page, 'Create 2 tasks').click();
-    await expect(page.getByText('2 tasks created in CalDAV')).toBeVisible();
+    await expect(toast(page, '2 tasks created in CalDAV')).toBeVisible();
 
     const mine = (await caldavTasks()).filter((x) => x.ics.includes(RUN));
     hrefs = mine.map((x) => x.href);
@@ -371,7 +443,7 @@ test('keyboard: Alt+Shift+T puts the open message into Bulwark tasks on the mail
     await frame.getByLabel('Add to').selectOption('bulwark');
     await expect(frame.getByLabel('Due date')).toHaveValue('2026-11-15');
     await footerButton(page, 'Create task').click();
-    await expect(page.getByText('Task created in Tasks (Bulwark)')).toBeVisible();
+    await expect(toast(page, 'Task created in Tasks (Bulwark)')).toBeVisible();
     tasks = await bulwarkTasks();
     mine = tasks.list.filter((x) => x.title === subject);
     expect(mine).toHaveLength(1);

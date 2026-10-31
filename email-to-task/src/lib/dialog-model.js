@@ -72,6 +72,7 @@ export async function prepareDialog(api, { emailIds, location = globalThis.locat
     name: target.id === 'bulwark' ? t('target.bulwark') : target.name,
     available: target.id === 'bulwark' ? bulwarkAvailable : true,
     connected: !target.credentialId || !!accounts[target.credentialId],
+    priority: target.priority !== false,
   })).filter((target) => target.available);
   const remembered = targets.find((x) => x.id === prefs.target);
   const target = remembered?.id ?? targets.find((x) => x.connected)?.id ?? targets[0]?.id ?? null;
