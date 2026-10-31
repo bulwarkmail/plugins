@@ -1,7 +1,7 @@
 {
   "id": "spam-score",
   "name": "Spam Score",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "author": "Bulwark Mail Community",
   "description": "Adds a Spam Analysis section to a message's \"More details\" panel. Reads the raw spam-filter headers (SpamAssassin / Rspamd score, threshold and level, plus any AI verdict) directly off the message and shows a colour-coded breakdown.",
   "type": "ui-extension",
