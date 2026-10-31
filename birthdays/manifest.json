@@ -1,7 +1,7 @@
 {
   "id": "birthdays",
   "name": "Birthday reminders",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "author": "Bulwark Mail Community",
   "description": "Upcoming birthdays from your contacts in the sidebar, reminders on the day and a few days before, a quick birthday greeting and, if you like, birthday events in your calendar.",
   "type": "sidebar-app",
