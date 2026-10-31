@@ -1,7 +1,7 @@
 {
   "id": "team-inbox",
   "name": "Team inbox",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Bulwark",
   "description": "Assign messages in team mailboxes to a member and mark them done, with \"Assigned to me\" and \"Open\" filters. Everyone in the team sees the same state.",
   "type": "ui-extension",
