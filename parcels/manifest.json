@@ -1,7 +1,7 @@
 {
   "id": "parcels",
   "name": "Package tracking",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "author": "Bulwark",
   "description": "Finds tracking numbers in your mail, shows where each parcel is and tells you when its status changes.",
   "type": "ui-extension",
