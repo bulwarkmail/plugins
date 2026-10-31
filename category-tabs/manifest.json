@@ -1,0 +1,32 @@
+{
+  "id": "category-tabs",
+  "name": "Inbox Category Tabs",
+  "version": "1.1.0",
+  "author": "Bulwark Mail Community",
+  "description": "Gmail-style inbox tabs (Primary / Promotions / Social / Updates). Fully customizable in settings: tabs, rules, colors, per-sender pins. Search-based by default; optional durable Sieve classification.",
+  "type": "ui-extension",
+  "permissions": [
+    "email:read",
+    "email:write",
+    "ui:message-list-tabs",
+    "ui:settings-section",
+    "filters:read",
+    "filters:write"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.8.0",
+  "locales": {
+    "en": {
+      "tab.primary": "Primary",
+      "tab.social": "Social",
+      "tab.promotions": "Promotions",
+      "tab.updates": "Updates"
+    },
+    "de": {
+      "tab.primary": "Allgemein",
+      "tab.social": "Soziale Netzwerke",
+      "tab.promotions": "Werbung",
+      "tab.updates": "Benachrichtigungen"
+    }
+  }
+}
