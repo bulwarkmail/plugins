@@ -1,7 +1,7 @@
 {
   "id": "outlook-style-headers",
   "name": "Outlook-style Quote Headers",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "author": "Bulwark Mail Community",
   "description": "Replaces the default reply/forward quote header with an Outlook-style From / Sent / To / Cc / Subject block. The original message follows directly, with no blockquote indent.",
   "type": "hook",
