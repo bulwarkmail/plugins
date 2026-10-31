@@ -15,6 +15,10 @@
   "minAppVersion": "1.15.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-sidebar.webp",
+    "media/screenshots/2-sidebar-dark.webp"
+  ],
   "settingsSchema": {
     "position": {
       "type": "select",
