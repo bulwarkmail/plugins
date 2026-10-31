@@ -1,7 +1,7 @@
 {
   "id": "quick-notes",
   "name": "Quick Notes",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "author": "Bulwark Mail Community",
   "description": "Per-email sticky notes in the sidebar: jot notes while reading emails",
   "type": "sidebar-app",
