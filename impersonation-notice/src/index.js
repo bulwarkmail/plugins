@@ -2,9 +2,9 @@
  * Impersonation Notice
  *
  * Renders a persistent top-of-app banner whenever the active session is a
- * Stalwart master-user impersonation. Detection is purely on the username:
- * Stalwart's impersonation syntax is "<target>%<master>", so any session
- * username containing '%' is treated as impersonated.
+ * Stalwart master-user impersonation. The host says so with the
+ * `impersonated` slot prop; older hosts don't pass it, so a username in
+ * Stalwart's impersonation syntax "<target>%<master>" counts as well.
  *
  * v2 status: improved. Slot iframes now have full api access, so:
  *   - The banner reads admin-managed config (returnUrl, returnLabel,
@@ -34,8 +34,18 @@ function looksLikeImpersonation(username) {
   return typeof username === 'string' && username.includes('%');
 }
 
-function parseImpersonatedMailbox(username) {
-  if (!looksLikeImpersonation(username)) return null;
+// Bulwark 1.11.1 and later sign an impersonated session in with the plain
+// mailbox, so the username has no '%' any more. Hosts that know about the
+// impersonation pass `impersonated: true` next to the username; the '%'
+// check stays for older hosts and for people who sign in with the
+// master-user syntax themselves.
+function isImpersonated(props) {
+  return props?.impersonated === true || looksLikeImpersonation(props?.username);
+}
+
+function parseImpersonatedMailbox(props) {
+  if (!isImpersonated(props)) return null;
+  const username = typeof props?.username === 'string' ? props.username : '';
   return username.split('%')[0] || null;
 }
 
@@ -48,8 +58,7 @@ function pickString(value, fallback) {
 // ─── Banner slot component ────────────────────────────────────
 
 function ImpersonationBanner(props) {
-  const username = props?.username;
-  const mailbox = parseImpersonatedMailbox(username);
+  const mailbox = parseImpersonatedMailbox(props);
   const [busy, setBusy] = useState(false);
   const [cfg, setCfg] = useState({
     returnUrl: pickString(props?.returnUrl, ''),
@@ -116,7 +125,7 @@ function ImpersonationBanner(props) {
 // shouldShow runs in the background iframe. It accepts the host's
 // extraProps so it can early-bail before mounting an empty slot iframe.
 function shouldShow(extraProps) {
-  return looksLikeImpersonation(extraProps?.username);
+  return parseImpersonatedMailbox(extraProps) !== null;
 }
 
 export const slots = {
