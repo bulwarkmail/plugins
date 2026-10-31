@@ -18,7 +18,7 @@ Nothing shows in the user's own mailbox or in a mailbox another person
 shared.
 
 Needs Bulwark 1.19 or later. Install it in the admin panel (Extensions >
-Plugins) and turn on "Enabled for everyone" to give it to every user; it
+Plugins) and turn on "Force on for everyone" to give it to every user; it
 has no settings.
 
 ## How it is stored
