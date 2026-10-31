@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import HERE, SECRETS, read_secret  # noqa: E402
 
-SEEDS = ['seed_mail.py', 'seed_caldav.py', 'seed_nextcloud.py', 'seed_paperless.py', 'seed_vikunja.py']
+SEEDS = ['seed_mail.py', 'seed_caldav.py', 'seed_nextcloud.py', 'seed_paperless.py', 'seed_vikunja.py', 'seed_donetick.py']
 
 
 def summary(with_ai):
@@ -21,6 +21,7 @@ def summary(with_ai):
     pl = read_secret('paperless') or {}
     vk = read_secret('vikunja') or {}
     cd = read_secret('caldav') or {}
+    dt = read_secret('donetick') or {}
     ol = read_secret('ollama') or {}
     rows = [
         ('Stalwart (JMAP, CalDAV)', 'http://localhost:18025',
@@ -34,6 +35,8 @@ def summary(with_ai):
          f'admin / {pl.get("admin", {}).get("password", "?")}, token {pl.get("token", "?")}'),
         ('Vikunja', vk.get('url', 'http://localhost:18456'),
          f'alice / {vk.get("password", "?")}, token {vk.get("token", "?")}, project {vk.get("projectId", "?")}'),
+        ('Donetick', dt.get('url', 'http://localhost:18021'),
+         f'alice / {dt.get("password", "?")}, access token {dt.get("token", "?")}'),
         ('Mocks (AI, Todoist, tracking)', 'http://localhost:18099', 'keys in test-env/mocks/README.md'),
     ]
     if with_ai:
@@ -47,7 +50,7 @@ def summary(with_ai):
             print(f'  {"".ljust(width)}  {creds}')
     print(f'\nSecrets: {SECRETS}')
     print('Webmail proxy: PLUGIN_PROXY_PRIVATE_ORIGINS='
-          'http://localhost:18025,http://localhost:18080,http://localhost:18010,http://localhost:18456,http://localhost:18099'
+          'http://localhost:18025,http://localhost:18080,http://localhost:18010,http://localhost:18456,http://localhost:18021,http://localhost:18099'
           + (',http://localhost:11434' if with_ai else ''))
 
 

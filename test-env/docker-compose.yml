@@ -114,6 +114,24 @@ services:
     # The image has no shell or curl, so there is no container healthcheck;
     # seed/seed_vikunja.py waits for /api/v1/info instead.
 
+  donetick:
+    image: donetick/donetick:v0.1.85
+    container_name: bpt-donetick
+    ports:
+      - "18021:2021"
+    volumes:
+      - donetick-data:/donetick-data
+    environment:
+      DT_ENV: selfhosted
+      DT_SQLITE_PATH: /donetick-data/donetick.db
+      DT_JWT_SECRET: bulwark-plugin-test-only-not-secret-0123456789
+      TZ: Europe/Berlin
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:2021/api/v1/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   mocks:
     image: python:3.13.16-alpine
     container_name: bpt-mocks
@@ -153,4 +171,5 @@ volumes:
   paperless-media:
   vikunja-db:
   vikunja-files:
+  donetick-data:
   ollama-models:

@@ -1,8 +1,9 @@
 # Plugin test environment
 
 Local Docker services for testing the Bulwark plugins end to end: Stalwart for
-mail, JMAP and CalDAV, Nextcloud, Paperless-ngx, Vikunja, a mock server for the
-paid APIs (Anthropic, OpenAI, Todoist, 17TRACK, DHL) and, optionally, Ollama.
+mail, JMAP and CalDAV, Nextcloud, Paperless-ngx, Vikunja, Donetick, a mock
+server for the paid APIs (Anthropic, OpenAI, Todoist, 17TRACK, DHL) and,
+optionally, Ollama.
 Everything runs on your machine.
 
 ## Start and stop
@@ -41,6 +42,7 @@ them together with the volumes.
 | Nextcloud | http://localhost:18080 | `nextcloud:34.0.4-apache` | `admin` / `admin-pass-123`, `alice` / `alice-pass-123` plus an app password | `nextcloud.json` |
 | Paperless-ngx | http://localhost:18010 | `ghcr.io/paperless-ngx/paperless-ngx:3.2.1`, `redis:8.2.10-alpine` | `admin` / `admin-pass-123` plus an API token | `paperless.json` |
 | Vikunja | http://localhost:18456 | `vikunja/vikunja:2.6.0` | `alice` / `alice-pass-123` plus an API token | `vikunja.json` |
+| Donetick | http://localhost:18021 | `donetick/donetick:v0.1.85` | `alice` / `alice-pass-123` plus an access token | `donetick.json` |
 | Mock APIs | http://localhost:18099 | `python:3.13.16-alpine` | fixed keys, see [mocks/README.md](mocks/README.md) | none |
 | Ollama (profile `ai`) | http://localhost:11434 | `ollama/ollama:0.40.3` | no auth | `ollama.json` |
 
@@ -118,6 +120,13 @@ SQLite. Registration is open. Seeded: user alice, an API token with every
 permission (`Authorization: Bearer tk_...`), the project "Bulwark inbox" with
 one task. The API is at `http://localhost:18456/api/v1`.
 
+### Donetick
+
+SQLite, sign-up open. Seeded: user alice, an access token and one chore. The
+external API is at `http://localhost:18021/eapi/v1` and takes the token in the
+header `secretkey: dt_...`; it can list and create chores but has no projects
+and no priority.
+
 ### Mock APIs
 
 One Python file, `mocks/server.py`. It serves the Anthropic Messages API, an
@@ -150,7 +159,7 @@ For a webmail running on the host (for example `npm run dev`), put this in its
 `.env.local`:
 
 ```
-PLUGIN_PROXY_PRIVATE_ORIGINS=http://localhost:18025,http://localhost:18080,http://localhost:18010,http://localhost:18456,http://localhost:18099,http://localhost:11434
+PLUGIN_PROXY_PRIVATE_ORIGINS=http://localhost:18025,http://localhost:18080,http://localhost:18010,http://localhost:18456,http://localhost:18021,http://localhost:18099,http://localhost:11434
 ```
 
 The value is compared by origin, so use exactly the URLs you enter in the
@@ -158,7 +167,8 @@ plugin settings: `http://127.0.0.1:18080` is not the same origin as
 `http://localhost:18080`. If the webmail runs in a container on the
 `bulwark-plugins-test_default` network, use the container names instead
 (`http://bpt-nextcloud`, `http://bpt-paperless:8000`, `http://bpt-vikunja:3456`,
-`http://bpt-mocks:18099`, `http://bpt-ollama:11434`, `http://bpt-stalwart:8080`)
+`http://bpt-donetick:2021`, `http://bpt-mocks:18099`, `http://bpt-ollama:11434`,
+`http://bpt-stalwart:8080`)
 both in the plugin settings and in `PLUGIN_PROXY_PRIVATE_ORIGINS`.
 
 ## Resetting
@@ -174,5 +184,5 @@ both in the plugin settings and in `PLUGIN_PROXY_PRIVATE_ORIGINS`.
 ## Ports
 
 18025 (Stalwart HTTP), 11587 (Stalwart SMTP submission), 18080 (Nextcloud),
-18010 (Paperless), 18456 (Vikunja), 18099 (mocks), 11434 (Ollama). They stay
-clear of 3000, 3100, 5432 and 8080.
+18010 (Paperless), 18456 (Vikunja), 18021 (Donetick), 18099 (mocks), 11434
+(Ollama). They stay clear of 3000, 3100, 5432 and 8080.
