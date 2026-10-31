@@ -1,7 +1,7 @@
 {
   "id": "ai-assistant",
   "name": "AI Writing Assistant",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "author": "Bulwark Mail Community",
   "description": "A chat next to the message you write or read: rewrite, translate, proofread, summarise and draft replies with an OpenAI-compatible service (OpenAI, Ollama, ...) or Anthropic. Works on the text you highlight. Nothing is sent until you ask.",
   "type": "ui-extension",
