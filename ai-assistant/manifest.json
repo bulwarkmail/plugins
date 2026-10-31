@@ -33,6 +33,10 @@
   "minAppVersion": "1.17.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-summary.webp",
+    "media/screenshots/2-summary-dark.webp"
+  ],
   "configSchema": {
     "defaultProvider": {
       "type": "select",

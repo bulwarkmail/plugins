@@ -17,6 +17,11 @@
   "minAppVersion": "1.19.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-list.webp",
+    "media/screenshots/2-list-dark.webp",
+    "media/screenshots/3-assign.webp"
+  ],
   "locales": {
     "en": {
       "action.assign_me": "Assign to me",

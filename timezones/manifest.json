@@ -20,6 +20,12 @@
   "minAppVersion": "1.15.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-world-clock.webp",
+    "media/screenshots/2-world-clock-dark.webp",
+    "media/screenshots/3-event-form.webp",
+    "media/screenshots/4-settings.webp"
+  ],
   "settingsSchema": {
     "favouriteZones": {
       "type": "string",

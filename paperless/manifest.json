@@ -23,6 +23,11 @@
   "minAppVersion": "1.16.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-send.webp",
+    "media/screenshots/2-send-dark.webp",
+    "media/screenshots/3-browse.webp"
+  ],
   "configSchema": {
     "serverUrl": {
       "type": "string",

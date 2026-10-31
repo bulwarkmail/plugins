@@ -13,6 +13,10 @@
   "minAppVersion": "1.15.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-details.webp",
+    "media/screenshots/2-details-dark.webp"
+  ],
   "settingsSchema": {
     "placeUnderSecurity": {
       "type": "boolean",

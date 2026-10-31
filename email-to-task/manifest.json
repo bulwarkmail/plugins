@@ -22,6 +22,10 @@
   "minAppVersion": "1.15.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-dialog.webp",
+    "media/screenshots/2-dialog-dark.webp"
+  ],
   "configSchema": {
     "vikunjaUrl": {
       "type": "string",

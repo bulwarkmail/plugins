@@ -24,6 +24,11 @@
   "minAppVersion": "1.15.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-files.webp",
+    "media/screenshots/2-files-dark.webp",
+    "media/screenshots/3-attach.webp"
+  ],
   "credentials": {
     "nextcloud": {
       "label": "Nextcloud",

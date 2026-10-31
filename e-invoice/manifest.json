@@ -17,6 +17,11 @@
   "entrypoint": "index.js",
   "minAppVersion": "1.20.0",
   "icon": "media/icon.svg",
+  "screenshots": [
+    "media/screenshots/1-banner.webp",
+    "media/screenshots/2-banner-dark.webp",
+    "media/screenshots/3-invoice.webp"
+  ],
   "configSchema": {
     "accountingAddress": {
       "type": "string",

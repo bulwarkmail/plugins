@@ -13,6 +13,9 @@
   "minAppVersion": "1.7.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-settings.webp"
+  ],
   "settingsSchema": {
     "tagNewsletter": {
       "type": "boolean",

@@ -16,6 +16,10 @@
   "minAppVersion": "1.15.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-tracking.webp",
+    "media/screenshots/2-tracking-dark.webp"
+  ],
   "configSchema": {
     "track17Url": {
       "type": "string",

@@ -14,6 +14,10 @@
   "minAppVersion": "1.7.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
+  "screenshots": [
+    "media/screenshots/1-confirm.webp",
+    "media/screenshots/2-confirm-dark.webp"
+  ],
   "configSchema": {
     "forceThreshold": {
       "type": "number",
