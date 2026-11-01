@@ -13,6 +13,9 @@ const SNIFFED_BY_EXTENSION = {
   'text/x-shellscript': ['sh', 'bash', 'zsh', 'ksh', 'csh', 'command'],
   'application/x-ms-shortcut': ['lnk'],
   'application/vnd.ms-cab-compressed': ['cab'],
+  // Java and Android apps: ZIP files the host tells apart by their entries.
+  'application/java-archive': ['jar'],
+  'application/vnd.android.package-archive': ['apk'],
   // Windows Installer packages are OLE compound files, like old Office files.
   'application/x-ole-storage': ['msi', 'msp', 'mst'],
   'application/x-rar-compressed': ['rar'],
@@ -32,6 +35,7 @@ const ZIP_CONTAINERS = new Set([
 const PROGRAM_TYPES = new Set([
   'application/x-msdownload', 'application/x-executable', 'application/x-mach-binary', 'text/x-shellscript',
   'application/x-ms-shortcut', 'application/vnd.ms-cab-compressed', 'application/x-ole-storage',
+  'application/java-archive', 'application/vnd.android.package-archive',
 ]);
 
 /** Old Office and Outlook files: OLE compound files like an installer, but documents. */

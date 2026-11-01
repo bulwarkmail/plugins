@@ -190,7 +190,7 @@ describe('attachment types, review findings', () => {
 
   it('refuses shortcuts, installers and cabinet files named like a document when programs are blocked', () => {
     const blocked = parseTypeList('exe');
-    for (const sniffedType of ['application/x-ms-shortcut', 'application/x-ole-storage', 'application/vnd.ms-cab-compressed', 'application/x-executable', 'application/x-mach-binary', 'text/x-shellscript']) {
+    for (const sniffedType of ['application/x-ms-shortcut', 'application/x-ole-storage', 'application/vnd.ms-cab-compressed', 'application/x-executable', 'application/x-mach-binary', 'text/x-shellscript', 'application/java-archive', 'application/vnd.android.package-archive']) {
       expect(typeProblem({ name: 'invoice.pdf', sniffedType }, blocked, none), sniffedType).toEqual({ reason: 'blocked', type: sniffedType });
     }
     expect(typeProblem({ name: 'invoice.pdf', sniffedType: 'application/x-ms-shortcut' }, parseTypeList('lnk'), none)).toEqual({ reason: 'blocked', type: 'application/x-ms-shortcut' });

@@ -9,5 +9,5 @@
 - Fails closed: a blocking rule that couldn't be checked (patterns out of time, a pattern line that can't run, an attachment Bulwark couldn't read, settings that never loaded) stops the send; a warning rule that couldn't finish says so in the warning.
 - The admin's patterns run in a Web Worker that is stopped after 250 ms per message, and patterns with nested or overlapping repeats are refused.
 - Finds card numbers grouped with no-break or thin spaces and followed by the expiry date or security code, and leaves out phone numbers and numbers no card network uses.
-- Catches shortcuts, cabinet files and installers renamed to a document name.
+- Catches shortcuts, cabinet files, installers and Java and Android apps renamed to a document name.
 - In all 30 languages Bulwark ships.

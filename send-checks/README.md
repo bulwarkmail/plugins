@@ -145,8 +145,8 @@ comments.
 
 Bulwark reads the first bytes of each file it attaches and tells the
 plugin what they look like (a Windows or Linux program, a script, ZIP,
-RAR, 7z, gzip, PDF, Windows shortcuts, cabinet files, installers, common
-images). A program extension on the blocked list (exe, msi, lnk, sh...)
+RAR, 7z, gzip, PDF, Windows shortcuts, cabinet files, installers, Java
+and Android apps, common images). A program extension on the blocked list (exe, msi, lnk, sh...)
 blocks every kind of program, also one renamed to invoice.pdf. A Word or
 Excel file is a ZIP inside; that doesn't count as a `.zip`, and an old
 .doc, .xls or .msg file isn't taken for an installer although both are
