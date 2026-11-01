@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { findIbans, isValidIban, maskIban } from '../src/lib/iban.js';
 import { findCards, luhnOk, cardLastFour } from '../src/lib/cards.js';
-import { findKeywords, findPatterns, maskMatch, parseKeywords, parsePatterns, patternProblem } from '../src/lib/text-rules.js';
-import { attachmentProblems, extensionsOf, parseTypeList, typeProblem } from '../src/lib/attachments.js';
+import { findKeywords, maskMatch, parseKeywords, parsePatterns, patternProblem } from '../src/lib/text-rules.js';
+import { attachmentProblems, extensionsOf, isTextAttachment, parseTypeList, typeProblem } from '../src/lib/attachments.js';
 
 describe('IBAN', () => {
   it('accepts valid IBANs of several countries, with and without spaces', () => {
@@ -99,36 +99,128 @@ describe('patterns', () => {
     expect(skipped).toEqual([]);
     expect(rules.map((r) => r.name)).toEqual(['Customer number', 'Internal', '\\bSECRET-\\d+']);
     // Without flags a pattern ignores case; a /literal/ keeps its own flags.
-    expect(rules[0].re.flags).toContain('i');
-    expect(rules[1].re.flags).not.toContain('i');
+    expect(rules[0].flags).toContain('i');
+    expect(rules[1].flags).not.toContain('i');
   });
 
   it('refuses catastrophic and broken patterns', () => {
     expect(patternProblem('(a+)+$')).toBe('nested quantifier');
     expect(patternProblem('(\\w*)*x')).toBe('nested quantifier');
-    expect(patternProblem('(x+x+)+y')).toBe('nested quantifier');
+    expect(patternProblem('(x+x+)+y')).toBe('overlapping repeats');
     expect(patternProblem('(a|aa)+$')).toBe('repeated alternation');
     expect(patternProblem('(a)\\1')).toBe('back reference');
     expect(patternProblem('x'.repeat(201))).toBe('too long');
     expect(patternProblem('KD-\\d{6}')).toBeNull();
     const { rules, skipped } = parsePatterns('Bad: (a+)+$\nBroken: [abc\nGood: KD-\\d{6}');
     expect(rules.map((r) => r.name)).toEqual(['Good']);
-    expect(skipped.map((s) => s.reason)).toEqual(['nested quantifier', expect.any(String)]);
+    expect(skipped.map((s) => [s.name, s.reason])).toEqual([['Bad', 'nested quantifier'], ['Broken', expect.any(String)]]);
   });
 
-  it('finds the first match of each rule and stops at the deadline', () => {
-    const { rules } = parsePatterns('Customer number: KD-\\d{6}');
-    expect(findPatterns('see kd-123456 and KD-654321', rules).found).toEqual([{ name: 'Customer number', match: 'kd-123456' }]);
-    // A match across the boundary of two scan pieces is still found.
-    const long = `${'x'.repeat(8 * 1024 - 4)}KD-123456`;
-    expect(findPatterns(long, rules).found).toHaveLength(1);
-    expect(findPatterns('KD-123456', rules, Date.now() - 1)).toEqual({ found: [], timedOut: true });
+  // Each of these took 11 to 41 seconds on 25 to 120 characters, and the
+  // old check let them through.
+  it('refuses a repeat inside a repeated group at any depth, and overlapping repeats side by side', () => {
+    expect(patternProblem('((a+))+$')).toBe('nested quantifier');
+    expect(patternProblem('((\\w+)\\s?)+$')).toBe('nested quantifier');
+    expect(patternProblem('(?:x(?:y(?:z+)))*')).toBe('nested quantifier');
+    expect(patternProblem('\\s*\\s*\\s*x')).toBe('overlapping repeats');
+    expect(patternProblem('\\w+\\d+$')).toBe('overlapping repeats');
+    expect(patternProblem('.*.*=.*')).toBe('overlapping repeats');
+    expect(patternProblem('[a-z]*a?[a-z]+')).toBe('overlapping repeats');
+  });
+
+  it('keeps the usual shapes of customer numbers and codes', () => {
+    for (const ok of ['KD-\\d{6}', '\\d+\\.\\d+', '\\w+@\\w+\\.de', '\\bPRJ-[A-Z]{3}-\\d{4}\\b', '\\s+\\w+', 'ab(c|d)ef', '(?:KD)?-\\d{6}', '[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}']) {
+      expect(patternProblem(ok), ok).toBeNull();
+    }
   });
 
   it('masks a match', () => {
     expect(maskMatch('KD-123456')).toBe('KD…56');
     expect(maskMatch('abcdef')).toBe('a…f');
     expect(maskMatch('abc')).toBe('•••');
+  });
+});
+
+describe('lists', () => {
+  it('take "# " and "//" lines as comments, so a keyword can start with #', () => {
+    const keywords = parseKeywords('#confidential\n# a comment\n// another\n#\nfalcon');
+    expect(keywords.map((k) => k.keyword)).toEqual(['#confidential', 'falcon']);
+    expect(findKeywords('Tagged #confidential today', keywords)).toEqual(['#confidential']);
+  });
+});
+
+describe('card numbers, review findings', () => {
+  const nbsp = String.fromCharCode(0xa0);
+  const thin = String.fromCharCode(0x2009);
+  const narrow = String.fromCharCode(0x202f);
+
+  it('finds a card number followed by the expiry date or the security code', () => {
+    expect(findCards('4242 4242 4242 4242 12/30').map((c) => c.digits)).toEqual(['4242424242424242']);
+    expect(findCards('4242 4242 4242 4242 123').map((c) => c.digits)).toEqual(['4242424242424242']);
+    expect(findCards('Amex 3782 822463 10005 1234').map((c) => c.digits)).toEqual(['378282246310005']);
+  });
+
+  it('accepts no-break, thin and narrow spaces and Unicode dashes between the groups', () => {
+    for (const sep of [nbsp, thin, narrow, String.fromCharCode(0x2011)]) {
+      expect(findCards(`card ${['4242', '4242', '4242', '4242'].join(sep)}`).map((c) => c.digits), JSON.stringify(sep)).toEqual(['4242424242424242']);
+    }
+  });
+
+  it('skips phone numbers after + and numbers that only look like a card network', () => {
+    // Luhn-valid 16 digits after a country code.
+    expect(findCards('Call +4915112345678907')).toEqual([]);
+    expect(findCards('Call + 4915112345678907')).toEqual([]);
+    // Order numbers: a start no network uses, or a length the network doesn't.
+    expect(findCards('Order 6100 0000 0000 0006')).toEqual([]);
+    expect(findCards('Ref 3400 0000 0000 0000')).toEqual([]);
+  });
+});
+
+describe('IBAN, review findings', () => {
+  it('accepts no-break spaces and dashes between the groups', () => {
+    const nbsp = String.fromCharCode(0xa0);
+    expect(findIbans(`IBAN DE89${nbsp}3704${nbsp}0044${nbsp}0532${nbsp}0130${nbsp}00`).map((m) => m.value)).toEqual(['DE89370400440532013000']);
+    expect(findIbans('IBAN DE89-3704-0044-0532-0130-00').map((m) => m.value)).toEqual(['DE89370400440532013000']);
+    expect(isValidIban(`DE89${nbsp}3704 0044 0532 0130 00`)).toBe(true);
+  });
+});
+
+describe('attachment types, review findings', () => {
+  const none = parseTypeList('');
+
+  it('refuses shortcuts, installers and cabinet files named like a document when programs are blocked', () => {
+    const blocked = parseTypeList('exe');
+    for (const sniffedType of ['application/x-ms-shortcut', 'application/x-ole-storage', 'application/vnd.ms-cab-compressed', 'application/x-executable', 'application/x-mach-binary', 'text/x-shellscript']) {
+      expect(typeProblem({ name: 'invoice.pdf', sniffedType }, blocked, none), sniffedType).toEqual({ reason: 'blocked', type: sniffedType });
+    }
+    expect(typeProblem({ name: 'invoice.pdf', sniffedType: 'application/x-ms-shortcut' }, parseTypeList('lnk'), none)).toEqual({ reason: 'blocked', type: 'application/x-ms-shortcut' });
+    expect(typeProblem({ name: 'invoice.pdf', sniffedType: 'application/x-ole-storage' }, parseTypeList('msi'), none)).toEqual({ reason: 'blocked', type: 'application/x-ole-storage' });
+  });
+
+  it('lets old Office files through: they are OLE files like an installer', () => {
+    for (const name of ['report.doc', 'sheet.xls', 'slides.ppt', 'mail.msg']) {
+      expect(typeProblem({ name, sniffedType: 'application/x-ole-storage' }, parseTypeList('exe, msi'), none), name).toBeNull();
+      expect(typeProblem({ name, sniffedType: 'application/x-ole-storage' }, none, parseTypeList('doc, xls, ppt, msg')), name).toBeNull();
+    }
+  });
+
+  it('refuses a shortcut or installer under an allowed name', () => {
+    const allowed = parseTypeList('pdf');
+    expect(typeProblem({ name: 'invoice.pdf', sniffedType: 'application/x-ms-shortcut' }, none, allowed)).toEqual({ reason: 'not-allowed', type: 'application/x-ms-shortcut' });
+    expect(typeProblem({ name: 'invoice.pdf', sniffedType: 'application/x-ole-storage' }, none, allowed)).toEqual({ reason: 'not-allowed', type: 'application/x-ole-storage' });
+  });
+
+  it('reads the text of the files the host sends text of', () => {
+    for (const file of [
+      { name: 'a.ini', type: 'application/octet-stream' },
+      { name: 'b.conf', type: '' },
+      { name: 'c.bin', type: 'application/json; charset=utf-8' },
+      { name: 'd.bin', type: 'application/ld+json' },
+      { name: 'e.yml', type: '' },
+    ]) {
+      expect(isTextAttachment(file), file.name).toBe(true);
+    }
+    expect(isTextAttachment({ name: 'f.pdf', type: 'application/pdf' })).toBe(false);
   });
 });
 

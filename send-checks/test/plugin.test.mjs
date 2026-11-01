@@ -10,6 +10,7 @@ import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { compileRules, evaluate, goesOutside } from '../src/lib/scan.js';
 import { normaliseConfig, DEFAULTS } from '../src/lib/config.js';
 import { dialogFor, FALLBACK } from '../src/lib/messages.js';
+import { nodeWorker } from './node-worker.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -87,19 +88,19 @@ describe('outside the organisation', () => {
     expect(goesOutside(mail({ externalRecipients: undefined, to: [] }))).toBe(false);
   });
 
-  it('skips an outside-only rule for internal recipients and runs the others', () => {
+  it('skips an outside-only rule for internal recipients and runs the others', async () => {
     const rules = compileRules(normaliseConfig({ keywords: 'confidential', keywordExternalOnly: false }));
     const internal = mail({ externalRecipients: [], authoredText: `Pay ${IBAN}, card ${CARD}. Confidential.` });
-    expect(evaluate(internal, rules).found.map((f) => f.rule)).toEqual(['keyword']);
+    expect((await evaluate(internal, rules)).found.map((f) => f.rule)).toEqual(['keyword']);
     const external = mail({ authoredText: `Pay ${IBAN}, card ${CARD}. Confidential.` });
-    expect(evaluate(external, rules).found.map((f) => f.rule)).toEqual(['iban', 'card', 'keyword']);
+    expect((await evaluate(external, rules)).found.map((f) => f.rule)).toEqual(['iban', 'card', 'keyword']);
   });
 });
 
 describe('what is scanned', () => {
   const rules = compileRules(normaliseConfig({ keywords: 'falcon' }));
 
-  it('the subject, the authored text, attachment names and text excerpts, not the quoted original', () => {
+  it('the subject, the authored text, attachment names and text excerpts, not the quoted original', async () => {
     const quoted = mail({
       subject: 'Re: falcon',
       authoredText: 'Thanks!',
@@ -110,7 +111,7 @@ describe('what is scanned', () => {
         { name: 'photo.jpg', type: 'image/jpeg', size: 10, textExcerpt: 'falcon' },
       ],
     });
-    const found = evaluate(quoted, rules).found;
+    const found = (await evaluate(quoted, rules)).found;
     expect(found.map((f) => [f.rule, f.where])).toEqual([
       ['keyword', null],
       ['iban', null],
@@ -118,8 +119,8 @@ describe('what is scanned', () => {
     ]);
   });
 
-  it('falls back to the text body on a host without authoredText', () => {
-    expect(evaluate(mail({ textBody: `Pay ${IBAN}` }), rules).found.map((f) => f.rule)).toEqual(['iban']);
+  it('falls back to the text body on a host without authoredText', async () => {
+    expect((await evaluate(mail({ textBody: `Pay ${IBAN}` }), rules)).found.map((f) => f.rule)).toEqual(['iban']);
   });
 });
 
@@ -230,5 +231,79 @@ describe('the dialog', () => {
     const dialog = dialogFor(found, tr);
     expect(dialog.message.split('\n').filter((l) => l.startsWith('• '))).toHaveLength(10);
     expect(dialog.message).toContain('and 2 more');
+  });
+});
+
+// Review findings 4, 8 and 15: a check that couldn't finish stops a
+// blocking rule's send (fail closed) and is named in a warning.
+describe('when a check can not finish', () => {
+  function withWorker(fn) {
+    const before = globalThis.Worker;
+    globalThis.Worker = function FakeWorker() { return nodeWorker(); };
+    return Promise.resolve(fn()).finally(() => { globalThis.Worker = before; });
+  }
+
+  it('runs the patterns in a Worker and finds a match', async () => {
+    await withWorker(async () => {
+      const { api, plugin } = await started({ patterns: String.raw`Customer number: KD-\d{6}`, patternAction: 'block' });
+      expect(await plugin.hooks.onBeforeEmailSend(mail({ authoredText: 'Ref KD-123456' }))).toBe(false);
+      const [{ args: [dialog] }] = api.calls('ui.alert');
+      expect(dialog.title).toBe("This message can't be sent");
+      expect(dialog.message).toContain('• Customer number: KD…56');
+    });
+  });
+
+  it('stops the send when a blocking pattern rule could not run (no Worker)', async () => {
+    const { api, plugin } = await started({ patterns: String.raw`Customer number: KD-\d{6}`, patternAction: 'block' });
+    expect(await plugin.hooks.onBeforeEmailSend(mail({ authoredText: 'Nothing here' }))).toBe(false);
+    const [{ args: [dialog] }] = api.calls('ui.alert');
+    expect(dialog.title).toBe("This message couldn't be checked");
+    expect(dialog.message).toContain("• Your organisation's patterns couldn't be checked in time");
+  });
+
+  it('asks when a warning pattern rule could not run', async () => {
+    const { api, plugin } = await started({ patterns: String.raw`KD-\d{6}`, patternAction: 'warn' }, { confirm: true });
+    expect(await plugin.hooks.onBeforeEmailSend(mail({ authoredText: 'Nothing here' }))).toBeUndefined();
+    const [{ args: [dialog] }] = api.calls('ui.confirm');
+    expect(dialog.title).toBe('Check before sending');
+    expect(dialog.message).toContain("Some of your organisation's checks couldn't finish:");
+  });
+
+  it('names a pattern line that can not run, and a blocking one stops the send', async () => {
+    await withWorker(async () => {
+      const { api, plugin } = await started({ patterns: String.raw`Slow: (a+)+$` + '\n' + String.raw`Good: KD-\d{6}`, patternAction: 'block' });
+      expect(await plugin.hooks.onBeforeEmailSend(mail({ authoredText: 'Nothing here' }))).toBe(false);
+      expect(api.calls('ui.alert')[0].args[0].message).toContain('• The pattern “Slow” is set up wrongly. Ask your administrator to fix it.');
+    });
+  });
+
+  it('stops the send when a file the host could not read may break a blocking type rule', async () => {
+    const { api, plugin } = await started({ blockedTypes: 'exe' });
+    const email = mail({ externalRecipients: [], attachments: [{ name: 'invoice.pdf', type: 'application/pdf', size: 10, unreadable: true }] });
+    expect(await plugin.hooks.onBeforeEmailSend(email)).toBe(false);
+    expect(api.calls('ui.alert')[0].args[0].message).toContain("• invoice.pdf couldn't be read");
+    // Without type rules nothing about the file is unknown that matters.
+    const relaxed = await started({});
+    expect(await relaxed.plugin.hooks.onBeforeEmailSend(email)).toBeUndefined();
+  });
+
+  it('refuses at upload a file the host could not read when a blocking type rule is set', async () => {
+    const { api, plugin } = await started({ blockedTypes: 'exe' });
+    expect(await plugin.hooks.onBeforeAttachmentUpload({ name: 'x.pdf', size: 10, unreadable: true })).toBe(false);
+    expect(api.calls('ui.alert')[0].args[0].message).toBe("x.pdf couldn't be checked, so it can't be attached. Try again in a moment.");
+  });
+
+  it('sends nothing when the settings were never read, instead of using the defaults', async () => {
+    const api = fakeApi({
+      id: 'send-checks',
+      handlers: { 'config.get': async () => { throw new Error('offline'); }, 'ui.alert': async () => undefined },
+    });
+    const plugin = load(api);
+    await plugin.activate(api);
+    expect(await plugin.hooks.onBeforeEmailSend(mail({ authoredText: 'Hello' }))).toBe(false);
+    expect(api.calls('ui.alert')[0].args[0]).toEqual({
+      title: "This message couldn't be checked",
+      message: "Your organisation's send checks couldn't load their settings, so the message wasn't sent. Try again in a moment.",
+    });
   });
 });

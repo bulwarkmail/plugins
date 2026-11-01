@@ -1,10 +1,13 @@
 /**
  * IBANs in free text: a country code, two check digits and the country's
- * fixed number of characters, with single spaces allowed between them (the
- * usual groups of four), checked with ISO 7064 mod 97-10. Only numbers that
+ * fixed number of characters, with single spaces (also no-break and thin
+ * spaces) or dashes allowed between them (the usual groups of four),
+ * checked with ISO 7064 mod 97-10. Only numbers that
  * pass the check count, so an order number that happens to start with two
  * letters is left alone.
  */
+
+import { GROUP_SEPARATOR } from './separators.js';
 
 // Lengths from the SWIFT IBAN registry.
 export const IBAN_LENGTHS = {
@@ -36,7 +39,7 @@ export function ibanChecksumOk(iban) {
 
 /** True for a whole IBAN, spaces allowed. */
 export function isValidIban(value) {
-  const compact = String(value ?? '').replace(/\s+/g, '').toUpperCase();
+  const compact = String(value ?? '').replace(/\s+/g, '').split('').filter((c) => !GROUP_SEPARATOR.test(c)).join('').toUpperCase();
   const length = IBAN_LENGTHS[compact.slice(0, 2)];
   return !!length && compact.length === length && ibanChecksumOk(compact);
 }
@@ -63,7 +66,7 @@ export function findIbans(text) {
         compact += ch.toUpperCase();
         i += 1;
         end = i;
-      } else if (ch === ' ' && i + 1 < text.length && ALNUM.test(text[i + 1])) {
+      } else if (GROUP_SEPARATOR.test(ch) && i + 1 < text.length && ALNUM.test(text[i + 1])) {
         i += 1;
       } else {
         break;

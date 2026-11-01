@@ -11,6 +11,10 @@ const SNIFFED_BY_EXTENSION = {
   'application/x-executable': ['elf', 'so', 'bin', 'run', 'out'],
   'application/x-mach-binary': ['app', 'dylib', 'macho'],
   'text/x-shellscript': ['sh', 'bash', 'zsh', 'ksh', 'csh', 'command'],
+  'application/x-ms-shortcut': ['lnk'],
+  'application/vnd.ms-cab-compressed': ['cab'],
+  // Windows Installer packages are OLE compound files, like old Office files.
+  'application/x-ole-storage': ['msi', 'msp', 'mst'],
   'application/x-rar-compressed': ['rar'],
   'application/x-7z-compressed': ['7z'],
   'application/gzip': ['gz', 'tgz'],
@@ -24,10 +28,19 @@ const ZIP_CONTAINERS = new Set([
   'epub', 'xpi', 'vsix', 'kmz', 'ipa', 'nupkg', 'whl', '3mf', 'pages', 'numbers', 'key',
 ]);
 
-/** Sniffed types that run code when opened. */
+/** Sniffed types that run code when opened (or install it). */
 const PROGRAM_TYPES = new Set([
   'application/x-msdownload', 'application/x-executable', 'application/x-mach-binary', 'text/x-shellscript',
+  'application/x-ms-shortcut', 'application/vnd.ms-cab-compressed', 'application/x-ole-storage',
 ]);
+
+/** Old Office and Outlook files: OLE compound files like an installer, but documents. */
+const OLE_DOCUMENTS = new Set(['doc', 'dot', 'xls', 'xlt', 'ppt', 'pot', 'pps', 'msg', 'pub', 'vsd', 'mpp']);
+
+/** Extensions of programs: blocking any of them blocks every program, whatever it is named. */
+const PROGRAM_EXTENSIONS = new Set(
+  Object.entries(SNIFFED_BY_EXTENSION).filter(([type]) => PROGRAM_TYPES.has(type)).flatMap(([, exts]) => exts),
+);
 
 /** "exe, .bat; application/x-msdownload image/*" → { extensions, types }. */
 export function parseTypeList(value) {
@@ -79,16 +92,21 @@ export function typeProblem(file, blocked, allowed) {
   const exts = extensionsOf(file.name);
   const last = exts[exts.length - 1] ?? '';
   const sniffed = typeof file.sniffedType === 'string' ? file.sniffedType.toLowerCase() : '';
-  // A ZIP-based document (docx, odt...) is sniffed as zip; that says nothing
-  // about it being a .zip.
-  const sniffedCounts = sniffed && !(sniffed === 'application/zip' && ZIP_CONTAINERS.has(last) && last !== 'zip');
+  // A ZIP-based document (docx, odt...) is sniffed as zip, and an old
+  // Office file as an OLE compound file like an installer; that says
+  // nothing about it being a .zip or a program.
+  const sniffedCounts = sniffed
+    && !(sniffed === 'application/zip' && ZIP_CONTAINERS.has(last) && last !== 'zip')
+    && !(sniffed === 'application/x-ole-storage' && OLE_DOCUMENTS.has(last));
   const declared = typeof file.type === 'string' ? file.type.toLowerCase() : '';
+  const blocksPrograms = [...blocked.extensions].some((e) => PROGRAM_EXTENSIONS.has(e));
 
   if (!isEmptyList(blocked)) {
     if (last && blocked.extensions.has(last)) return { reason: 'blocked', type: last };
     // A double extension: "invoice.pdf.exe" ends in exe, caught above;
     // "report.exe.txt" doesn't run, so only the last one counts.
-    if (sniffedCounts && (typeMatches(sniffed, blocked.types) || sniffedTypesFor(blocked.extensions).has(sniffed))) {
+    if (sniffedCounts && (typeMatches(sniffed, blocked.types) || sniffedTypesFor(blocked.extensions).has(sniffed)
+      || (blocksPrograms && PROGRAM_TYPES.has(sniffed)))) {
       return { reason: 'blocked', type: sniffed };
     }
     if (declared && typeMatches(declared, blocked.types)) return { reason: 'blocked', type: declared };
@@ -132,11 +150,13 @@ export function attachmentProblems(attachments, { blocked, allowed, limit }) {
   return out;
 }
 
-/** Attachment types worth reading for the text rules, by MIME type or extension. */
-const TEXT_EXTENSIONS = new Set(['txt', 'csv', 'tsv', 'json', 'xml', 'ics', 'vcf', 'md', 'log', 'html', 'htm', 'yaml', 'yml']);
+/** Attachment types worth reading for the text rules, by MIME type or extension (as the host reads them). */
+const TEXT_EXTENSIONS = new Set(['txt', 'csv', 'tsv', 'json', 'xml', 'ics', 'vcf', 'md', 'log', 'html', 'htm', 'yaml', 'yml', 'ini', 'conf']);
+const TEXT_TYPES = new Set(['application/json', 'application/xml', 'application/csv', 'application/x-yaml', 'application/yaml']);
 export function isTextAttachment(file) {
-  const type = String(file?.type ?? '').toLowerCase();
-  if (type.startsWith('text/') || /\/(json|xml|csv)$/.test(type)) return true;
+  // "application/json; charset=utf-8": the parameters don't change the type.
+  const type = String(file?.type ?? '').toLowerCase().split(';')[0].trim();
+  if (type.startsWith('text/') || TEXT_TYPES.has(type) || /\+(json|xml)$/.test(type)) return true;
   const exts = extensionsOf(file?.name);
   return TEXT_EXTENSIONS.has(exts[exts.length - 1] ?? '');
 }
