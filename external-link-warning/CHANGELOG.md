@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.0.0 (2026-11-01)
+
 ### Added
 - Admins can check links when they are clicked: with their own link check service (a small JSON contract, see the README), Google Safe Browsing, or both
 - The dialog says what the check found, warns strongly about unsafe links, and points out link text that names another domain than the link goes to
