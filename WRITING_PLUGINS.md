@@ -445,9 +445,13 @@ Timing and failures:
   plugin's open dialogs, since nothing waits for their answer any more.
 - From 1.20, while a plugin the admin forces on is loading, failed to start
   or was turned off after errors, and it checks sends (`onBeforeEmailSend`),
-  Bulwark doesn't send at all: it waits a few seconds, then tells the user a
-  required check isn't running. A `false` from the hook never counts as a
-  failure.
+  Bulwark doesn't send at all: it waits up to 8 seconds, then tells the user
+  a required check isn't running. A `false` from the hook never counts as a
+  failure. The message is built after that wait, so a check that was still
+  starting gets the whole of it.
+- From 1.20 a plugin frame may start a Web Worker from a blob URL
+  (`worker-src 'self' blob:`), for work it has to stop at a deadline. The
+  worker has the frame's own network limits.
 
 What `onBeforeEmailSend` gets (1.20 and later; older hosts leave the new
 fields out, so treat them as optional). It runs for the composer, quick
@@ -467,13 +471,16 @@ replies and `api.email.forward`:
     sniffedType,       // what the first bytes say: application/x-msdownload,
                        // application/zip, application/pdf, text/plain, ...
     textExcerpt,       // first 1 MB of a text file; email:blob-read only
+    unreadable,        // true: Bulwark couldn't read the file; treat as not checked
   }],
 }
 ```
 
-`onBeforeAttachmentUpload` gets `sniffedType` too, for a file from the
-user's device. `onBeforeExternalLink` gets `{ href, target, emailId, text }`,
-`text` being what the link says (1.20 and later). It fails open, so a check
+`onBeforeAttachmentUpload` gets `sniffedType` (or `unreadable`) too, for a
+file from the user's device. `onBeforeExternalLink` gets `{ href, target,
+emailId, text }`, `text` being what the link says (1.20 and later). `href`
+is the address as the browser parses it (`new URL(href).href`), and that
+exact string is what opens, so check that one. It fails open, so a check
 that must hold a link returns `false` and opens it itself with
 `api.ui.openExternalUrl`, which doesn't come back to the plugin's own
 handler.
