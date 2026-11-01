@@ -18,7 +18,7 @@ export function plannedChecks(config, features) {
 }
 
 /** `promise`, or a rejection once `ms` have passed (and `onTimeout` was called). */
-function withDeadline(promise, ms, onTimeout) {
+export function withDeadline(promise, ms, onTimeout) {
   let timer;
   return Promise.race([
     promise,
@@ -43,16 +43,25 @@ function withDeadline(promise, ms, onTimeout) {
  *   ready:    async () => ({ endpoint: boolean, google: boolean }),  // set up by the admin?
  * }
  */
-export async function runChecks({ href, host, config, features, services, budgetMs = LOOKUP_BUDGET_MS, log }) {
+export async function runChecks({ href, host, config, features, services, budgetMs = LOOKUP_BUDGET_MS, now = Date.now, log }) {
   const plan = plannedChecks(config, features);
   if (!plan.endpoint && !plan.google) return { verdict: 'off' };
+  // One budget for the whole click: finding out which checks are set up
+  // counts too, or a slow host would push the opening past the click's
+  // user activation and the browser would block it as a popup.
+  const deadline = now() + budgetMs;
+  const left = () => Math.max(0, deadline - now());
 
   let ready = { endpoint: false, google: false };
-  try { ready = await services.ready(); } catch (err) { log?.('Could not read which link checks are set up', err); }
+  try {
+    ready = await withDeadline(Promise.resolve().then(() => services.ready()), left());
+  } catch (err) {
+    log?.('Could not read which link checks are set up', err);
+  }
 
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const signal = controller?.signal;
-  const run = (name, start) => withDeadline(Promise.resolve().then(start), budgetMs, () => controller?.abort())
+  const run = (name, start) => withDeadline(Promise.resolve().then(start), left(), () => controller?.abort())
     .then((value) => ({ name, ok: true, value }), (error) => {
       log?.(`The ${name} link check failed`, error);
       return { name, ok: false, error };

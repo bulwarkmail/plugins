@@ -56,6 +56,21 @@ describe('runChecks', () => {
     expect(result.verdict).toBe('failed');
   });
 
+  it('counts finding out which checks are set up against the same budget', async () => {
+    const slow = (value, ms) => vi.fn(() => new Promise((resolve) => setTimeout(() => resolve(value), ms)));
+    const s = { ready: slow({ endpoint: true, google: true }, 60), endpoint: { check: slow({ verdict: 'safe' }, 60) }, google: { check: slow({ verdict: 'safe' }, 60) } };
+    // Each step alone fits in 90 ms, both together don't.
+    const started = Date.now();
+    const result = await run(s, cfg({ lookup: 'endpoint' }), {}, 90);
+    expect(result.verdict).toBe('failed');
+    expect(Date.now() - started).toBeLessThan(150);
+  });
+
+  it('gives up when finding out which checks are set up never ends', async () => {
+    const s = { ...services(), ready: vi.fn(() => new Promise(() => {})) };
+    expect((await run(s, cfg({ lookup: 'endpoint' }), {}, 50)).verdict).toBe('failed');
+  });
+
   it('counts a check the admin didn\'t set up as failed', async () => {
     expect((await run(services({ ready: { endpoint: false, google: true } }), cfg({ lookup: 'endpoint' }))).verdict).toBe('failed');
     expect((await run(services(), cfg({ lookup: 'endpoint', endpointUrl: '' }))).verdict).toBe('failed');

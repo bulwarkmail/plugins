@@ -24,7 +24,7 @@
 
 import { hostnameFromHref, isTrusted, normaliseHref, parseDomains } from './lib/domains.js';
 import { readConfig, DEFAULT_CONFIG } from './lib/config.js';
-import { runChecks } from './lib/lookup.js';
+import { LOOKUP_BUDGET_MS, runChecks, withDeadline } from './lib/lookup.js';
 import { createEndpoint } from './lib/endpoint.js';
 import { createSafeBrowsing } from './lib/safebrowsing.js';
 import { decide, dialogFor } from './lib/decide.js';
@@ -83,17 +83,25 @@ async function currentConfig() {
   return config;
 }
 
+let readyPromise = null;
+
 /** Which checks the admin set up: the endpoint (with or without a token) and the key. */
 async function readiness() {
   if (ready && Date.now() - readyAt < READY_TTL_MS) return ready;
-  const list = await pluginApi.proxy.accounts();
-  const configured = (id) => Array.isArray(list) && list.some((a) => a && a.credentialId === id && a.connected === true);
-  ready = {
-    endpointCredential: configured(CREDENTIALS.endpoint) ? CREDENTIALS.endpoint : configured(CREDENTIALS.endpointOpen) ? CREDENTIALS.endpointOpen : null,
-    google: configured(CREDENTIALS.google),
-  };
-  readyAt = Date.now();
-  return ready;
+  // One request at a time: activation starts it, the first click joins it.
+  if (!readyPromise) {
+    readyPromise = (async () => {
+      const list = await pluginApi.proxy.accounts();
+      const configured = (id) => Array.isArray(list) && list.some((a) => a && a.credentialId === id && a.connected === true);
+      ready = {
+        endpointCredential: configured(CREDENTIALS.endpoint) ? CREDENTIALS.endpoint : configured(CREDENTIALS.endpointOpen) ? CREDENTIALS.endpointOpen : null,
+        google: configured(CREDENTIALS.google),
+      };
+      readyAt = Date.now();
+      return ready;
+    })().finally(() => { readyPromise = null; });
+  }
+  return readyPromise;
 }
 
 function proxyRequest(credentialId, responseType) {
@@ -130,7 +138,18 @@ async function addLocalTrust(domain) {
 
 /** What a click on `ctx` leads to (see decide.js). */
 export async function decideFor(ctx, host) {
-  const cfg = await currentConfig();
+  // The settings count against the click's budget: the first click after
+  // activation may still wait for them, and the link must open while the
+  // click's user activation lasts.
+  const started = Date.now();
+  let cfg;
+  try {
+    cfg = await withDeadline(currentConfig(), LOOKUP_BUDGET_MS);
+  } catch (err) {
+    warn('The admin settings took too long', err);
+    // Not known yet: the check failed, and what is known of onFailure decides.
+    return decide({ host, text: ctx.text, trusted: false, check: { verdict: 'failed' }, config });
+  }
   const trusted = isTrusted(host, await trustedList(cfg));
   const check = trusted && cfg.skipTrusted
     ? { verdict: 'off' }
@@ -140,6 +159,7 @@ export async function decideFor(ctx, host) {
       config: cfg,
       features: pluginApi.host?.features,
       services: services(),
+      budgetMs: Math.max(0, LOOKUP_BUDGET_MS - (Date.now() - started)),
       log: warn,
     });
   return decide({ host, text: ctx.text, trusted, check, config: cfg });
@@ -189,8 +209,10 @@ export async function activate(api) {
   const stored = await api.storage.get('localTrusted');
   localTrusted = Array.isArray(stored) ? stored.slice() : [];
 
-  // Pre-warm so the first click doesn't wait for the settings.
+  // Pre-warm so the first click doesn't wait for the settings, nor for
+  // which checks the admin set up.
   loadConfig().catch(() => {});
+  readiness().catch(() => {});
 
   api.log.info('External Link Warning plugin activated');
 }

@@ -124,6 +124,53 @@ describe('without a lookup (the default)', () => {
     expect(api.calls('ui.openExternalUrl')[0].args[0]).toBe('http://evil.example/@good.example/login');
   });
 
+  it('reads which checks are set up when it starts, before the first click', async () => {
+    const { api } = await started({ config: { lookup: 'endpoint', endpointUrl: 'https://check.corp.example/v1' } });
+    await vi.waitFor(() => expect(api.calls('proxy.accounts')).toHaveLength(1));
+  });
+
+  it('keeps the first click within the budget when the settings are slow', async () => {
+    const api = fakeApi({
+      id: 'external-link-warning',
+      settings: { rememberLocalChoices: false },
+      translations: { en: manifest.locales.en },
+      hostFeatures: { noThirdPartyTraffic: false },
+      handlers: {
+        'config.get': () => new Promise(() => {}),
+        'proxy.accounts': async () => ALL_READY,
+        'ui.confirm': async () => false,
+      },
+    });
+    const plugin = load(api);
+    await plugin.activate(api);
+    const started = Date.now();
+    expect(await click(plugin, 'https://unknown.test/')).toBe(false);
+    expect(Date.now() - started).toBeLessThan(4500);
+    await vi.waitFor(() => expect(api.calls('ui.confirm')).toHaveLength(1));
+    expect(api.calls('ui.confirm')[0].args[0].message).toContain("Couldn't check this link.");
+  }, 15_000);
+
+  it('keeps the first click within the budget when the proxy is slow to say what is set up', async () => {
+    const api = fakeApi({
+      id: 'external-link-warning',
+      settings: { rememberLocalChoices: false },
+      translations: { en: manifest.locales.en },
+      hostFeatures: { noThirdPartyTraffic: false },
+      handlers: {
+        'config.get': async () => ({ lookup: 'endpoint', endpointUrl: 'https://check.corp.example/v1', onFailure: 'closed' }),
+        'proxy.accounts': () => new Promise(() => {}),
+        'ui.alert': async () => undefined,
+      },
+    });
+    const plugin = load(api);
+    await plugin.activate(api);
+    const started = Date.now();
+    expect(await click(plugin, 'https://unknown.test/')).toBe(false);
+    expect(Date.now() - started).toBeLessThan(4500);
+    await vi.waitFor(() => expect(api.calls('ui.alert')).toHaveLength(1));
+    expect(api.calls('ui.alert')[0].args[0].title).toBe("Link couldn't be checked");
+  }, 15_000);
+
   it('leaves mailto: and relative links alone', async () => {
     const { plugin } = await started();
     expect(await click(plugin, 'mailto:a@b.test')).toBeUndefined();
