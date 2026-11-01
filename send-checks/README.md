@@ -130,7 +130,8 @@ can't read them.
   turns the plugin off where they can, isn't checked. Force-enable the
   plugin for everyone in the admin dashboard. While a force-enabled check
   is loading or has stopped after errors, Bulwark 1.20 holds sends with
-  "A required check isn't running".
+  "Not sent. A check your organisation requires isn't running. Try again
+  in a moment."
 - The plugin's checks are a safety net against mistakes, not data loss
   prevention: someone who wants to get around them can write the number
   differently.

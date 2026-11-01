@@ -443,6 +443,40 @@ Timing and failures:
   seconds turn the plugin off. The user sees a notice and can turn it on
   again in Settings > Plugins. When a hook times out, the host closes the
   plugin's open dialogs, since nothing waits for their answer any more.
+- From 1.20, while a plugin the admin forces on is loading, failed to start
+  or was turned off after errors, and it checks sends (`onBeforeEmailSend`),
+  Bulwark doesn't send at all: it waits a few seconds, then tells the user a
+  required check isn't running. A `false` from the hook never counts as a
+  failure.
+
+What `onBeforeEmailSend` gets (1.20 and later; older hosts leave the new
+fields out, so treat them as optional). It runs for the composer, quick
+replies and `api.email.forward`:
+
+```js
+{
+  to, cc, bcc, subject, htmlBody, textBody, identityId, fromEmail, inReplyTo,
+  surface: 'composer' | 'quick-reply' | 'plugin-forward',
+  mode: 'compose' | 'reply' | 'replyAll' | 'forward',
+  authoredText,        // what the user wrote: no quoted original, no signature
+  externalRecipients,  // bare lowercase addresses outside the organisation
+                       // of the sending account (empty: all internal)
+  attachments: [{
+    name, type, size,
+    blobId, inline,    // inline: an image shown in the body
+    sniffedType,       // what the first bytes say: application/x-msdownload,
+                       // application/zip, application/pdf, text/plain, ...
+    textExcerpt,       // first 1 MB of a text file; email:blob-read only
+  }],
+}
+```
+
+`onBeforeAttachmentUpload` gets `sniffedType` too, for a file from the
+user's device. `onBeforeExternalLink` gets `{ href, target, emailId, text }`,
+`text` being what the link says (1.20 and later). It fails open, so a check
+that must hold a link returns `false` and opens it itself with
+`api.ui.openExternalUrl`, which doesn't come back to the plugin's own
+handler.
 - Some hooks run for every row of the message list or on every keystroke.
   Answer from memory and do slow work afterwards.
 
@@ -478,7 +512,7 @@ declared with `api.ui.setActions`, and each entry of `shortcuts` runs its
 | `onBeforeReply` | intercept | `email:read` | `ReplyContext` | when Reply is chosen, before the composer opens |
 | `onBeforeReplyAll` | intercept | `email:read` | `ReplyContext` | when Reply all is chosen, before the composer opens |
 | `onBeforeForward` | intercept | `email:read` | `ReplyContext` | when Forward is chosen, before the composer opens |
-| `onBeforeExternalLink` | intercept | `ui:observe` | `ExternalLinkContext` | when a link in a message is clicked; return false to stop it or { href } to change it |
+| `onBeforeExternalLink` | intercept | `ui:observe` | `ExternalLinkContext` | when a link is opened (mail, reader view, events, contacts, notifications, the unsubscribe link, links other plugins open); return false to stop it or { href } to change it |
 | `onAvatarResolve` | transform | `email:read` | `string \| null (avatar URL), { email, name }` | when a sender avatar is needed |
 
 #### Mail: writing
@@ -507,7 +541,7 @@ declared with `api.ui.setActions`, and each entry of `shortcuts` runs its
 | `onBeforeEmailSend` | intercept | `email:send` | `OutgoingEmail` | when Send is pressed; a handler that fails or times out stops the send |
 | `onTransformOutgoingEmail` | transform | `email:send` | `OutgoingEmail` | right before the message is submitted |
 | `onComposeSend` | takeover | `email:send` | `ComposeSendRequest` | at the start of sending; may send the message itself |
-| `onAfterEmailSend` | observer | `email:read` | `{ emailId, submissionId, to, cc, bcc, subject, scheduledFor }` | after the server accepted the message |
+| `onAfterEmailSend` | observer | `email:read` | `{ emailId, accountId, submissionId, to, cc, bcc, subject, scheduledFor, composerId }` | after the server accepted the message |
 
 #### Mail: organizing
 
@@ -524,8 +558,8 @@ declared with `api.ui.setActions`, and each entry of `shortcuts` runs its
 | `onEmailSpamToggle` | observer | `email:read` | `{ emailIds, spam }` | after messages were marked as spam or not spam |
 | `onBeforeEmailReadStateChange` | intercept | `email:write` | `{ emailIds, read }` | before messages are marked read or unread |
 | `onEmailReadStateChange` | observer | `email:read` | `{ emailIds, read }` | after messages were marked read or unread |
-| `onBeforeEmailStarToggle` | intercept | `email:write` | `{ emailIds, starred }` | before messages are starred or unstarred |
-| `onEmailStarToggle` | observer | `email:read` | `{ emailIds, starred }` | after messages were starred or unstarred |
+| `onBeforeEmailStarToggle` | intercept | `email:write` | `{ emailIds, starred, accountId }` | before messages are starred or unstarred; `accountId` names the messages' account when it is not the user's own (a team or shared mailbox) |
+| `onEmailStarToggle` | observer | `email:read` | `{ emailIds, starred, accountId }` | after messages were starred or unstarred; `accountId` as on onBeforeEmailStarToggle |
 | `onBeforeEmailKeywordChange` | intercept | `email:write` | `{ emailIds, added: string[], removed: string[] }` | before tags or other keywords are changed |
 | `onEmailKeywordChange` | observer | `email:read` | `{ emailIds, added: string[], removed: string[] }` | after tags or other keywords changed |
 | `onBeforeEmailCategorize` | intercept | `email:read` | `EmailCategorizeContext` | before messages are moved to another inbox tab |
@@ -1119,7 +1153,7 @@ merged views of several accounts.
 
 | Surface | Kind | Permission | Props or context | Where |
 |---|---|---|---|---|
-| `app-top-banner` | frame | `ui:app-top-banner` | `username` (`account:read`), `serverUrl` (`account:read`) | a banner across the top of every page |
+| `app-top-banner` | frame | `ui:app-top-banner` | `username` (`account:read`), `serverUrl` (`account:read`), `impersonated` (`account:read`) | a banner across the top of every page; `impersonated` is true when an admin opened the mailbox through an impersonation handoff |
 | `command-palette` | action | `ui:commands` |  | entries in the command palette (Ctrl+K) |
 
 <p>
@@ -1428,6 +1462,8 @@ api.host.features.externalSenderLabel       // true while the admin's "External"
                                              // from outside the organisation is on for this user
 api.host.features.externalRecipientWarning  // true while the confirm before sending outside
                                              // the organisation is on for this user
+api.host.features.noThirdPartyTraffic       // 1.20 and later: true while "No third-party traffic"
+                                             // is on (or not known yet)
 api.host.onFeaturesChange(fn)               // fn(features); returns an unsubscribe function
 ```
 
@@ -1443,6 +1479,14 @@ Bulwark does. For the retired `external-mail-warning` plugin Bulwark also
 skips the handlers itself: `onBeforeEmailSend` while
 `externalRecipientWarning` is true, `onNewEmailReceived` and the
 `email-banner` slot while `externalSenderLabel` is true.
+
+With `noThirdPartyTraffic` on, the credential proxy reaches only servers the
+admin entered on the plugin's admin page (credentials with `originKey`) and
+refuses servers fixed in the manifest. A plugin whose only network access is
+`http:proxy` with admin credentials, at least one of them with `originKey`,
+keeps running in the mode; every other plugin that declares network access
+doesn't start. Turn the fixed services off while the flag is on instead of
+treating their refusals as errors.
 
 `api.host` is new in Bulwark 1.19. Older versions don't have it, so read a
 flag as `api.host?.features?.externalRecipientWarning === true`.
@@ -1818,8 +1862,12 @@ await api.admin.getConfig(key) / getAllConfig()
 await api.admin.setConfig(key, value) / deleteConfig(key)
 ```
 
-`api.admin.*` only works for a signed-in admin; for anyone else `get*`
-resolve to nothing and `set*` reject.
+`api.config.get()` and `api.admin.getConfig` / `getAllConfig` return the
+same thing: every setting except `secret` fields, for any signed-in user.
+From 1.20 that holds when the user is also signed in to the admin console;
+before, `api.admin.get*` returned the secrets then. Secrets are only for the
+credential proxy (`api.proxy`), which adds them on the server. `set*` and
+`deleteConfig` need an admin session and reject otherwise.
 
 ### api.sieve
 
@@ -1952,6 +2000,7 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.ui.setDayLabels` | `ui:calendar-action` |
 | `api.ui.setPages` | `ui:app-page` |
 | `api.ui.openPage` | `ui:app-page` |
+| `api.ui.openEmail` | `email:read` |
 | `api.ui.setSectionTitle` | `ui:sidebar-widget` |
 | `api.ui.setPanel` | none |
 | `api.sieve.isSupported` | `filters:read` |
