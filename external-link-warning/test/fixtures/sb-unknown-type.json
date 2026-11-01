@@ -1,0 +1,13 @@
+{
+  "fullHashes": [
+    {
+      "fullHash": "UYZART+LKl8NQ7wiUVL0lTC+KkC/4rq2CqruemexCJA=",
+      "fullHashDetails": [
+        {
+          "threatType": "SOMETHING_NEW"
+        }
+      ]
+    }
+  ],
+  "cacheDuration": "300s"
+}

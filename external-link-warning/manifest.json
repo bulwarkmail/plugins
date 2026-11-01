@@ -3,13 +3,13 @@
   "name": "External Link Warning",
   "version": "1.3.1",
   "author": "Bulwark Mail Community",
-  "description": "Warns before opening external links to unknown domains. Admins can pre-populate a trusted domain list.",
+  "description": "Warns before external links open a domain that isn't on the trusted list. Admins can add trusted domains and check links with their own link check service or Google Safe Browsing first.",
   "type": "hook",
   "permissions": [
-    "admin:config"
+    "http:proxy"
   ],
   "entrypoint": "index.js",
-  "minAppVersion": "1.7.0",
+  "minAppVersion": "1.20.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
   "screenshots": [
@@ -19,10 +19,122 @@
   "configSchema": {
     "trustedDomains": {
       "type": "string",
+      "multiline": true,
       "label": "Trusted domains (organisation-wide)",
       "description": "Comma- or newline-separated list of trusted domains. Applies to every user. Subdomains match automatically (example.com also trusts docs.example.com).",
       "placeholder": "example.com, github.com, slack.com",
       "default": ""
+    },
+    "lookup": {
+      "type": "select",
+      "label": "Check links before they open",
+      "description": "Off: only the trusted-domain warning. Company service: your own link check gets the full URL. Google Safe Browsing: Google gets only short hash prefixes of the link, never the URL (non-commercial use only). Both: the two side by side.",
+      "default": "off",
+      "options": [
+        {
+          "label": "Off",
+          "value": "off"
+        },
+        {
+          "label": "Company link check service",
+          "value": "endpoint"
+        },
+        {
+          "label": "Google Safe Browsing",
+          "value": "safebrowsing"
+        },
+        {
+          "label": "Both",
+          "value": "both"
+        }
+      ]
+    },
+    "endpointUrl": {
+      "type": "string",
+      "label": "Link check service URL",
+      "description": "Bulwark posts {\"url\", \"host\"} here and expects {\"verdict\": \"safe\" | \"unsafe\" | \"unknown\"}. https only; a plain-http address works only when the server admin lists its origin in PLUGIN_PROXY_PRIVATE_ORIGINS. See the plugin README for the full contract.",
+      "placeholder": "https://linkcheck.example.com/check",
+      "default": ""
+    },
+    "endpointToken": {
+      "type": "secret",
+      "label": "Link check service token",
+      "description": "Optional. Sent as \"Authorization: Bearer <token>\". Leave empty if the service needs none.",
+      "default": ""
+    },
+    "safeBrowsingKey": {
+      "type": "secret",
+      "label": "Google Safe Browsing API key",
+      "description": "An API key of a Google Cloud project with the Safe Browsing API enabled. The Safe Browsing API is for non-commercial use only.",
+      "default": ""
+    },
+    "onFailure": {
+      "type": "select",
+      "label": "When a link can't be checked",
+      "description": "Open: users see the domain warning with \"Couldn't check this link\" and may continue. Closed: the link can't be opened until the check works again.",
+      "default": "open",
+      "options": [
+        {
+          "label": "Let users continue (fail open)",
+          "value": "open"
+        },
+        {
+          "label": "Don't open the link (fail closed)",
+          "value": "closed"
+        }
+      ]
+    },
+    "onUnsafe": {
+      "type": "select",
+      "label": "When a check flags a link",
+      "description": "Warn: a strong warning, users may still open it. Block: the link can't be opened.",
+      "default": "warn",
+      "options": [
+        {
+          "label": "Warn",
+          "value": "warn"
+        },
+        {
+          "label": "Block",
+          "value": "block"
+        }
+      ]
+    },
+    "skipTrusted": {
+      "type": "boolean",
+      "label": "Don't check trusted domains",
+      "description": "Links to trusted domains open without a check.",
+      "default": true
+    }
+  },
+  "credentials": {
+    "safebrowsing": {
+      "label": "Google Safe Browsing",
+      "scope": "admin",
+      "inject": {
+        "type": "header",
+        "name": "X-Goog-Api-Key"
+      },
+      "secretKey": "safeBrowsingKey",
+      "origin": "https://safebrowsing.googleapis.com"
+    },
+    "linkcheck": {
+      "label": "Link check service (with token)",
+      "scope": "admin",
+      "inject": {
+        "type": "bearer"
+      },
+      "secretKey": "endpointToken",
+      "originKey": "endpointUrl"
+    },
+    "linkcheck-open": {
+      "label": "Link check service (without token)",
+      "scope": "admin",
+      "inject": {
+        "type": "none"
+      },
+      "secretKey": "endpointToken",
+      "originKey": "endpointUrl"
     }
   },
   "settingsSchema": {
@@ -49,18 +161,62 @@
       "trust.message": "Links to {host} and its subdomains will open without this warning on this device.",
       "trust.confirm": "Always trust {host}",
       "trust.cancel": "Just this once",
-      "trustedAdded": "{host} added to your trusted domains"
+      "trustedAdded": "{host} added to your trusted domains",
+      "check.safe": "Checked: no known threats.",
+      "check.failed": "Couldn't check this link.",
+      "text.mismatch": "The link text says {text}, but the link goes to {host}.",
+      "unsafe.title": "This link may be dangerous",
+      "unsafe.message": "The link goes to {host}.\n\n{href}\n\nYour organisation's link check flagged it as unsafe. Only continue if you're sure it's safe.",
+      "unsafe.reason": "Reason: {reason}",
+      "unsafe.continue": "Open anyway",
+      "unsafe.cancel": "Go back",
+      "blocked.title": "Link blocked",
+      "blocked.message": "The link goes to {host}.\n\n{href}\n\nYour organisation's link check flagged it as unsafe, so it can't be opened.",
+      "closed.title": "Link couldn't be checked",
+      "closed.message": "The link goes to {host}.\n\n{href}\n\nYour organisation couldn't check this link, so it can't be opened right now. Try again in a moment.",
+      "close": "Close",
+      "google.title": "Suspected dangerous site",
+      "google.target": "The link goes to {host}.",
+      "google.SOCIAL_ENGINEERING": "Google Safe Browsing reports that this site may be a phishing site. It may try to trick you into giving away passwords or other personal information.",
+      "google.MALWARE": "Google Safe Browsing reports that this site may install harmful software on your device.",
+      "google.UNWANTED_SOFTWARE": "Google Safe Browsing reports that this site may offer software that changes your device in ways you may not want.",
+      "google.POTENTIALLY_HARMFUL_APPLICATION": "Google Safe Browsing reports that this site may offer apps that could harm your device.",
+      "google.imperfect": "These warnings aren't always right, and a site without a warning isn't always safe.",
+      "google.blocked": "Your organisation doesn't allow opening links like this.",
+      "google.advisory": "Advisory provided by Google"
     },
     "de": {
       "dialog.title": "Externen Link öffnen?",
-      "dialog.message": "Du bist dabei, {host} zu besuchen.\n\n{href}\n\nDiese Domain steht nicht auf deiner Liste vertrauenswürdiger Domains. Fahre nur fort, wenn du sie kennst.",
+      "dialog.message": "Sie sind dabei, {host} zu besuchen.\n\n{href}\n\nDiese Domain steht nicht auf Ihrer Liste vertrauenswürdiger Domains. Fahren Sie nur fort, wenn Sie sie kennen.",
       "dialog.continue": "Fortfahren",
       "dialog.cancel": "Abbrechen",
       "trust.title": "{host} ab jetzt vertrauen?",
       "trust.message": "Links zu {host} und seinen Subdomains öffnen sich auf diesem Gerät dann ohne diese Warnung.",
       "trust.confirm": "{host} immer vertrauen",
       "trust.cancel": "Nur dieses Mal",
-      "trustedAdded": "{host} zu deinen vertrauenswürdigen Domains hinzugefügt"
+      "trustedAdded": "{host} zu Ihren vertrauenswürdigen Domains hinzugefügt",
+      "check.safe": "Geprüft: keine bekannten Gefahren.",
+      "check.failed": "Dieser Link konnte nicht geprüft werden.",
+      "text.mismatch": "Der Linktext nennt {text}, der Link führt aber zu {host}.",
+      "unsafe.title": "Dieser Link ist möglicherweise gefährlich",
+      "unsafe.message": "Der Link führt zu {host}.\n\n{href}\n\nDie Linkprüfung Ihrer Organisation hat ihn als unsicher eingestuft. Fahren Sie nur fort, wenn Sie sicher sind, dass er harmlos ist.",
+      "unsafe.reason": "Grund: {reason}",
+      "unsafe.continue": "Trotzdem öffnen",
+      "unsafe.cancel": "Zurück",
+      "blocked.title": "Link gesperrt",
+      "blocked.message": "Der Link führt zu {host}.\n\n{href}\n\nDie Linkprüfung Ihrer Organisation hat ihn als unsicher eingestuft. Er kann deshalb nicht geöffnet werden.",
+      "closed.title": "Link konnte nicht geprüft werden",
+      "closed.message": "Der Link führt zu {host}.\n\n{href}\n\nIhre Organisation konnte diesen Link nicht prüfen. Er kann deshalb gerade nicht geöffnet werden. Versuchen Sie es gleich noch einmal.",
+      "close": "Schließen",
+      "google.title": "Vermutlich gefährliche Website",
+      "google.target": "Der Link führt zu {host}.",
+      "google.SOCIAL_ENGINEERING": "Laut Google Safe Browsing ist diese Website möglicherweise eine Phishing-Seite. Sie könnte versuchen, Sie zur Eingabe von Passwörtern oder anderen persönlichen Daten zu verleiten.",
+      "google.MALWARE": "Laut Google Safe Browsing installiert diese Website möglicherweise schädliche Software auf Ihrem Gerät.",
+      "google.UNWANTED_SOFTWARE": "Laut Google Safe Browsing bietet diese Website möglicherweise Software an, die Ihr Gerät auf unerwünschte Weise verändert.",
+      "google.POTENTIALLY_HARMFUL_APPLICATION": "Laut Google Safe Browsing bietet diese Website möglicherweise Apps an, die Ihrem Gerät schaden könnten.",
+      "google.imperfect": "Solche Warnungen sind nicht immer richtig, und eine Website ohne Warnung ist nicht immer sicher.",
+      "google.blocked": "Ihre Organisation erlaubt nicht, solche Links zu öffnen.",
+      "google.advisory": "Hinweis bereitgestellt von Google"
     }
   }
 }

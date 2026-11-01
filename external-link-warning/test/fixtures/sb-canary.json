@@ -1,0 +1,16 @@
+{
+  "fullHashes": [
+    {
+      "fullHash": "UYZART+LKl8NQ7wiUVL0lTC+KkC/4rq2CqruemexCJA=",
+      "fullHashDetails": [
+        {
+          "threatType": "MALWARE",
+          "attributes": [
+            "CANARY"
+          ]
+        }
+      ]
+    }
+  ],
+  "cacheDuration": "300s"
+}

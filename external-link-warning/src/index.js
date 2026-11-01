@@ -1,118 +1,124 @@
 /**
- * External Link Warning — intercepts clicks on external links and asks the
- * user to confirm before navigating to a domain that isn't on the trusted
- * list.
+ * External Link Warning: asks before a link opens a domain that isn't on
+ * the trusted list, and (2.0) checks links with the company's own link
+ * check service and/or Google Safe Browsing first.
  *
- * Trusted-domain sources (merged, de-duplicated):
- *   1. Admin-managed list (api.admin.getConfig('trustedDomains'))
- *   2. Per-user list from plugin settings (trustedDomainsCsv)
- *   3. Locally-trusted domains the user explicitly chose to always trust
- *      (kept in plugin storage)
+ * Trusted domains (merged): the admin's list (configSchema trustedDomains),
+ * the user's own (settings trustedDomainsCsv), and domains the user chose
+ * to always trust on this device (plugin storage).
  *
- * Migrated to the sandboxed contract:
- *   - The custom CSS-in-JS modal is GONE — we now use api.ui.confirm.
- *   - window.open is replaced with api.ui.openExternalUrl.
- *   - All storage / admin lookups are awaited.
- *   - The hook is registered statically via the `hooks` export.
+ * The checks (configSchema lookup, see src/lib/lookup.js):
+ *   - the company endpoint gets the full URL (src/lib/endpoint.js);
+ *   - Google gets 4-byte hash prefixes only (src/lib/safebrowsing.js), and
+ *     is off while the host's no-third-party mode is on.
+ * Both go through the host's plugin proxy, which adds the token or key; the
+ * plugin never sees them and reads only the admin's non-secret settings
+ * (api.config.get). Verdicts are cached in memory only.
  *
- * api.ui.confirm has two buttons, so trusting a domain is a second, explicit
- * question: "Continue" in the first dialog opens the link once; only the
- * "Always trust <domain>" button in the follow-up dialog remembers it. The
- * follow-up is only asked when the `rememberLocalChoices` setting is on.
+ * The host's link hook fails open (a handler that throws or times out lets
+ * the link open), so every refusal here is "return false and show the
+ * dialog ourselves", and a link the user accepts is opened with
+ * api.ui.openExternalUrl, which the host doesn't send back through this
+ * plugin's own hook.
  */
 
-// English fallbacks; the manifest's locales carry the translations.
-const FALLBACK = {
-  'dialog.title': 'Open external link?',
-  'dialog.message': "You're about to visit {host}.\n\n{href}\n\nThis domain isn't on your trusted list. Only continue if you recognise it.",
-  'dialog.continue': 'Continue',
-  'dialog.cancel': 'Cancel',
-  'trust.title': 'Trust {host} from now on?',
-  'trust.message': 'Links to {host} and its subdomains will open without this warning on this device.',
-  'trust.confirm': 'Always trust {host}',
-  'trust.cancel': 'Just this once',
-  trustedAdded: '{host} added to your trusted domains',
-};
+import { hostnameFromHref, isTrusted, parseDomains } from './lib/domains.js';
+import { readConfig, DEFAULT_CONFIG } from './lib/config.js';
+import { runChecks } from './lib/lookup.js';
+import { createEndpoint } from './lib/endpoint.js';
+import { createSafeBrowsing } from './lib/safebrowsing.js';
+import { decide, dialogFor } from './lib/decide.js';
+import { EN } from './lib/strings.js';
+import { VerdictDialog } from './ui/verdict-dialog.js';
+
+/** Admin settings are read again after this long (on the next click). */
+const CONFIG_TTL_MS = 5 * 60 * 1000;
+/** Which credentials the admin set up, read again after this long. */
+const READY_TTL_MS = 60 * 1000;
+
+export const CREDENTIALS = { google: 'safebrowsing', endpoint: 'linkcheck', endpointOpen: 'linkcheck-open' };
+
+let pluginApi = null;
+let localTrusted = [];
+let config = { ...DEFAULT_CONFIG };
+let configAt = 0;
+let configPromise = null;
+let ready = null;
+let readyAt = 0;
+let endpoint = null;
+let google = null;
 
 function tr(key, vars) {
   const i18n = pluginApi && pluginApi.i18n;
   if (i18n && typeof i18n.has === 'function' && i18n.has(key)) return i18n.t(key, vars);
-  return String(FALLBACK[key] || key).replace(/\{(\w+)\}/g, (m, k) => (vars && k in vars ? String(vars[k]) : m));
+  return String(EN[key] || key).replace(/\{(\w+)\}/g, (m, k) => (vars && k in vars ? String(vars[k]) : m));
 }
 
-function parseDomains(input) {
-  if (!input) return [];
-  if (Array.isArray(input)) {
-    return input.map((d) => normaliseDomain(String(d))).filter(Boolean);
-  }
-  return String(input)
-    .split(/[\s,;]+/)
-    .map(normaliseDomain)
-    .filter(Boolean);
+function warn(message, err) {
+  try { pluginApi?.log?.warn(message, err); } catch { /* ignore */ }
 }
 
-function normaliseDomain(raw) {
-  let d = String(raw).trim().toLowerCase();
-  if (!d) return '';
-  d = d.replace(/^\*\./, '');
-  d = d.replace(/^https?:\/\//, '');
-  d = d.replace(/\/.*$/, '');
-  return d;
-}
-
-function hostnameFromHref(href) {
-  try {
-    // No `window.location` reliable origin inside a background iframe; treat
-    // the href as absolute. Relative URLs (without a scheme) are very rare in
-    // email bodies and aren't external anyway, so we ignore them.
-    const url = new URL(href);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
-    return url.hostname.toLowerCase();
-  } catch {
-    return '';
-  }
-}
-
-function isTrusted(hostname, list) {
-  if (!hostname) return false;
-  for (const d of list) {
-    if (!d) continue;
-    if (hostname === d) return true;
-    if (hostname.endsWith('.' + d)) return true;
-  }
-  return false;
-}
-
-// ─── Module-level state, populated by activate() ──────────────
-
-let pluginApi = null;
-let cachedAdminDomains = [];
-let adminFetched = false;
-let adminFetchPromise = null;
-let localTrusted = [];
-
-function fetchAdminDomains() {
-  if (adminFetched) return Promise.resolve(cachedAdminDomains);
-  if (adminFetchPromise) return adminFetchPromise;
-  adminFetchPromise = (async () => {
+function loadConfig() {
+  if (configPromise) return configPromise;
+  configPromise = (async () => {
     try {
-      const value = await pluginApi.admin.getConfig('trustedDomains');
-      cachedAdminDomains = parseDomains(value);
+      const raw = await pluginApi.config.get();
+      config = readConfig(raw);
+      configAt = Date.now();
     } catch (err) {
-      pluginApi.log.warn('Could not load admin trusted-domains list', err);
-      cachedAdminDomains = [];
+      // Keep what we had (the defaults at first): no lookups, the trusted list empty.
+      warn('Could not read the admin settings', err);
     } finally {
-      adminFetched = true;
+      configPromise = null;
     }
-    return cachedAdminDomains;
+    return config;
   })();
-  return adminFetchPromise;
+  return configPromise;
 }
 
-async function getTrustedList() {
+/** The admin settings: awaited the first time, refreshed in the background later. */
+async function currentConfig() {
+  if (!configAt) return loadConfig();
+  if (Date.now() - configAt > CONFIG_TTL_MS) void loadConfig();
+  return config;
+}
+
+/** Which checks the admin set up: the endpoint (with or without a token) and the key. */
+async function readiness() {
+  if (ready && Date.now() - readyAt < READY_TTL_MS) return ready;
+  const list = await pluginApi.proxy.accounts();
+  const configured = (id) => Array.isArray(list) && list.some((a) => a && a.credentialId === id && a.connected === true);
+  ready = {
+    endpointCredential: configured(CREDENTIALS.endpoint) ? CREDENTIALS.endpoint : configured(CREDENTIALS.endpointOpen) ? CREDENTIALS.endpointOpen : null,
+    google: configured(CREDENTIALS.google),
+  };
+  readyAt = Date.now();
+  return ready;
+}
+
+function proxyRequest(credentialId, responseType) {
+  return (url, init = {}) => pluginApi.proxy.fetch(credentialId, url, { ...init, responseType: init.responseType ?? responseType });
+}
+
+function services() {
+  return {
+    ready: async () => {
+      const r = await readiness();
+      return { endpoint: !!r.endpointCredential, google: r.google };
+    },
+    endpoint: {
+      check: async (url, href, host, opts) => {
+        const r = await readiness();
+        return endpoint(r.endpointCredential).check(url, href, host, opts);
+      },
+    },
+    google: { check: (href, opts) => google.check(href, opts) },
+  };
+}
+
+async function trustedList(cfg) {
   const userDomains = parseDomains(pluginApi.plugin.settings.trustedDomainsCsv);
-  const adminDomains = await fetchAdminDomains();
-  return [...new Set([...adminDomains, ...userDomains, ...localTrusted])];
+  return [...new Set([...cfg.trustedDomains, ...userDomains, ...localTrusted])];
 }
 
 async function addLocalTrust(domain) {
@@ -122,39 +128,69 @@ async function addLocalTrust(domain) {
   pluginApi.toast.success(tr('trustedAdded', { host: domain }));
 }
 
-/** Ask about an untrusted link, then open it if the user agrees. */
-async function confirmAndOpen(href, hostname) {
-  const proceed = await pluginApi.ui.confirm({
-    title: tr('dialog.title'),
-    message: tr('dialog.message', { host: hostname, href }),
-    confirmLabel: tr('dialog.continue'),
-    cancelLabel: tr('dialog.cancel'),
-  });
-  if (!proceed) return;
+/** What a click on `ctx` leads to (see decide.js). */
+export async function decideFor(ctx, host) {
+  const cfg = await currentConfig();
+  const trusted = isTrusted(host, await trustedList(cfg));
+  const check = trusted && cfg.skipTrusted
+    ? { verdict: 'off' }
+    : await runChecks({
+      href: ctx.href,
+      host,
+      config: cfg,
+      features: pluginApi.host?.features,
+      services: services(),
+      log: warn,
+    });
+  return decide({ host, text: ctx.text, trusted, check, config: cfg });
+}
 
-  if (pluginApi.plugin.settings.rememberLocalChoices !== false) {
+/** Show the dialog for a decision and open the link when the user says so. */
+async function present(decision, ctx, host) {
+  const dialog = dialogFor(decision, { host, href: ctx.href, text: ctx.text }, tr);
+  if (!dialog) return;
+  if (dialog.type === 'alert') {
+    await pluginApi.ui.alert(dialog.options);
+    return;
+  }
+  let open = false;
+  if (dialog.type === 'confirm') open = (await pluginApi.ui.confirm(dialog.options)) === true;
+  else open = (await pluginApi.ui.openDialog(dialog.options)) === 'open';
+  if (!open) return;
+
+  // "Always trust" only for a domain warning, never after an unsafe verdict.
+  if (decision.kind === 'warn' && pluginApi.plugin.settings.rememberLocalChoices !== false) {
     const always = await pluginApi.ui.confirm({
-      title: tr('trust.title', { host: hostname }),
-      message: tr('trust.message', { host: hostname }),
-      confirmLabel: tr('trust.confirm', { host: hostname }),
+      title: tr('trust.title', { host }),
+      message: tr('trust.message', { host }),
+      confirmLabel: tr('trust.confirm', { host }),
       cancelLabel: tr('trust.cancel'),
     });
-    if (always) await addLocalTrust(hostname);
+    if (always) await addLocalTrust(host);
   }
-
-  await pluginApi.ui.openExternalUrl(href, '_blank');
+  await pluginApi.ui.openExternalUrl(ctx.href, '_blank');
 }
 
 // ─── Activate ─────────────────────────────────────────────────
 
 export async function activate(api) {
   pluginApi = api;
+  config = { ...DEFAULT_CONFIG };
+  configAt = 0;
+  ready = null;
+  readyAt = 0;
+  const endpoints = new Map();
+  endpoint = (credentialId) => {
+    if (!endpoints.has(credentialId)) endpoints.set(credentialId, createEndpoint({ request: proxyRequest(credentialId, 'text') }));
+    return endpoints.get(credentialId);
+  };
+  google = createSafeBrowsing({ request: proxyRequest(CREDENTIALS.google, 'json') });
 
   const stored = await api.storage.get('localTrusted');
   localTrusted = Array.isArray(stored) ? stored.slice() : [];
 
-  // Pre-warm so the first click doesn't race against the network.
-  fetchAdminDomains().catch(() => {});
+  // Pre-warm so the first click doesn't wait for the settings.
+  loadConfig().catch(() => {});
 
   api.log.info('External Link Warning plugin activated');
 }
@@ -163,20 +199,29 @@ export async function activate(api) {
 
 export const hooks = {
   async onBeforeExternalLink(ctx) {
-    if (!pluginApi || !ctx?.href) return;
+    if (!pluginApi || !ctx?.href) return undefined;
+    const host = hostnameFromHref(ctx.href);
+    if (!host) return undefined; // mailto:, tel:, relative links: not ours
 
-    const hostname = hostnameFromHref(ctx.href);
-    if (!hostname) return; // mailto:, tel:, relative URLs — leave alone
+    let decision;
+    try {
+      decision = await decideFor(ctx, host);
+    } catch (err) {
+      // Something of ours broke: the domain warning, never a silent open.
+      warn('Link check failed', err);
+      decision = { kind: config.onFailure === 'closed' ? 'closed' : 'warn', line: 'failed', mismatch: '' };
+    }
+    if (decision.kind === 'open') return undefined;
 
-    const trusted = await getTrustedList();
-    if (isTrusted(hostname, trusted)) return; // pass through
-
-    // Cancel the host's navigation right away and run the dialogs on our
-    // own. Awaiting them here would let the host's hook timeout open the
-    // link behind the user's back while they are still deciding.
-    confirmAndOpen(ctx.href, hostname).catch((err) => {
-      pluginApi.log.warn('External link dialog failed', err);
-    });
+    // Stop the host's navigation and run the dialog on our own: awaiting it
+    // here would leave the decision to the host's hook timeout.
+    present(decision, ctx, host).catch((err) => warn('External link dialog failed', err));
     return false;
   },
+};
+
+// ─── Slots ────────────────────────────────────────────────────
+
+export const slots = {
+  'plugin-dialog': { component: VerdictDialog },
 };
