@@ -31,6 +31,7 @@ import { parseMime, extractDetachedSigned } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
 import { parseCertificatePemOrDer, extractCertificateInfo } from './certificate-utils.js';
 import { generateUUID } from './util.js';
+import { rawSendOptions } from './send-options.js';
 import { makeUi } from './ui.js';
 import { errorMessage, translator } from './i18n.js';
 import {
@@ -323,11 +324,8 @@ async function onComposeSend(req) {
     }
     const rawBytes = await blobToBytes(rfc822);
 
-    const envelopeRecipients = [...new Set([...allRecipientEmails])];
-    // Pass a scheduled send's time through, so it is not sent right away.
-    const sendOpts = { envelopeRecipients };
-    if (req.delayedUntil) sendOpts.delayedUntil = req.delayedUntil;
-    await host.jmap.sendRaw(bytesArrayBuffer(rawBytes), identityId, sendOpts);
+    // A scheduled send's time and the host's label token go back with it.
+    await host.jmap.sendRaw(bytesArrayBuffer(rawBytes), identityId, rawSendOptions(req, allRecipientEmails));
 
     const how = encrypt && sign ? 'signedEncrypted'
       : encrypt ? 'encrypted'
