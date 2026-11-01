@@ -1,0 +1,177 @@
+{
+  "id": "send-checks",
+  "name": "Send Checks",
+  "version": "0.1.0",
+  "author": "Bulwark Mail Community",
+  "description": "Checks a message before it is sent: IBANs, payment card numbers, keywords and your own patterns in the subject, text and text attachments, and attachment types and sizes. Each rule warns or blocks, optionally only when the message goes outside the organisation.",
+  "type": "hook",
+  "permissions": [
+    "email:send",
+    "email:read",
+    "email:blob-read"
+  ],
+  "entrypoint": "index.js",
+  "minAppVersion": "1.20.0",
+  "icon": "media/icon.svg",
+  "banner": "media/banner.svg",
+  "configSchema": {
+    "ibanAction": {
+      "type": "select",
+      "label": "IBANs",
+      "description": "Bank account numbers (IBAN) that pass the check-digit test. Warn asks the user to confirm; Block stops the send.",
+      "default": "warn",
+      "options": [
+        { "label": "Off", "value": "off" },
+        { "label": "Warn", "value": "warn" },
+        { "label": "Block", "value": "block" }
+      ]
+    },
+    "ibanExternalOnly": {
+      "type": "boolean",
+      "label": "IBANs: only outside the organisation",
+      "description": "Check IBANs only when a recipient is outside the organisation (the domains of Organisation > Security > External mail and the sender's own domains).",
+      "default": true
+    },
+    "cardAction": {
+      "type": "select",
+      "label": "Payment card numbers",
+      "description": "13 to 19 digit card numbers that pass the Luhn check. The warning shows only the last four digits.",
+      "default": "warn",
+      "options": [
+        { "label": "Off", "value": "off" },
+        { "label": "Warn", "value": "warn" },
+        { "label": "Block", "value": "block" }
+      ]
+    },
+    "cardExternalOnly": {
+      "type": "boolean",
+      "label": "Card numbers: only outside the organisation",
+      "description": "Check card numbers only when a recipient is outside the organisation.",
+      "default": true
+    },
+    "keywords": {
+      "type": "string",
+      "multiline": true,
+      "label": "Keywords",
+      "description": "One word or phrase per line, matched in any case. A keyword that starts and ends with a letter or digit matches whole words only. Lines starting with # are ignored. Empty: no keyword check.",
+      "placeholder": "Strictly confidential\nproject falcon",
+      "default": ""
+    },
+    "keywordAction": {
+      "type": "select",
+      "label": "Keywords: action",
+      "default": "warn",
+      "options": [
+        { "label": "Warn", "value": "warn" },
+        { "label": "Block", "value": "block" }
+      ]
+    },
+    "keywordExternalOnly": {
+      "type": "boolean",
+      "label": "Keywords: only outside the organisation",
+      "default": false
+    },
+    "patterns": {
+      "type": "string",
+      "multiline": true,
+      "label": "Patterns",
+      "description": "One regular expression per line, as Name: pattern or Name: /pattern/flags (flags i, m, s, u; without flags the match ignores case). At most 50 lines of 200 characters. Patterns with nested repeats such as (a+)+, repeated alternatives such as (a|b)+ or back references are skipped, because they can hang the browser.",
+      "placeholder": "Customer number: KD-\\d{6}\nInternal project: /PRJ-[A-Z]{3}-\\d+/",
+      "default": ""
+    },
+    "patternAction": {
+      "type": "select",
+      "label": "Patterns: action",
+      "default": "warn",
+      "options": [
+        { "label": "Warn", "value": "warn" },
+        { "label": "Block", "value": "block" }
+      ]
+    },
+    "patternExternalOnly": {
+      "type": "boolean",
+      "label": "Patterns: only outside the organisation",
+      "default": false
+    },
+    "blockedTypes": {
+      "type": "string",
+      "label": "Blocked file types",
+      "description": "Extensions and MIME types, separated by commas or spaces, e.g. exe, bat, js, application/x-msdownload. A blocked program extension such as exe also catches a renamed program by its content.",
+      "placeholder": "exe, bat, cmd, com, scr, js, vbs, ps1, msi",
+      "default": ""
+    },
+    "allowedTypes": {
+      "type": "string",
+      "label": "Allowed file types",
+      "description": "When set, only these extensions or MIME types may be attached (e.g. pdf, docx, xlsx, image/*). Images pasted into the text are not affected. Empty: every type not blocked above.",
+      "default": ""
+    },
+    "maxSizeMb": {
+      "type": "number",
+      "label": "Largest attachment (MB)",
+      "description": "Per file, including images pasted into the text. 0: no limit.",
+      "default": 0
+    },
+    "attachmentAction": {
+      "type": "select",
+      "label": "Attachments: action",
+      "description": "Block refuses a file as soon as it is attached (unless the rule counts only outside the organisation) and again at Send.",
+      "default": "block",
+      "options": [
+        { "label": "Warn", "value": "warn" },
+        { "label": "Block", "value": "block" }
+      ]
+    },
+    "attachmentExternalOnly": {
+      "type": "boolean",
+      "label": "Attachments: only outside the organisation",
+      "default": false
+    }
+  },
+  "locales": {
+    "en": {
+      "warn.title": "Check before sending",
+      "warn.message": "Your organisation asks you to check this before the message goes out:\n\n{list}",
+      "warn.confirm": "Send anyway",
+      "warn.cancel": "Go back",
+      "warn.cancelled": "Message not sent",
+      "block.title": "This message can't be sent",
+      "block.message": "Your organisation doesn't allow sending this:\n\n{list}\n\nRemove it and try again.",
+      "block.alsoCheck": "Also check:\n\n{list}",
+      "outside.note": "Some of these only count because the message goes outside your organisation.",
+      "upload.title": "This file can't be attached",
+      "upload.type": "Your organisation doesn't allow attaching {name} ({type}).",
+      "upload.size": "{name} is larger than {max} MB, the most your organisation allows.",
+      "item.iban": "IBAN {masked}",
+      "item.card": "Card number ending {last4}",
+      "item.keyword": "The word “{keyword}”",
+      "item.pattern": "{name}: {masked}",
+      "item.type": "{name}: file type not allowed ({type})",
+      "item.size": "{name}: larger than {max} MB",
+      "item.inFile": "{item} (in {file})",
+      "item.more": "and {count} more"
+    },
+    "de": {
+      "warn.title": "Vor dem Senden prüfen",
+      "warn.message": "Ihre Organisation bittet Sie, das vor dem Versand zu prüfen:\n\n{list}",
+      "warn.confirm": "Trotzdem senden",
+      "warn.cancel": "Zurück",
+      "warn.cancelled": "Nachricht nicht gesendet",
+      "block.title": "Diese Nachricht kann nicht gesendet werden",
+      "block.message": "Ihre Organisation erlaubt nicht, das zu senden:\n\n{list}\n\nEntfernen Sie es und versuchen Sie es noch einmal.",
+      "block.alsoCheck": "Prüfen Sie außerdem:\n\n{list}",
+      "outside.note": "Einiges davon zählt nur, weil die Nachricht an Empfänger außerhalb Ihrer Organisation geht.",
+      "upload.title": "Diese Datei kann nicht angehängt werden",
+      "upload.type": "Ihre Organisation erlaubt nicht, {name} ({type}) anzuhängen.",
+      "upload.size": "{name} ist größer als {max} MB, mehr erlaubt Ihre Organisation nicht.",
+      "item.iban": "IBAN {masked}",
+      "item.card": "Kartennummer mit Endziffern {last4}",
+      "item.keyword": "Das Wort „{keyword}“",
+      "item.pattern": "{name}: {masked}",
+      "item.type": "{name}: Dateityp nicht erlaubt ({type})",
+      "item.size": "{name}: größer als {max} MB",
+      "item.inFile": "{item} (in {file})",
+      "item.more": "und {count} weitere"
+    }
+  }
+}
