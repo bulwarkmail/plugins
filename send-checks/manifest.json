@@ -1,7 +1,7 @@
 {
   "id": "send-checks",
   "name": "Send Checks",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "author": "Bulwark Mail Community",
   "description": "Checks a message before it is sent: IBANs, payment card numbers, keywords and your own patterns in the subject, text and text attachments, and attachment types and sizes. Each rule warns or blocks, optionally only when the message goes outside the organisation.",
   "type": "hook",
