@@ -24,8 +24,30 @@ Needs Bulwark 1.20 or later. Plugins don't run in Bulwark Lite.
   it is attached ("This file can't be attached"), when the attachment rule
   blocks and doesn't depend on the recipients. Otherwise it is checked at
   Send.
+- **Couldn't check**: when a check can't finish (see below), a blocking
+  rule stops the send with "This message couldn't be checked" and names
+  what couldn't be checked; a warning rule adds "Some checks couldn't
+  finish" to the warning and the user decides.
 
-The dialogs are in English and German.
+The dialogs are in all 30 languages Bulwark ships.
+
+## When a check can't finish
+
+The plugin fails closed. A rule counts as not checked when:
+
+- the patterns didn't finish within 250 ms for the message, or the
+  browser couldn't start the Worker they run in;
+- one of the admin's pattern lines can't run (see "Patterns that are
+  refused"): fix the line, until then a blocking pattern rule stops every
+  message it applies to, and a warning one asks every time;
+- Bulwark couldn't read an attachment (another account's file in the
+  unified view, a network error): its type and text are unknown, so the
+  type rules and, for a text file, the text rules aren't checked for it;
+- the plugin couldn't read its settings and never could since it started:
+  then nothing is sent ("couldn't load their settings"). Once read, a later
+  failed read keeps the last settings.
+
+A blocking rule that isn't checked stops the send, as if it had matched.
 
 ## What is checked
 
@@ -34,8 +56,9 @@ The dialogs are in English and German.
   forward and without the signature (so an IBAN in the message being
   answered doesn't warn on every reply);
 - attachment names;
-- the text of text attachments (txt, csv, json, xml, ics, vcf, md, log, html
-  and other `text/*` files), the first 1 MB of each;
+- the text of text attachments (txt, csv, tsv, json, xml, ics, vcf, md,
+  log, html, yaml, ini, conf and other `text/*` files), the first 1 MB of
+  each;
 - each attachment's type, by its extension and by its content, and its
   size. Images pasted into the text count for the size limit only.
 
@@ -68,7 +91,7 @@ domain or group.
 | `ibanExternalOnly` | `true` | Check IBANs only when a recipient is outside the organisation. |
 | `cardAction` | `warn` | Card numbers: 13 to 19 digits, together or grouped with spaces or dashes, that pass the Luhn check and start like a card network's number: `off`, `warn` or `block`. |
 | `cardExternalOnly` | `true` | Check card numbers only when a recipient is outside the organisation. |
-| `keywords` | empty | One word or phrase per line, any case. A keyword that starts and ends with a letter or digit matches whole words only ("secret" doesn't match "secretary"). Lines starting with `#` are ignored. |
+| `keywords` | empty | One word or phrase per line, any case. A keyword that starts and ends with a letter or digit matches whole words only ("secret" doesn't match "secretary"). Lines starting with `# ` (hash and space) or `//` are comments, so `#confidential` is a keyword. |
 | `keywordAction` | `warn` | `warn` or `block`. |
 | `keywordExternalOnly` | `false` | Only outside the organisation. |
 | `patterns` | empty | One regular expression per line: `Name: pattern` or `Name: /pattern/flags` (flags `i`, `m`, `s`, `u`). Without flags a pattern ignores case. The warning shows the name and the match with only its first and last characters. |
@@ -93,29 +116,42 @@ does this for the account the message goes out from, also when the user
 has several accounts. The plugin learns only which recipients are outside,
 not the domain list. Bcc recipients count too.
 
+### How patterns run
+
+A regular expression can take seconds or minutes on a short text
+(catastrophic backtracking), and JavaScript can't stop one match from the
+outside. So the patterns run in a Web Worker, apart from the page, and the
+Worker is stopped when the 250 ms for the message are over. The plugin
+needs Bulwark 1.20, whose plugin sandbox allows such Workers.
+
 ### Patterns that are refused
 
-A slow regular expression would freeze the user's browser when they press
-Send, so these lines are skipped (the browser console names the line and
-the reason):
+These lines can't run; each counts as a rule that couldn't be checked, and
+the dialog names it ("The pattern “Name” is set up wrongly"):
 
-- longer than 200 characters;
-- a repeated group with a repeat inside it, such as `(a+)+` or `(\w*)*`;
+- longer than 200 characters, or not a valid regular expression;
+- a repeated group with a repeat inside it, at any depth, such as `(a+)+`,
+  `((a+))+` or `((\w+)\s?)+`;
 - a repeated group with alternatives, such as `(a|b)+`: write `[ab]+`
   instead, or put each alternative on its own line;
+- repeats next to each other that can match the same characters, such as
+  `\s*\s*x` or `\w+\d+`;
 - back references (`\1`, `\k<name>`).
 
-At most 50 pattern lines are used, and all patterns together get 250 ms
-per message; after that the rest isn't checked for this message.
+At most 50 pattern lines are used. Lines starting with `# ` or `//` are
+comments.
 
 ### File types by content
 
 Bulwark reads the first bytes of each file it attaches and tells the
 plugin what they look like (a Windows or Linux program, a script, ZIP,
-RAR, 7z, gzip, PDF, common images). A Word or Excel file is a ZIP inside;
-that doesn't count as a `.zip`. Files the browser no longer has (an
-attachment of a forwarded message) are checked by name only when Bulwark
-can't read them.
+RAR, 7z, gzip, PDF, Windows shortcuts, cabinet files, installers, common
+images). A program extension on the blocked list (exe, msi, lnk, sh...)
+blocks every kind of program, also one renamed to invoice.pdf. A Word or
+Excel file is a ZIP inside; that doesn't count as a `.zip`, and an old
+.doc, .xls or .msg file isn't taken for an installer although both are
+OLE files. A file Bulwark couldn't read counts as not checked (see "When a
+check can't finish").
 
 ## Permissions
 
