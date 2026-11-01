@@ -12,6 +12,8 @@
 //   calendar   { from, to, days: [{ date, events: [{ title, start?, end?, allDay? }] }] }  busy and free days
 //   table      { columns: [string], rows: [[string]] }
 
+import { dateIn } from './clock.js';
+
 export const WIDGET_KINDS = ['choices', 'checklist', 'times', 'contacts', 'emails', 'calendar', 'table'];
 const MAX_ITEMS = 30;
 const MAX_TEXT = 300;
@@ -78,12 +80,13 @@ function addDays(day, n) {
 }
 
 /** The days of a calendar lookup with their events, busy or free. */
-export function calendarWidget(events, { from, to }) {
+export function calendarWidget(events, { from, to, zone }) {
   const days = [];
   for (let day = from; day && to && day <= to && days.length < 31; day = addDays(day, 1)) {
     const todays = events.filter((e) => {
+      if (e.isAllDay) return String(e.start ?? '').slice(0, 10) === day;
       const start = String(e.utcStart ?? e.start ?? '');
-      return start.slice(0, 10) === day || (e.isAllDay && String(e.start ?? '').slice(0, 10) === day);
+      return (zone && e.utcStart ? dateIn(zone, e.utcStart) : start.slice(0, 10)) === day;
     });
     days.push({
       date: day,

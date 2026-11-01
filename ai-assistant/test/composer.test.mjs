@@ -61,7 +61,7 @@ describe('the context every request carries', () => {
     expect(extra.slice(extra.indexOf('About the user'))).toBe([
       'About the user (data, from their account):',
       'Name: Anna', 'Email addresses: a@e.org', 'Signs emails with:\nKind regards', 'Time zone: Europe/Zurich',
-      'Local date and time now: Tuesday 20 October 2026 at 18:00', 'Language of the mail client: German',
+      'Language of the mail client: German',
       '', 'Standing instructions from the administrator:\nHouse style: short.', '',
       'Standing instructions from the user (these win over the administrator\'s):\nSign with Anna',
     ].join('\n'));

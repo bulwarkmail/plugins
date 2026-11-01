@@ -8,12 +8,13 @@ import { BarButton, InfoBar, Row, Spinner, Stack, Text } from '@plugin-host/ui';
 import { ErrorMessage, Lines, copyWithToast, useApi, useTask } from './common.jsx';
 import { formatActionItems, parseActionItems, parseReplies } from '../lib/parse.js';
 import { ownText } from '../lib/draft.js';
+import { clock, userZone, whenIn } from '../lib/clock.js';
 
-/** The fields of a message the prompts use. */
-export function emailForPrompt(email) {
+/** The fields of a message the prompts use; its date in the user's time zone. */
+export function emailForPrompt(email, zone) {
   return {
     from: email.from?.[0] ?? null,
-    date: email.receivedAt ?? '',
+    date: email.receivedAt ? whenIn(zone ?? userZone(null), email.receivedAt) : '',
     subject: email.subject ?? '',
     text: email.text ?? '',
   };
@@ -59,7 +60,8 @@ export function ReaderBar(props) {
 
   const run = async (name) => {
     const full = await loadText(api, email);
-    await task.run(name, { email: emailForPrompt(full), today: new Date().toISOString().slice(0, 10) });
+    const zone = userZone(api);
+    await task.run(name, { email: emailForPrompt(full, zone), now: clock(zone) });
   };
   const running = task.status === 'running';
   const open = task.status !== 'idle';
@@ -211,7 +213,8 @@ export function ThreadSummary(props) {
     try {
       const ids = emailIds.slice(-MAX_THREAD_MESSAGES);
       const emails = (await Promise.all(ids.map((id) => api.email.get(id).catch(() => null)))).filter(Boolean);
-      const input = emails.map((e) => ({ ...emailForPrompt(e), text: ownText(e.text ?? '') || e.preview || '' }));
+      const zone = userZone(api);
+      const input = emails.map((e) => ({ ...emailForPrompt(e, zone), text: ownText(e.text ?? '') || e.preview || '' }));
       await task.run('thread', { emails: input });
     } finally {
       setLoading(false);

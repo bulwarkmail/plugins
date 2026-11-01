@@ -44,9 +44,9 @@ describe('the app\'s settings', () => {
 
 describe('runTool', () => {
   it('reads the message the user replies to', async () => {
-    const api = fakeApi({ handlers: { 'email.get': async (id) => ({ id, from: [{ name: 'Carol', email: 'carol@example.org' }], receivedAt: '2026-10-12T09:00:00Z', subject: 'Thursday', text: 'Can we meet?' }) } });
+    const api = fakeApi({ timeZone: 'UTC', handlers: { 'email.get': async (id) => ({ id, from: [{ name: 'Carol', email: 'carol@example.org' }], receivedAt: '2026-10-12T09:00:00Z', subject: 'Thursday', text: 'Can we meet?' }) } });
     const text = await runTool(api, 'read_original_message', {}, { inReplyToId: 'M1' });
-    expect(text).toBe('From: Carol <carol@example.org>\nDate: 2026-10-12T09:00:00Z\nSubject: Thursday\n\nCan we meet?');
+    expect(text).toBe('From: Carol <carol@example.org>\nDate: Monday, 2026-10-12 09:00\nSubject: Thursday\n\nCan we meet?');
     expect(api.calls('email.get').map((c) => c.args)).toEqual([['M1']]);
     await expect(runTool(api, 'read_original_message', {}, {})).rejects.toThrow(/no original message/);
   });
@@ -95,7 +95,7 @@ describe('runTool', () => {
 describe('mail lookups', () => {
   it('searches the mail through the api, lists ids for read_message, and brings a card', async () => {
     const asked = [];
-    const api = fakeApi({ handlers: {
+    const api = fakeApi({ timeZone: 'UTC', handlers: {
       'email.search': async (q) => { asked.push(q); return [{ id: 'M7', subject: 'Invoice 42', from: [{ name: 'Carol', email: 'carol@example.org' }], receivedAt: '2026-10-12T09:00:00Z', preview: 'Please find attached' }]; },
       'email.get': async (id) => ({ id, subject: 'Invoice 42', from: [{ name: 'Carol', email: 'carol@example.org' }], receivedAt: '2026-10-12T09:00:00Z', text: 'The invoice is attached.' }),
     } });
@@ -105,7 +105,7 @@ describe('mail lookups', () => {
     expect(found.text).toContain('Invoice 42');
     expect(found.widget).toMatchObject({ type: 'emails', items: [{ id: 'M7', subject: 'Invoice 42', from: 'Carol' }] });
     const read = await runTool(api, 'read_message', { id: 'M7' });
-    expect(read).toBe('From: Carol <carol@example.org>\nDate: 2026-10-12T09:00:00Z\nSubject: Invoice 42\n\nThe invoice is attached.');
+    expect(read).toBe('From: Carol <carol@example.org>\nDate: Monday, 2026-10-12 09:00\nSubject: Invoice 42\n\nThe invoice is attached.');
     await expect(runTool(api, 'search_mail', {})).rejects.toThrow(/at least one of/);
     await expect(runTool(api, 'search_mail', { text: 'x', after: 'soon' })).rejects.toThrow(/date/);
     await expect(runTool(api, 'read_message', { id: '' })).rejects.toThrow(/empty/);

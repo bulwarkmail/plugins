@@ -9,7 +9,8 @@ import { emailForPrompt } from '../Reader.jsx';
 import { keepEdges } from '../AssistantDialog.jsx';
 import { ensureConsent, loadSetup, savePrefs } from '../../lib/assistant.js';
 import { composerChatSystem, readerChatSystem, buildPrompt, contextSuffix } from '../../lib/prompts.js';
-import { loadPerson, localNow } from '../../lib/person.js';
+import { loadPerson } from '../../lib/person.js';
+import { clock, userZone } from '../../lib/clock.js';
 import { historyMessages, runChat } from '../../lib/chat.js';
 import { runTool, toolsFor } from '../../lib/tools.js';
 import { MAX_AUTO_ACTIONS, actionToolsFor, describeAction, effectiveActionMode, isActionTool, performAction, undoAction } from '../../lib/actions.js';
@@ -19,7 +20,7 @@ import { defaultTarget, languageOptions } from '../../lib/languages.js';
 import { diffSuggestions } from '../../lib/grammar.js';
 import { COMPOSER_CONTEXT_KEY, DRAFT_KEY, READER_CHAT_KEY, chatKey, pendingKey } from '../../lib/background.js';
 import {
-  MAX_TURNS, PENDING_TTL_MS, appLabels, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, today, uid,
+  MAX_TURNS, PENDING_TTL_MS, appLabels, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, uid,
 } from './model.js';
 
 export function useAssistantChat(props) {
@@ -157,7 +158,7 @@ export function useAssistantChat(props) {
 
   /** Who the user is and their standing instructions, for this request. */
   const extraContext = useCallback(() => contextSuffix({
-    person: person ? { ...person, now: localNow(person.timeZone) } : null,
+    person,
     instructions: { admin: setup?.config?.instructions, user: prefs.instructions },
     place: { panel: mode, labels: appLabels(t) },
   }), [person, setup, prefs, mode, t]);
@@ -190,11 +191,12 @@ export function useAssistantChat(props) {
       const onText = (full) => patchTurn(turn.id, { content: full });
       let text;
       const extra = extraContext();
+      const now = clock(userZone(api, person?.timeZone));
       if (task) {
-        const prompt = buildPrompt(task, { language: locale, extra, ...taskInput });
+        const prompt = buildPrompt(task, { language: locale, extra, ...taskInput, ...(task === 'actions' ? { now } : {}) });
         text = await streamCompletion(api, endpoint, prompt, { onText, signal: abort.signal });
       } else {
-        const ctx = { inReplyToId: mode === 'composer' ? context?.inReplyToId : undefined, lookups, actions: actionMode, mode, openEmailId: mode === 'reader' ? contextEmail?.id : undefined, settingsName: t('app.nav.settings') };
+        const ctx = { inReplyToId: mode === 'composer' ? context?.inReplyToId : undefined, lookups, actions: actionMode, mode, openEmailId: mode === 'reader' ? contextEmail?.id : undefined, settingsName: t('app.nav.settings'), zone: now.zone };
         const tools = [...toolsFor(ctx), ...actionToolsFor(ctx)];
         let autoActions = 0;
         // Lookups run straight away; an action is shown first, then waits for
@@ -223,8 +225,8 @@ export function useAssistantChat(props) {
           }
         };
         const system = mode === 'composer'
-          ? composerChatSystem({ language: locale, today: today(), subject, mode: context?.mode, originalSubject: context?.originalSubject, scope, text: src, hasTools: tools.length > 0, actions: actionMode, extra })
-          : readerChatSystem({ language: locale, today: today(), email: contextEmail ? emailForPrompt(contextEmail) : null, emailId: contextEmail?.id, selection: scope === 'passage' ? src : '', hasTools: tools.length > 0, actions: actionMode, extra });
+          ? composerChatSystem({ language: locale, now, subject, mode: context?.mode, originalSubject: context?.originalSubject, scope, text: src, hasTools: tools.length > 0, actions: actionMode, extra })
+          : readerChatSystem({ language: locale, now, email: contextEmail ? emailForPrompt(contextEmail, now.zone) : null, emailId: contextEmail?.id, selection: scope === 'passage' ? src : '', hasTools: tools.length > 0, actions: actionMode, extra });
         const messages = [...historyMessages(previous), { role: 'user', content: userTurn.content }];
         const out = await runChat(api, endpoint, {
           system, messages, tools, runTool: callTool,
@@ -254,7 +256,7 @@ export function useAssistantChat(props) {
     } finally {
       if (controller.current === abort) controller.current = null;
     }
-  }, [api, setup, askConsent, patchTurn, locale, mode, context, lookups, subject, contextEmail, extraContext, t]);
+  }, [api, setup, askConsent, patchTurn, locale, mode, context, lookups, subject, contextEmail, extraContext, person, t]);
 
   /** A quick action on the current source (or on `text` from a right-click). */
   const quick = useCallback((action, { text, targetTag } = {}) => {
@@ -267,14 +269,14 @@ export function useAssistantChat(props) {
       });
       return;
     }
-    const { task, input: taskInput, show } = taskForAction(mode, action, src, { target: targetTag ?? target, email });
+    const { task, input: taskInput, show } = taskForAction(mode, action, src, { target: targetTag ?? target, email, now: clock(userZone(api, person?.timeZone)) });
     const scopeLabel = t(`panel.scope.${src.scope}`);
     const name = action === 'translate'
       ? t('panel.translate_to', { language: languages.find((l) => l.tag === (targetTag ?? target))?.label ?? (targetTag ?? target) })
       : t(mode === 'composer' ? `assistant.action.${action}` : `reader.${action}`, {});
     if (action !== 'translate' && mode === 'composer') void savePrefs(api, { lastAction: action });
     void send({ label: `${name} · ${scopeLabel}`, task, input: taskInput, show, scope: src.scope, src: src.text });
-  }, [api, mode, source, target, email, languages, send, t]);
+  }, [api, mode, source, target, email, languages, send, person, t]);
 
   /** The typed request. */
   const submit = useCallback(() => {

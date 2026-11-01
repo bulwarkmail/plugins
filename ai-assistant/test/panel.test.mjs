@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
@@ -18,10 +18,11 @@ const CONSENT = 'consent:anthropic:http://localhost:18099';
 const EMAIL = { id: 'M1', subject: 'Thursday', receivedAt: '2026-10-12T09:00:00Z', from: [{ name: 'Carol', email: 'carol@example.org' }], text: 'Can we meet on Thursday at 3?' };
 
 /** A model that answers each request in turn; the last answer repeats. */
-function makeApi({ answers = ['Answer.'], body = 'Hello Bob, can we meet tuesday? Thanks', consent = true, handlers = {} } = {}) {
+function makeApi({ answers = ['Answer.'], body = 'Hello Bob, can we meet tuesday? Thanks', consent = true, handlers = {}, timeZone } = {}) {
   let i = 0;
   const api = fakeApi({
     translations: manifest.locales,
+    ...(timeZone ? { timeZone } : {}),
     handlers: {
       'admin.getAllConfig': async () => CONFIG,
       'composer.getBody': async () => ({ html: `<p>${body}</p>`, text: body }),
@@ -578,7 +579,7 @@ describe('the reader panel', () => {
     expect(system).toContain('Email addresses: anna@example.org');
     expect(system).toContain('Signs emails with:\nKind regards,\nAnna');
     expect(system).toContain('Time zone: Europe/Zurich');
-    expect(system).toMatch(/Local date and time now: \w+/);
+    expect(system).toMatch(/Now it is \w+day, \d{4}-\d{2}-\d{2}, \d\d:\d\d in the user's time zone/);
     expect(system).toContain('Standing instructions from the administrator:\nWrite in British English.');
     expect(system).toContain('Standing instructions from the user (these win over the administrator\'s):\nKeep it short.');
     expect(system.indexOf('administrator')).toBeLessThan(system.indexOf('Keep it short.'));
@@ -586,6 +587,45 @@ describe('the reader panel', () => {
     await quickAction('Summarize');
     await settled();
     expect(sentPrompt(api).system).toContain('Keep it short.');
+  });
+
+  it('gives the model the user\'s own date at 00:30 in Berlin, not the UTC date', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-30T23:30:00Z'));
+    try {
+      const api = makeApi({ answers: ['Done.'], timeZone: 'Europe/Berlin', handlers: { 'user.getTimeZone': async () => 'Europe/Berlin' } });
+      await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+      await type('Was habe ich morgen?');
+      await pressEnter();
+      await settled();
+      const system = sentPrompt(api).system;
+      expect(system).toContain('Now it is Saturday, 2026-10-31, 00:30');
+      expect(system).toContain('Tomorrow is Sunday, 2026-11-01');
+      expect(system).not.toMatch(/Today is 2026-10-30/);
+      // The quick action for to-dos gets the same date.
+      await quickAction('To-dos and dates');
+      await settled();
+      expect(sentPrompt(api).system).toContain('Now it is Saturday, 2026-10-31, 00:30');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives the model the user\'s own date at 23:30 in Los Angeles', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-01T06:30:00Z'));
+    try {
+      const api = makeApi({ answers: ['Done.'], timeZone: 'America/Los_Angeles', handlers: { 'user.getTimeZone': async () => 'America/Los_Angeles' } });
+      await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+      await type('What do I have tomorrow?');
+      await pressEnter();
+      await settled();
+      const system = sentPrompt(api).system;
+      expect(system).toContain('Now it is Saturday, 2026-10-31, 23:30');
+      expect(system).toContain('Tomorrow is Sunday, 2026-11-01');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('draws the widgets the model adds and sends a chip as the next request', async () => {

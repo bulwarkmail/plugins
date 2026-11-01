@@ -23,7 +23,6 @@ export const excerpt = (text, max = 90) => {
   const flat = String(text ?? '').replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
-export const today = () => new Date().toISOString().slice(0, 10);
 
 /** The text a request works on: the selection, else the message. */
 export function sourceFor(mode, { selection, body, email }) {
@@ -80,7 +79,7 @@ export function lastTopic(turns) {
 }
 
 /** What a quick action sends, as a task of prompts.js, and how its result is shown. */
-export function taskForAction(mode, action, source, { target, email, instruction } = {}) {
+export function taskForAction(mode, action, source, { target, email, instruction, now } = {}) {
   if (mode === 'composer') {
     if (REWRITE_STYLES.includes(action)) return { task: 'rewrite', input: { text: source.text, style: action }, show: 'proposal' };
     if (action === 'translate') return { task: 'translate', input: { text: source.text, target }, show: 'proposal' };
@@ -88,9 +87,9 @@ export function taskForAction(mode, action, source, { target, email, instruction
     if (action === 'write') return { task: 'write', input: { prompt: instruction, subject: email?.subject ?? '' }, show: 'proposal' };
     return { task: 'edit', input: { text: source.text, instruction }, show: 'proposal' };
   }
-  const mail = email ? emailForPrompt(email) : null;
+  const mail = email ? emailForPrompt(email, now?.zone) : null;
   if (action === 'summary') return { task: 'summary', input: { email: mail }, show: 'text' };
-  if (action === 'actions') return { task: 'actions', input: { email: mail, today: today() }, show: 'actions' };
+  if (action === 'actions') return { task: 'actions', input: { email: mail, now }, show: 'actions' };
   if (action === 'replies') return { task: 'replies', input: { email: mail }, show: 'replies' };
   if (action === 'explain') return { task: 'explain', input: { email: mail, text: source.text }, show: 'text' };
   return { task: 'translate', input: { text: source.text, target }, show: 'text' };

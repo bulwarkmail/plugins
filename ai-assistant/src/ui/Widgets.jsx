@@ -7,42 +7,47 @@ import { useState } from 'react';
 import { Badge, Button, LinkButton, Row, Stack, Text } from '@plugin-host/ui';
 import { copyWithToast } from './common.jsx';
 import { formatDate } from './Reader.jsx';
+import { userZone } from '../lib/clock.js';
 
 const card = { border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px' };
 const DAYS_SHOWN = 7;
 
-function fmt(locale, value, { time = true } = {}) {
+function fmt(locale, value, { time = true, zone } = {}) {
   if (!value) return '';
   try {
-    const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value);
+    // A calendar date is shown as it is; an instant in the user's zone.
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const d = new Date(dateOnly ? `${value}T12:00:00Z` : value);
     if (Number.isNaN(d.getTime())) return value;
-    return new Intl.DateTimeFormat(locale, time && !/^\d{4}-\d{2}-\d{2}$/.test(value)
-      ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
-      : { weekday: 'short', day: 'numeric', month: 'short' }).format(d);
+    const tz = dateOnly ? 'UTC' : zone;
+    return new Intl.DateTimeFormat(locale, time && !dateOnly
+      ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', ...(tz ? { timeZone: tz } : {}) }
+      : { weekday: 'short', day: 'numeric', month: 'short', ...(tz ? { timeZone: tz } : {}) }).format(d);
   } catch {
     return value;
   }
 }
 
-function timeOnly(locale, value) {
+function timeOnly(locale, value, zone) {
   try {
-    return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+    return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', ...(zone ? { timeZone: zone } : {}) }).format(new Date(value));
   } catch {
     return value;
   }
 }
 
 /** A slot as a sentence for the message: "Tue, 21 Oct, 10:00 to 11:00". */
-export function slotText(locale, item) {
+export function slotText(locale, item, zone) {
   if (item.label && !item.start) return item.label;
-  const start = fmt(locale, item.start);
-  const end = item.end ? (item.end.slice(0, 10) === item.start.slice(0, 10) ? timeOnly(locale, item.end) : fmt(locale, item.end)) : '';
+  const start = fmt(locale, item.start, { zone });
+  const end = item.end ? (item.end.slice(0, 10) === item.start.slice(0, 10) ? timeOnly(locale, item.end, zone) : fmt(locale, item.end, { zone })) : '';
   return `${item.label ? `${item.label}: ` : ''}${start}${end ? ` – ${end}` : ''}`;
 }
 
 export function Widget({ api, mode, widget, onSend, onInsert }) {
   const t = api.i18n.t;
   const locale = api.i18n.getLocale?.() ?? 'en';
+  const zone = userZone(api);
   if (!widget) return null;
   switch (widget.type) {
     case 'choices':
@@ -69,7 +74,7 @@ export function Widget({ api, mode, widget, onSend, onInsert }) {
       return (
         <div data-widget="times"><Stack gap={1}>
           {widget.items.map((item, i) => {
-            const line = slotText(locale, item);
+            const line = slotText(locale, item, zone);
             return (
               <div key={i} style={card}>
                 <Row justify="between" wrap={false}>
@@ -113,7 +118,7 @@ export function Widget({ api, mode, widget, onSend, onInsert }) {
               <Row justify="between" wrap={false} align="start">
                 <Stack gap={0} className="min-w-0">
                   <Text weight="medium" truncate>{item.subject || '(no subject)'}</Text>
-                  <Text size="xs" tone="muted">{[item.from, item.date ? fmt(locale, item.date) : ''].filter(Boolean).join(' · ')}</Text>
+                  <Text size="xs" tone="muted">{[item.from, item.date ? fmt(locale, item.date, { zone }) : ''].filter(Boolean).join(' · ')}</Text>
                 </Stack>
                 <Button size="sm" variant="ghost" icon="file-text" aria-label={t('widget.read')} title={t('widget.read')} onClick={() => onSend?.(t('widget.read_prompt', { subject: item.subject || item.id, id: item.id }))} />
               </Row>
@@ -122,7 +127,7 @@ export function Widget({ api, mode, widget, onSend, onInsert }) {
         </Stack></div>
       );
     case 'calendar':
-      return <CalendarWidget api={api} widget={widget} locale={locale} />;
+      return <CalendarWidget api={api} widget={widget} locale={locale} zone={zone} />;
     case 'table':
       return (
         <div style={{ overflowX: 'auto' }} data-widget="table">
@@ -138,7 +143,7 @@ export function Widget({ api, mode, widget, onSend, onInsert }) {
 }
 
 /** Busy and free days of a calendar lookup, the first week open, the rest behind Show all. */
-function CalendarWidget({ api, widget, locale }) {
+function CalendarWidget({ api, widget, locale, zone }) {
   const t = api.i18n.t;
   const [all, setAll] = useState(false);
   const days = all ? widget.days : widget.days.slice(0, DAYS_SHOWN);
@@ -153,7 +158,7 @@ function CalendarWidget({ api, widget, locale }) {
                 ? <Badge tone="success">{t('widget.free')}</Badge>
                 : day.events.map((e, i) => (
                   <Text key={i} size="xs" truncate>
-                    {e.allDay ? t('widget.all_day') : `${timeOnly(locale, e.start)}${e.end ? `–${timeOnly(locale, e.end)}` : ''}`} {e.title}
+                    {e.allDay ? t('widget.all_day') : `${timeOnly(locale, e.start, zone)}${e.end ? `–${timeOnly(locale, e.end, zone)}` : ''}`} {e.title}
                   </Text>
                 ))}
             </Stack>
