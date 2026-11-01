@@ -1,0 +1,13 @@
+{
+  "fullHashes": [
+    {
+      "fullHash": "yDw+rUJ/Wvj8198yapNfcoLv/kuEXh+5M6XXFUr0HS4=",
+      "fullHashDetails": [
+        {
+          "threatType": "SOCIAL_ENGINEERING"
+        }
+      ]
+    }
+  ],
+  "cacheDuration": "300s"
+}
