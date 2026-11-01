@@ -5,7 +5,8 @@ Asks before a link opens a domain that isn't on the trusted list. Since
 link check service, with Google Safe Browsing, or with both. The dialog
 always names the domain the link really goes to.
 
-Needs Bulwark 1.20.0 or later. Bulwark Lite has no plugins.
+Needs Bulwark 1.20.0 or later. Bulwark Lite has no plugins. The dialogs come
+in every language Bulwark ships.
 
 ## Admin settings
 
@@ -14,7 +15,7 @@ Warning).
 
 | Setting | Key | Default | What it does |
 | --- | --- | --- | --- |
-| Trusted domains | `trustedDomains` | empty | Comma- or newline-separated. Subdomains match (example.com also trusts docs.example.com). Applies to every user. |
+| Trusted domains | `trustedDomains` | empty | Comma- or newline-separated. Subdomains match (example.com also trusts docs.example.com). International domains work in either form (bücher.example or xn--bcher-kva.example). Applies to every user. |
 | Check links before they open | `lookup` | `off` | `off`, `endpoint` (company service), `safebrowsing` (Google) or `both`. |
 | Link check service URL | `endpointUrl` | empty | Where the company service answers (see below). |
 | Link check service token | `endpointToken` | empty | Optional secret, sent as `Authorization: Bearer <token>`. |
@@ -35,7 +36,10 @@ that device (turn "Offer Always trust" off to skip that question).
 
 1. A trusted domain opens at once (unless `skipTrusted` is off; then it is
    checked first and opens at once when nothing is found).
-2. Otherwise the checks run, side by side, for at most 3 seconds.
+2. Otherwise the checks run, side by side. The whole click gets 3 seconds,
+   including reading the admin settings and which checks are set up the
+   first time (both are read when the plugin starts), so the link still
+   opens while the browser counts it as the user's click.
 3. A link is **unsafe** when either check says so. The user gets a strong
    warning with the reason, or with `onUnsafe: block` only a Close button.
 4. If a check fails (error, bad answer, no answer in 3 seconds, not set up)
@@ -44,6 +48,12 @@ that device (turn "Offer Always trust" off to skip that question).
    opens); closed shows only Close.
 5. Otherwise the normal domain warning, with "Checked: no known threats."
    when a check answered safe.
+
+One address end to end: the plugin reads every link the way the browser
+does (the WHATWG URL rules), and checks, shows and opens exactly that
+address. `http://evil.example\@good.example/` goes to evil.example in a
+browser, so evil.example is what is checked and named; an international
+domain is checked in its punycode form.
 
 When the link text looks like an address ("paypal.com") but the link goes
 somewhere else, the dialog says so.
