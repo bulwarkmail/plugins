@@ -73,10 +73,19 @@ describe('the defaults', () => {
     expect(Object.keys(manifest.configSchema).sort()).toEqual(Object.keys(DEFAULTS).sort());
   });
 
-  it('every string has an English fallback and a German translation', () => {
-    expect(Object.keys(manifest.locales.en).sort()).toEqual(Object.keys(FALLBACK).sort());
-    expect(Object.keys(manifest.locales.de).sort()).toEqual(Object.keys(FALLBACK).sort());
+  it('every string has an English fallback and a translation in every language Bulwark ships', () => {
+    const webmail = ['ar', 'ca', 'cs', 'da', 'de', 'en', 'es', 'et', 'fa', 'fr', 'he', 'hu', 'it', 'ja', 'ko', 'lv', 'mn', 'nb', 'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'th', 'tr', 'uk', 'vi', 'zh', 'zh-TW'];
+    expect(Object.keys(manifest.locales).sort()).toEqual([...webmail].sort());
+    const placeholders = (s) => (String(s).match(/\{\w+\}/g) ?? []).sort();
+    for (const locale of webmail) {
+      expect(Object.keys(manifest.locales[locale]).sort(), locale).toEqual(Object.keys(FALLBACK).sort());
+      for (const [key, value] of Object.entries(FALLBACK)) {
+        expect(placeholders(manifest.locales[locale][key]), `${locale} ${key}`).toEqual(placeholders(value));
+      }
+    }
     for (const [key, value] of Object.entries(FALLBACK)) expect(manifest.locales.en[key], key).toBe(value);
+    // German addresses the user formally.
+    expect(Object.values(manifest.locales.de).join(' ')).not.toMatch(/\b(du|dein|deine|dich|dir)\b/i);
   });
 });
 
@@ -201,6 +210,14 @@ describe('onBeforeEmailSend', () => {
     const [{ args: [dialog] }] = api.calls('ui.confirm');
     expect(dialog.title).toBe('Vor dem Senden prüfen');
     expect(dialog.message).toContain('Kartennummer mit Endziffern 4242');
+  });
+
+  it('speaks the other languages Bulwark ships, here French and Japanese', async () => {
+    for (const [locale, title] of [['fr', 'Vérifiez avant d’envoyer'], ['ja', '送信前に確認してください']]) {
+      const { api, plugin } = await started({}, { locale });
+      await plugin.hooks.onBeforeEmailSend(mail({ authoredText: `Card ${CARD}` }));
+      expect(api.calls('ui.confirm')[0].args[0].title, locale).toBe(title);
+    }
   });
 });
 
