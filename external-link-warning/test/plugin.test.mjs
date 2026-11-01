@@ -67,7 +67,24 @@ async function started({ config = {}, accounts = ALL_READY, endpoint, google, co
 
 const click = (plugin, href, text) => plugin.hooks.onBeforeExternalLink({ href, ...(text ? { text } : {}) });
 
+const WEBMAIL_LOCALES = ['ar', 'ca', 'cs', 'da', 'de', 'en', 'es', 'et', 'fa', 'fr', 'he', 'hu', 'it', 'ja', 'ko', 'lv', 'mn', 'nb', 'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'th', 'tr', 'uk', 'vi', 'zh', 'zh-TW'];
+
 describe('the manifest', () => {
+  it('speaks every language Bulwark ships, with every text and its placeholders', () => {
+    expect(Object.keys(manifest.locales).sort()).toEqual([...WEBMAIL_LOCALES].sort());
+    const vars = (s) => (s.match(/\{\w+\}/g) ?? []).sort();
+    for (const locale of WEBMAIL_LOCALES) {
+      const table = manifest.locales[locale];
+      expect(Object.keys(table).sort(), locale).toEqual(Object.keys(EN).sort());
+      for (const [key, text] of Object.entries(EN)) {
+        expect(typeof table[key] === 'string' && table[key].trim().length > 0, `${locale} ${key}`).toBe(true);
+        expect(vars(table[key]), `${locale} ${key}`).toEqual(vars(text));
+        // Translated: only the brand texts may stay English.
+        if (locale !== 'en' && !/^(dialog\.cancel|close)$/.test(key)) expect(table[key], `${locale} ${key}`).not.toBe(text);
+      }
+    }
+  });
+
   it('ships the English texts the code falls back to, and German for every key', () => {
     expect(manifest.locales.en).toEqual(EN);
     expect(Object.keys(manifest.locales.de).sort()).toEqual(Object.keys(EN).sort());
