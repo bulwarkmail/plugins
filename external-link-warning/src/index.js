@@ -22,7 +22,7 @@
  * plugin's own hook.
  */
 
-import { hostnameFromHref, isTrusted, parseDomains } from './lib/domains.js';
+import { hostnameFromHref, isTrusted, normaliseHref, parseDomains } from './lib/domains.js';
 import { readConfig, DEFAULT_CONFIG } from './lib/config.js';
 import { runChecks } from './lib/lookup.js';
 import { createEndpoint } from './lib/endpoint.js';
@@ -198,10 +198,16 @@ export async function activate(api) {
 // ─── Hooks ────────────────────────────────────────────────────
 
 export const hooks = {
-  async onBeforeExternalLink(ctx) {
-    if (!pluginApi || !ctx?.href) return undefined;
-    const host = hostnameFromHref(ctx.href);
-    if (!host) return undefined; // mailto:, tel:, relative links: not ours
+  async onBeforeExternalLink(raw) {
+    if (!pluginApi || !raw?.href) return undefined;
+    // One address end to end: the one the browser opens (WHATWG URL) is
+    // what is checked, shown and opened. Bulwark 1.20 hands it over in this
+    // form already; this keeps an older host from opening something else.
+    const href = normaliseHref(raw.href);
+    if (!href) return undefined; // mailto:, tel:, relative links: not ours
+    const ctx = { ...raw, href };
+    const host = hostnameFromHref(href);
+    if (!host) return undefined;
 
     let decision;
     try {

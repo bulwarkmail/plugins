@@ -108,6 +108,22 @@ describe('without a lookup (the default)', () => {
     expect(api.calls('ui.openExternalUrl')[0].args[0]).toBe('https://unknown.test/a');
   });
 
+  it('checks, shows and opens the address the browser opens, not the raw text', async () => {
+    const posted = [];
+    const { api, plugin } = await started({
+      config: { lookup: 'endpoint', endpointUrl: 'https://check.corp.example/v1' },
+      confirm: true,
+      endpoint: (url, init) => { posted.push(JSON.parse(init.body)); return proxyResponse(JSON.stringify({ verdict: 'safe' })); },
+    });
+    expect(await click(plugin, 'http://evil.example\\@good.example/login')).toBe(false);
+    await vi.waitFor(() => expect(api.calls('ui.openExternalUrl')).toHaveLength(1));
+    expect(posted).toEqual([{ url: 'http://evil.example/@good.example/login', host: 'evil.example' }]);
+    const message = api.calls('ui.confirm')[0].args[0].message;
+    expect(message).toContain('evil.example');
+    expect(message).not.toMatch(/visit good\.example/);
+    expect(api.calls('ui.openExternalUrl')[0].args[0]).toBe('http://evil.example/@good.example/login');
+  });
+
   it('leaves mailto: and relative links alone', async () => {
     const { plugin } = await started();
     expect(await click(plugin, 'mailto:a@b.test')).toBeUndefined();

@@ -2,7 +2,7 @@
 // (https://developers.google.com/safe-browsing/reference/URLs.and.Hashing).
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { canonicalize, expressions, normaliseIpv4, normaliseIpv6 } from '../src/lib/canonical.js';
+import { canonicalize, canonicalizeHref, expressions, normaliseIpv4, normaliseIpv6 } from '../src/lib/canonical.js';
 import { latin1Bytes, sha256, toBase64, fromBase64 } from '../src/lib/sha256.js';
 
 const GOOGLE_EXAMPLES = [
@@ -58,6 +58,37 @@ describe('canonicalize', () => {
 
   it('has no host for an empty input', () => {
     expect(canonicalize('')).toBeNull();
+  });
+});
+
+// What is checked must be what the browser opens. Browsers parse links with
+// the WHATWG URL parser, which reads some addresses differently from
+// Google's rules alone.
+describe('canonicalizeHref: the address the browser opens', () => {
+  it('still gives Google\'s results for all of Google\'s examples', () => {
+    for (const [input, expected] of GOOGLE_EXAMPLES) expect(canonicalizeHref(input).url, input).toBe(expected);
+  });
+
+  it('takes a backslash as the path separator browsers make of it', () => {
+    const link = 'http://evil.example\\@good.example/login';
+    expect(canonicalizeHref(link).host).toBe('evil.example');
+    expect(expressions(link)[0]).toBe('evil.example/@good.example/login');
+    expect(expressions(link).some((e) => e.startsWith('good.example'))).toBe(false);
+  });
+
+  it('drops user info the way the browser does', () => {
+    expect(canonicalizeHref('https://good.example:pw@evil.example/x').host).toBe('evil.example');
+    expect(expressions('https://good.example@evil.example/x')[0]).toBe('evil.example/x');
+  });
+
+  it('hashes an international domain in its punycode form', () => {
+    expect(canonicalizeHref('https://bücher.example/a').host).toBe('xn--bcher-kva.example');
+    expect(expressions('https://BÜCHER.example/a')[0]).toBe('xn--bcher-kva.example/a');
+  });
+
+  it('reads full-width dots as dots', () => {
+    expect(canonicalizeHref('http://www\uFF0Eevil\uFF0Eexample/').host).toBe('www.evil.example');
+    expect(expressions('http://www\u3002evil\uFF0Eexample/x')).toContain('evil.example/x');
   });
 });
 

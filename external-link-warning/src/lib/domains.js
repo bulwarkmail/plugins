@@ -8,7 +8,24 @@ export function normaliseDomain(raw) {
   d = d.replace(/[/?#].*$/, '');
   d = d.replace(/:\d+$/, '');
   d = d.replace(/\.+$/, '');
-  return d;
+  if (!d) return '';
+  // The form link hosts have: punycode for an international domain
+  // (bücher.example trusts xn--bcher-kva.example), dots for full-width dots.
+  try {
+    return new URL(`http://${d}`).hostname.replace(/\.+$/, '');
+  } catch {
+    return '';
+  }
+}
+
+/** A link as the browser opens it (WHATWG URL), http and https only; '' otherwise. */
+export function normaliseHref(href) {
+  try {
+    const url = new URL(String(href).trim());
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+  } catch {
+    return '';
+  }
 }
 
 /** A comma-, space- or newline-separated list (or an array) as domains. */
@@ -39,6 +56,14 @@ export function isTrusted(hostname, list) {
   return false;
 }
 
+/** Extensions that make link text a file name ("report.pdf"), not a domain. */
+const FILE_EXTENSIONS = new Set([
+  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'txt', 'csv',
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tif', 'tiff', 'heic',
+  'zip', 'rar', '7z', 'gz', 'tar', 'exe', 'msi', 'bat', 'cmd', 'js', 'vbs', 'ps1', 'jar', 'apk', 'dmg', 'iso',
+  'htm', 'html', 'eml', 'msg', 'ics', 'vcf', 'xml', 'json', 'mp3', 'mp4', 'mov', 'avi', 'wav', 'mkv', 'log',
+]);
+
 /**
  * The domain a link's visible text names, when it looks like a web address
  * ("paypal.com", "https://paypal.com/login", "www.paypal.com"), else ''.
@@ -51,7 +76,11 @@ export function domainInText(text) {
   // An address with a scheme, or something shaped like host.tld[/...].
   let candidate = trimmed;
   if (!/^https?:\/\//i.test(candidate)) {
-    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(?:[:/?#].*)?$/i.test(candidate)) return '';
+    const match = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.([a-z]{2,})([:/?#].*)?$/i.exec(candidate);
+    if (!match) return '';
+    // "report.pdf" or "setup.exe" is a file name, not a domain, unless a
+    // path follows the host.
+    if (!match[2] && FILE_EXTENSIONS.has(match[1].toLowerCase())) return '';
     candidate = `http://${candidate}`;
   }
   const host = hostnameFromHref(candidate);

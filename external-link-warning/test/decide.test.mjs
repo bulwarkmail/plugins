@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { plannedChecks, runChecks } from '../src/lib/lookup.js';
 import { decide, dialogFor } from '../src/lib/decide.js';
-import { domainInText, linkTextMismatch } from '../src/lib/domains.js';
+import { domainInText, isTrusted, linkTextMismatch, normaliseHref, parseDomains } from '../src/lib/domains.js';
 import { readConfig } from '../src/lib/config.js';
 import { EN } from '../src/lib/strings.js';
 
@@ -150,10 +150,35 @@ describe('link text', () => {
     expect(domainInText(undefined)).toBe('');
   });
 
+  it('takes file names for file names, not domains', () => {
+    for (const name of ['report.pdf', 'invoice.docx', 'setup.exe', 'photo.jpg', 'Daten.zip']) expect(domainInText(name), name).toBe('');
+    expect(linkTextMismatch('report.pdf', 'evil.example')).toBe('');
+    // With a scheme or a path it is an address again.
+    expect(domainInText('https://report.pdf/x')).toBe('report.pdf');
+    expect(domainInText('files.example.com/report.pdf')).toBe('files.example.com');
+    expect(domainInText('paypal.com')).toBe('paypal.com');
+  });
+
   it('matches the target host and its parents', () => {
     expect(linkTextMismatch('paypal.com', 'www.paypal.com')).toBe('');
     expect(linkTextMismatch('www.paypal.com', 'paypal.com')).toBe('');
     expect(linkTextMismatch('paypal.com', 'paypal.com.evil.example')).toBe('paypal.com');
     expect(linkTextMismatch('Click here', 'evil.example')).toBe('');
+  });
+});
+
+describe('trusted domains and addresses', () => {
+  it('trusts an international domain in the form links have', () => {
+    const list = parseDomains('bücher.example, https://Straße.example/path, *.corp.example');
+    // Browsers keep ß (nontransitional IDNA), so links to Straße.example have this host too.
+    expect(list).toEqual(['xn--bcher-kva.example', 'xn--strae-oqa.example', 'corp.example']);
+    expect(isTrusted(new URL('https://www.bücher.example/').hostname, list)).toBe(true);
+  });
+
+  it('reads a link the way the browser opens it', () => {
+    expect(normaliseHref('http://evil.example\\@good.example/login')).toBe('http://evil.example/@good.example/login');
+    expect(normaliseHref('HTTPS://Bücher.Example/a b')).toBe('https://xn--bcher-kva.example/a%20b');
+    expect(normaliseHref('mailto:a@b.test')).toBe('');
+    expect(normaliseHref('/inbox')).toBe('');
   });
 });

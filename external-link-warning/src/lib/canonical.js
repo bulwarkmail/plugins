@@ -189,6 +189,28 @@ export function canonicalize(input) {
   return { scheme, host, path, query, url };
 }
 
+/**
+ * The canonical form of the address a browser really opens for `href`.
+ * The browser parses links with the WHATWG URL parser: a backslash is a
+ * path separator (`http://evil.example\@good.example/` opens evil.example),
+ * user info is dropped, an IDN host becomes punycode, full-width dots
+ * become dots and a numeric host becomes dotted IPv4. That parse comes
+ * first, then Google's rules above. Text the parser refuses, such as
+ * Google's examples without a scheme, goes through Google's rules alone.
+ */
+export function canonicalizeHref(input) {
+  let url = null;
+  try { url = new URL(String(input).trim()); } catch { url = null; }
+  if (url && (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname) {
+    url.username = '';
+    url.password = '';
+    url.port = '';
+    url.hash = '';
+    return canonicalize(url.href);
+  }
+  return canonicalize(input);
+}
+
 /** The host suffixes to look up: the host, then up to four from its last five parts. */
 export function hostSuffixes(host) {
   const out = [host];
@@ -226,7 +248,7 @@ export function pathPrefixes(path, query) {
 
 /** Every host/path expression of a URL (at most 30), or [] when it has no host. */
 export function expressions(input) {
-  const canonical = canonicalize(input);
+  const canonical = canonicalizeHref(input);
   if (!canonical) return [];
   const out = [];
   for (const host of hostSuffixes(canonical.host)) {
