@@ -11,9 +11,8 @@ import { ActionsMenu, actionLabel, actionsFor } from './ActionsMenu.jsx';
 import { ContextChips } from './ContextChips.jsx';
 
 export function InputBox({ chat, composerId }) {
-  const { api, t, mode, source, email, input, setInput, inputRef, running, target, setTarget, languages } = chat;
+  const { api, t, mode, source, email, input, setInput, inputRef, running, target, setTarget, languages, translating, setTranslating } = chat;
   const [inputFocused, setInputFocused] = useState(false);
-  const [translating, setTranslating] = useState(false);
   // The box around the text field shows its focus, so the field drops the
   // kit's own outline, which would draw a second frame inside the box. In
   // forced colours the box's border colour is lost, so the outline stays.
@@ -77,20 +76,29 @@ export function InputBox({ chat, composerId }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
             <ContextChips api={api} source={source} email={email} onRemove={chat.removeContext} onRestore={chat.restoreContext} />
-            {actions.length > 0 && (translating ? (
+            {(actions.length > 0 || translating) && (translating ? (
               <Row gap={1} wrap={false}>
                 <Select
-                  value={target}
+                  // Starts on an empty entry, so the last language used can be picked too.
+                  value=""
+                  autoFocus
+                  data-translate-to
                   aria-label={t('composer.translate_label')}
-                  options={languages.map((l) => ({ value: l.tag, label: l.label }))}
+                  options={[
+                    { value: '', label: `${t('composer.translate_label')}…` },
+                    ...languages.filter((l) => l.tag === target),
+                    ...languages.filter((l) => l.tag !== target),
+                  ].map((l) => ('tag' in l ? { value: l.tag, label: l.label } : l))}
                   onChange={(value) => {
+                    if (!value) return;
                     setTarget(value);
-                    setTranslating(false);
+                    const text = translating.text;
+                    setTranslating(null);
                     void savePrefs(api, { translateTo: value });
-                    chat.quick('translate', { targetTag: value });
+                    chat.quick('translate', { targetTag: value, ...(text ? { text } : {}) });
                   }}
                 />
-                <Button variant="ghost" size="icon" icon="x" aria-label={t('common.cancel')} onClick={() => setTranslating(false)} />
+                <Button variant="ghost" size="icon" icon="x" aria-label={t('common.cancel')} onClick={() => setTranslating(null)} />
               </Row>
             ) : (
               <ActionsMenu
@@ -98,7 +106,7 @@ export function InputBox({ chat, composerId }) {
                 actions={actions}
                 actionLabel={(action) => actionLabel(t, mode, action)}
                 disabled={running}
-                onPick={(action) => (action === 'translate' ? setTranslating(true) : chat.quick(action))}
+                onPick={(action) => (action === 'translate' ? setTranslating({}) : chat.quick(action))}
               />
             ))}
           </div>

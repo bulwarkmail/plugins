@@ -118,7 +118,7 @@ for (const theme of ['light', 'dark']) {
       await frame.getByRole('button', { name: 'Actions' }).click();
       await frame.getByRole('menuitem', { name: 'Summarize' }).click();
       await acceptPrivacy(page, { frame });
-      await expect(frame.getByText('Summarize · this message')).toBeVisible();
+      await expect(frame.getByText('Summarize', { exact: true })).toBeVisible();
       await waitDone(frame);
       await expect(frame.locator('[data-turn="assistant"]').last()).toContainText(svc.answer);
       await shoot(page, ID, 'reader-summary', theme);
@@ -188,7 +188,7 @@ test('a highlighted passage: explain it from the right-click menu, then draft a 
 
     const { frame } = await readerPanel(page);
     await acceptPrivacy(page, { frame });
-    await expect(frame.getByText('Explain · highlighted passage')).toBeVisible();
+    await expect(frame.getByText('Explain · highlighted text')).toBeVisible();
     await waitDone(frame);
     await expect(frame.locator('[data-turn="assistant"]').last()).toContainText(svc.answer);
     // The panel follows the selection while it is there.
@@ -196,7 +196,7 @@ test('a highlighted passage: explain it from the right-click menu, then draft a 
     await frame.getByRole('button', { name: 'Actions' }).click();
       await frame.getByRole('menuitem', { name: 'Draft a reply' }).click();
     await waitDone(frame);
-    await expect(frame.getByText('Draft a reply · highlighted passage')).toBeVisible();
+    await expect(frame.getByText('Draft a reply · highlighted text')).toBeVisible();
     await expect(frame.locator('[data-turn="assistant"][data-status="done"]')).toHaveCount(2);
   } finally {
     await uninstallPlugin(api, ID);

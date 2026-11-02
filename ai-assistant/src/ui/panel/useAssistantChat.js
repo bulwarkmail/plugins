@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi } from '../common.jsx';
+import { actionLabel } from './ActionsMenu.jsx';
 import { emailForPrompt } from '../Reader.jsx';
 import { keepEdges } from '../AssistantDialog.jsx';
 import { ensureConsent, loadSetup, savePrefs } from '../../lib/assistant.js';
@@ -22,6 +23,9 @@ import { COMPOSER_CONTEXT_KEY, DRAFT_KEY, READER_CHAT_KEY, chatKey, pendingKey }
 import {
   MAX_TURNS, PENDING_TTL_MS, appLabels, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, uid,
 } from './model.js';
+
+/** Scopes that are part of the text; a quick action on them says so in its bubble. */
+const PART_SCOPES = new Set(['selection', 'passage']);
 
 export function useAssistantChat(props) {
   const api = useApi(props);
@@ -46,6 +50,8 @@ export function useAssistantChat(props) {
   const [input, setInput] = useState('');
   const [consent, setConsent] = useState(null);
   const [target, setTarget] = useState(defaultTarget(locale));
+  // The language picker of Translate: null, or { text } (text: what the right-click handed over).
+  const [translating, setTranslating] = useState(null);
   const languages = useMemo(() => languageOptions(locale), [locale]);
   const inputRef = useRef(null);
   const controller = useRef(null);
@@ -261,21 +267,22 @@ export function useAssistantChat(props) {
   /** A quick action on the current source (or on `text` from a right-click). */
   const quick = useCallback((action, { text, targetTag } = {}) => {
     const src = text ? { scope: mode === 'composer' ? 'selection' : 'passage', text } : source;
+    // The bubble names the action; the scope only when it is part of the text.
+    const named = (name) => (PART_SCOPES.has(src.scope) ? `${name} · ${t(`panel.scope.${src.scope}`)}` : name);
     if (action === 'reply') {
       void send({
-        label: `${t('panel.quick.reply')} · ${t(`panel.scope.${src.scope}`)}`,
+        label: named(t('panel.quick.reply')),
         sent: src.scope === 'passage' ? `Draft a reply to this email that answers the passage I highlighted:\n<passage>\n${src.text}\n</passage>` : 'Draft a reply to this email.',
         scope: src.scope, src: src.text,
       });
       return;
     }
     const { task, input: taskInput, show } = taskForAction(mode, action, src, { target: targetTag ?? target, email, now: clock(userZone(api, person?.timeZone)) });
-    const scopeLabel = t(`panel.scope.${src.scope}`);
     const name = action === 'translate'
       ? t('panel.translate_to', { language: languages.find((l) => l.tag === (targetTag ?? target))?.label ?? (targetTag ?? target) })
-      : t(mode === 'composer' ? `assistant.action.${action}` : `reader.${action}`, {});
+      : actionLabel(t, mode, action);
     if (action !== 'translate' && mode === 'composer') void savePrefs(api, { lastAction: action });
-    void send({ label: `${name} · ${scopeLabel}`, task, input: taskInput, show, scope: src.scope, src: src.text });
+    void send({ label: named(name), task, input: taskInput, show, scope: src.scope, src: src.text });
   }, [api, mode, source, target, email, languages, send, person, t]);
 
   /** The typed request. */
@@ -308,6 +315,11 @@ export function useAssistantChat(props) {
       if (!pending.at || Date.now() - pending.at > PENDING_TTL_MS) return;
       if (pending.action === 'ask' || !pending.action) {
         inputRef.current?.focus();
+        return;
+      }
+      // "Translate…" asks for the language first.
+      if (pending.action === 'translate') {
+        setTranslating({ text: pending.text || undefined });
         return;
       }
       quick(pending.action, pending.text ? { text: pending.text } : {});
@@ -386,7 +398,7 @@ export function useAssistantChat(props) {
 
   return {
     api, t, locale, mode, email, setup, loaded, turns, consent, source, input, setInput, inputRef,
-    target, setTarget, languages, running,
+    target, setTarget, languages, running, translating, setTranslating,
     removeContext, restoreContext, quick, submit, stop, apply, sendText, insertText, clear, retry,
     patchTurn, answerAction, undoStep,
   };

@@ -681,3 +681,45 @@ describe('the reader panel', () => {
     expect(sentPrompt(api).tools.map((t) => t.name)).toEqual(['find_setting']);
   });
 });
+
+describe('quick action names', () => {
+  const userBubble = () => [...document.querySelectorAll('[data-turn="user"]')].at(-1)?.textContent;
+
+  it('name only the action when it works on the whole message or draft', async () => {
+    const reader = makeApi({ answers: ['- a point'] });
+    await mount(reader, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await quickAction('Summarize');
+    await settled();
+    expect(userBubble()).toBe('Summarize');
+    cleanup();
+
+    const composer = makeApi({ answers: ['Hello Bob, can we meet on Tuesday?'] });
+    await mount(composer, { composerId: 'c1', selection: { text: '', empty: true }, focusRequest: 0 });
+    await quickAction('Improve');
+    await settled();
+    expect(userBubble()).toBe('Improve');
+  });
+
+  it('keep the scope when it works on part of the text', async () => {
+    const api = makeApi({ answers: ['It means Thursday afternoon.'] });
+    await mount(api, { email: EMAIL, selection: { text: 'Thursday at 3' }, focusRequest: 0 });
+    await quickAction('Explain');
+    await settled();
+    expect(userBubble()).toBe('Explain · highlighted text');
+  });
+
+  it('ask for the language when Translate… comes from the right-click menu', async () => {
+    const api = makeApi({ answers: ['Donnerstag um 3'] });
+    await api.storage.set(pendingKey('reader', 'M1'), { action: 'translate', text: 'Thursday at 3', at: Date.now() });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 1 });
+    const picker = await screen.findByRole('combobox', { name: 'Translate into' });
+    expect(document.activeElement).toBe(picker);
+    // Nothing goes out before the language is chosen.
+    expect(api.calls('proxy.fetch')).toHaveLength(0);
+    await act(async () => { fireEvent.change(picker, { target: { value: 'de' } }); });
+    await settled();
+    expect(userBubble()).toBe('Translate to German · highlighted text');
+    expect(JSON.stringify(sentPrompt(api).messages)).toContain('Thursday at 3');
+    expect(screen.queryByRole('combobox', { name: 'Translate into' })).toBeNull();
+  });
+});

@@ -128,7 +128,7 @@
   "panel.scope.body": "whole message",
   "panel.scope.empty": "new message",
   "panel.scope.message": "this message",
-  "panel.scope.passage": "highlighted passage",
+  "panel.scope.passage": "highlighted text",
   "panel.translate_to": "Translate to {language}",
   "panel.quick.explain": "Explain",
   "panel.quick.reply": "Draft a reply",

@@ -64,7 +64,7 @@ for (const service of SERVICES) {
       await frame.getByRole('button', { name: 'Actions' }).click();
       await frame.getByRole('menuitem', { name: 'More formal' }).click();
       await acceptPrivacy(page, { frame, expectText: service.provider });
-      await expect(frame.getByText('More formal · whole message')).toBeVisible();
+      await expect(frame.getByText('More formal', { exact: true })).toBeVisible();
 
       await waitDone(frame);
       const { card, preview } = lastProposal(frame);
@@ -163,7 +163,7 @@ test('translate a selected line and insert it below', async ({ page }) => {
     await expect(frame.getByText('Selected text')).toBeVisible();
     await expect(frame.getByText('Guten Tag, wir sehen uns am Dienstag.')).toBeVisible();
     await frame.getByRole('button', { name: 'Actions' }).click();
-      await frame.getByRole('menuitem', { name: 'Translate' }).click();
+    await frame.getByRole('menuitem', { name: 'Translate' }).click();
     await frame.getByLabel('Translate into').selectOption('en');
     await acceptPrivacy(page, { frame });
     await expect(frame.getByText('Translate to English · selected text')).toBeVisible();
