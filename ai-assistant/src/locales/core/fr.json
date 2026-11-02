@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Lecture de vos paramètres",
   "panel.steps.kind.find_setting": "Paramètres",
   "panel.steps.kind.read_my_settings": "Paramètres",
-  "shortcut.toggle": "Ouvrir ou fermer l'assistant IA"
+  "shortcut.toggle": "Ouvrir ou fermer l'assistant IA",
+  "panel.menu.count": "{count} suggestions",
+  "panel.menu.none": "Aucun résultat"
 }

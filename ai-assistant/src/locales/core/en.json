@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Read your settings",
   "panel.steps.kind.find_setting": "Settings",
   "panel.steps.kind.read_my_settings": "Settings",
-  "shortcut.toggle": "Open or close the AI assistant"
+  "shortcut.toggle": "Open or close the AI assistant",
+  "panel.menu.count": "{count} suggestions",
+  "panel.menu.none": "No matches"
 }

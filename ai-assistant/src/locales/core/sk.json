@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Prečítané vaše nastavenia",
   "panel.steps.kind.find_setting": "Nastavenia",
   "panel.steps.kind.read_my_settings": "Nastavenia",
-  "shortcut.toggle": "Otvoriť alebo zavrieť asistenta AI"
+  "shortcut.toggle": "Otvoriť alebo zavrieť asistenta AI",
+  "panel.menu.count": "Návrhy: {count}",
+  "panel.menu.none": "Žiadne zhody"
 }

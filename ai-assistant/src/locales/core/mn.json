@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Таны тохиргоог уншлаа",
   "panel.steps.kind.find_setting": "Тохиргоо",
   "panel.steps.kind.read_my_settings": "Тохиргоо",
-  "shortcut.toggle": "AI туслахыг нээх эсвэл хаах"
+  "shortcut.toggle": "AI туслахыг нээх эсвэл хаах",
+  "panel.menu.count": "Санал: {count}",
+  "panel.menu.none": "Тохирох зүйл алга"
 }

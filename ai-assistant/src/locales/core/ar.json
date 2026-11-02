@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "تمت قراءة إعداداتك",
   "panel.steps.kind.find_setting": "الإعدادات",
   "panel.steps.kind.read_my_settings": "الإعدادات",
-  "shortcut.toggle": "فتح مساعد الذكاء الاصطناعي أو إغلاقه"
+  "shortcut.toggle": "فتح مساعد الذكاء الاصطناعي أو إغلاقه",
+  "panel.menu.count": "الاقتراحات: {count}",
+  "panel.menu.none": "لا توجد نتائج"
 }
