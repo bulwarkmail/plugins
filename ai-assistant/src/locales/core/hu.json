@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "A beállításaid beolvasva",
   "panel.steps.kind.find_setting": "Beállítások",
   "panel.steps.kind.read_my_settings": "Beállítások",
-  "shortcut.toggle": "Az AI-asszisztens megnyitása vagy bezárása"
+  "shortcut.toggle": "Az AI-asszisztens megnyitása vagy bezárása",
+  "panel.menu.count": "{count} javaslat",
+  "panel.menu.none": "Nincs találat"
 }

@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Citite setările tale",
   "panel.steps.kind.find_setting": "Setări",
   "panel.steps.kind.read_my_settings": "Setări",
-  "shortcut.toggle": "Deschide sau închide asistentul AI"
+  "shortcut.toggle": "Deschide sau închide asistentul AI",
+  "panel.menu.count": "Sugestii: {count}",
+  "panel.menu.none": "Niciun rezultat"
 }

@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Ayarlarınız okundu",
   "panel.steps.kind.find_setting": "Ayarlar",
   "panel.steps.kind.read_my_settings": "Ayarlar",
-  "shortcut.toggle": "Yapay zekâ asistanını aç veya kapat"
+  "shortcut.toggle": "Yapay zekâ asistanını aç veya kapat",
+  "panel.menu.count": "{count} öneri",
+  "panel.menu.none": "Eşleşme yok"
 }

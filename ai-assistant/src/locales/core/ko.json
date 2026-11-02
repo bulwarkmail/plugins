@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "설정을 읽었습니다",
   "panel.steps.kind.find_setting": "설정",
   "panel.steps.kind.read_my_settings": "설정",
-  "shortcut.toggle": "AI 어시스턴트 열기 또는 닫기"
+  "shortcut.toggle": "AI 어시스턴트 열기 또는 닫기",
+  "panel.menu.count": "제안 {count}개",
+  "panel.menu.none": "일치 항목 없음"
 }

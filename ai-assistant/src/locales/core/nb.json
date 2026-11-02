@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Leste innstillingene dine",
   "panel.steps.kind.find_setting": "Innstillinger",
   "panel.steps.kind.read_my_settings": "Innstillinger",
-  "shortcut.toggle": "Åpne eller lukk KI-assistenten"
+  "shortcut.toggle": "Åpne eller lukk KI-assistenten",
+  "panel.menu.count": "{count} forslag",
+  "panel.menu.none": "Ingen treff"
 }

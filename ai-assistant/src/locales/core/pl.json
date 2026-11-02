@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Odczytano Twoje ustawienia",
   "panel.steps.kind.find_setting": "Ustawienia",
   "panel.steps.kind.read_my_settings": "Ustawienia",
-  "shortcut.toggle": "Otwórz lub zamknij asystenta AI"
+  "shortcut.toggle": "Otwórz lub zamknij asystenta AI",
+  "panel.menu.count": "Podpowiedzi: {count}",
+  "panel.menu.none": "Brak wyników"
 }
