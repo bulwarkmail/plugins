@@ -36,14 +36,17 @@ completes the command's name (`/to-dos-and-dates`), Escape closes it.
 
 The pencil next to your last typed question puts it back into the input;
 a chip says "Editing your last message" (its x stops). Sending replaces
-that question and its answer. **Answer again** under the last answer asks
-for a new one.
+that question and its answer; Escape stops editing. **Answer again**
+under the last answer asks for a new one, only while the message the
+answer was about is open. Neither shows after an answer that did
+something (an action done or waiting), so nothing is done twice.
 
 ### Notes the assistant remembers
 
 Say "Remember that my manager is Jan". The assistant always asks first
 ("Remember: “My manager is Jan”?"), whatever the actions setting. Notes
-need actions on (ask first or automatic). At most 50 notes of 200
+need actions on (ask first or automatic); the settings say so when they
+are off, and whether the administrator switched them off. At most 50 notes of 200
 characters, kept in this browser. Settings > AI Assistant > Chat lists
 them to change or delete, and has a switch to stop using them. Undo on
 the card removes a note again.
@@ -51,10 +54,32 @@ the card removes a note again.
 ### Templates
 
 With lookups on, the assistant can read your message templates. In the
-composer it can put one into the draft at the cursor, filling in the
-`{{placeholders}}` it knows (the subject stays as it is; undo it in the
-editor). It can save a reply as a new template; it always asks first, and
-Undo deletes the template again.
+composer (lookups on) it can put one into the draft at the cursor, below
+a selection and never over it, filling in the `{{placeholders}}` it knows
+(the subject stays as it is; undo it in the editor). When it fills in
+values it always asks first and the card lists them; in an HTML template
+the values go in as text, never as markup. It can save a reply as a new
+template; it always asks first, the card shows the text (up to 1,500
+characters, with the full length when longer), and Undo deletes the
+template again. A plugin enabled before the update lacks templates:read
+and templates:write until the user turns it off and on (or the admin
+installs it again); the assistant checks once per panel and hides the
+templates tools until then.
+
+### When the storage is full
+
+New chat, the 8-hour split and Continue this chat first make room by
+dropping the oldest earlier chats. When that is not enough, the chat
+stays as it is and the panel says "The assistant's storage is full."
+A chat too big for the 400 KB history keeps lookup results of 300
+characters, then none, then only its newest turns.
+
+### Two tabs
+
+A tab that comes back after 8 hours shows the chat another tab started
+meanwhile instead of moving it away. Turns one tab removed (Edit, Answer
+again) stay removed in the other (the running chat keeps their ids,
+`removed`, at most 200).
 
 ### What is sent to the AI service
 
@@ -72,7 +97,7 @@ Undo deletes the template again.
 
 | Setting | Effect |
 | --- | --- |
-| Chat tools (`allowChatTools`, on) | Earlier chats, saved prompts, slash commands, Edit and Answer again, notes and templates. Off: the reader keeps one chat that never moves to history (2.1 behaviour) |
+| Chat tools (`allowChatTools`, on) | Earlier chats, saved prompts, slash commands, Edit and Answer again, notes and templates. Off switches all of them off, notes and templates included; the reader keeps one chat that never moves to history (2.1 behaviour) |
 | Prompts for everyone (`prompts`, multiline) | One prompt per line, `Name: what to ask`. Lines without a name, empty lines and lines starting with `#` are left out; at most 30 |
 | Remember notes (`allowMemory`, on) | Off: no remember action, notes are not sent, the settings hide them |
 
@@ -87,7 +112,7 @@ returns instead of picking.
 
 | Key | Content |
 | --- | --- |
-| `chat:reader` | `{ id, started, turns, at }`; turns carry `at` (ms). Saves merge by turn id |
+| `chat:reader` | `{ id, started, turns, at, removed? }`; turns carry `at` (ms). Saves merge by turn id; `removed` lists turn ids a frame took out |
 | `history:index` | `[{ id, title, at, count, size, renamed? }]`, newest first |
 | `history:<id>` | `{ turns }` of an old chat (no Retry inputs, lookup results cut to 2,000 characters) |
 | `memory` | `{ notes: [{ id, text, at }] }` |

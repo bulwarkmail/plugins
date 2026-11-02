@@ -139,16 +139,24 @@ summarised, not obeyed. Very long texts are cut at 30 000 characters.
   quick actions and saved prompts. Type to filter, arrow keys to move,
   Enter runs, Tab completes the name, Escape closes the list.
 - **Edit and Answer again.** The pencil next to your last question puts it
-  back into the input; sending it replaces that question and its answer.
-  Answer again asks for a new last answer.
+  back into the input; sending it replaces that question and its answer
+  (Escape stops editing). Answer again asks for a new last answer, while
+  the message it was about is open. Neither is offered after an answer
+  that did something (an event, a note), so nothing happens twice.
 - **Remember.** "Remember that my manager is Jan": the assistant asks
   before it keeps a note. Notes (at most 50, 200 characters each) go with
   every request; see, change and delete them in the settings, or switch
   them off there.
 - **Templates.** With lookups on, the assistant can read your message
-  templates. In the composer it can put one into the draft (filling in the
-  placeholders it knows), and it can save a written reply as a new
-  template after you agree.
+  templates. In the composer it can put one into the draft at the cursor,
+  below what you selected, never over it. When it fills in placeholders it
+  shows the values and asks first. It can save a written reply as a new
+  template after you agree. A plugin enabled before this update needs to
+  be turned off and on (or installed again by the administrator) to get
+  the templates permissions; until then the templates tools stay hidden.
+- When the browser storage is full, New chat and the 8-hour split keep
+  the chat and say so, after dropping the oldest earlier chats did not
+  make room. A chat too big for the history keeps shorter lookup results.
 
 ## Setting it up (administrator)
 
@@ -173,7 +181,7 @@ settings. Set up one or both services:
 | Most messages per batch | 1 to 200, default 50 |
 | Change settings | Let users allow the assistant to change their app settings (appearance, reading, composing, list, notifications, calendar view). Off by default |
 | Files | Find, read and attach the user's files, save attachments to Files, create files and folders. Never deletes or shares. On by default |
-| Chat tools | History, saved prompts, slash commands, edit and regenerate. On by default |
+| Chat tools | Earlier chats, saved prompts, / commands, Edit and Answer again, notes and templates. Off switches all of these off. On by default |
 | Prompts for everyone | Saved prompts all users get, one per line: `Name: what to ask` |
 | Remember notes | Users can have the assistant keep short notes about them. On by default |
 | Every view | The assistant in Calendar, Contacts, Files and Settings, and Catch me up. On by default |
