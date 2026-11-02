@@ -65,9 +65,12 @@ export function useArea(chat, props = {}) {
   // ─── The conversation: only how many messages it has, asked once per message ───
   // getThreadCount reads no message (and has its own rate limit); without it
   // there is no chip, and read_thread is still offered.
+  // A message of a login this webmail can't read (blobsReadable false) gets
+  // no attachment chips and no conversation: those reads would fail.
+  const readableBlobs = email?.blobsReadable !== false;
   const [thread, setThread] = useState(null); // { id, count }
   useEffect(() => {
-    if (!flags.threadCount || mode !== 'reader' || !emailId) return undefined;
+    if (!flags.threadCount || mode !== 'reader' || !emailId || !readableBlobs) return undefined;
     let live = true;
     const timer = setTimeout(() => {
       void Promise.resolve(api.email.getThreadCount(emailId, email?.accountId ? { accountId: email.accountId } : {})).then(
@@ -77,13 +80,12 @@ export function useArea(chat, props = {}) {
     }, THREAD_DELAY);
     return () => { live = false; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flags.threadCount, mode, emailId]);
+  }, [flags.threadCount, mode, emailId, readableBlobs]);
   const threadCount = thread?.id === emailId ? thread.count : 0;
-  const threadReadable = flags.thread && inChat && !threadOut && (!flags.threadCount || threadCount > 1);
+  const threadReadable = flags.thread && inChat && readableBlobs && !threadOut && (!flags.threadCount || threadCount > 1);
   const threadOn = threadReadable && threadCount > 1;
 
-  // ─── Attachments (none for a message of a login this webmail can't read) ───
-  const readableBlobs = email?.blobsReadable !== false;
+  // ─── Attachments ───
   const allAttachments = useMemo(() => (flags.attachments && inChat && readableBlobs ? contextAttachments(email) : []), [flags.attachments, inChat, readableBlobs, email]);
   const attachments = allAttachments.filter((a) => !removedAtt.has(a.blobId));
 

@@ -111,13 +111,18 @@ describe('attachments in the chat', () => {
 });
 
 describe('a message of a login this webmail can\'t read', () => {
-  it('shows no attachment chips and offers no read_attachment', async () => {
+  it('shows no attachment or conversation chips and offers no reads of it', async () => {
     const api = makeApi();
     await mount(api, { email: { ...EMAIL, blobsReadable: false } });
+    // Past the moment the panel would count the conversation.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 600)); });
     expect(screen.queryByRole('group', { name: /agenda\.pdf/ })).toBeNull();
+    expect(screen.queryByRole('group', { name: /This conversation/ })).toBeNull();
     const body = await ask(api, 'what is attached?');
     expect(body.tools.map((t) => t.name)).not.toContain('read_attachment');
+    expect(body.tools.map((t) => t.name)).not.toContain('read_thread');
     expect(body.system).not.toContain('agenda.pdf');
+    expect(api.calls('email.getThreadCount')).toHaveLength(0);
   });
 });
 
