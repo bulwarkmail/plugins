@@ -52,8 +52,9 @@ export function slashName(label) {
 }
 
 /**
- * The entries a / query matches, best first: names that start with it, then
- * names with a word that starts with it, then names that hold it.
+ * The entries a / query matches, best first: a saved prompt (`prompt: true`)
+ * with exactly that name, names that start with it, then names with a word
+ * that starts with it, then names that hold it.
  */
 export function matchCommands(entries, query) {
   const q = normalize(query);
@@ -62,7 +63,8 @@ export function matchCommands(entries, query) {
   entries.forEach((entry, i) => {
     const name = normalize(entry.label);
     const words = String(entry.label ?? '').toLowerCase().split(/[\s\-–·]+/).map(normalize);
-    const rank = name.startsWith(q) ? 0 : words.some((w) => w.startsWith(q)) ? 1 : name.includes(q) ? 2 : -1;
+    // A saved prompt named exactly like the query comes first, before a quick action of that name.
+    const rank = name === q && entry.prompt ? 0 : name.startsWith(q) ? 1 : words.some((w) => w.startsWith(q)) ? 2 : name.includes(q) ? 3 : -1;
     if (rank >= 0) scored.push({ entry, rank, i });
   });
   return scored.sort((a, b) => (a.rank - b.rank) || (a.i - b.i)).map((x) => x.entry);

@@ -83,6 +83,19 @@ export function HistoryPanel({ api, onClose, onContinue }) {
     setShown({ entry, turns });
   };
 
+  // The chat now running goes into the history first; when that is full, nothing changes and the user hears why.
+  const continueShown = async () => {
+    setBusy(true);
+    try {
+      await onContinue(shown.entry.id);
+    } catch (err) {
+      api.log?.warn?.('could not continue the chat', err?.message ?? err);
+      api.toast?.error?.(t('panel.storage_full'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const rename = async (id) => {
     const list = await renameHistoryChat(api, id, name);
     setIndex(list);
@@ -150,7 +163,7 @@ export function HistoryPanel({ api, onClose, onContinue }) {
             </Stack>
           </div>
           <div style={{ ...bar, borderBottom: 0, borderTop: '1px solid var(--color-border)', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <Button size="sm" icon="message-forward" busy={busy} onClick={async () => { setBusy(true); await onContinue(shown.entry.id); setBusy(false); }}>{t('chat.history.continue')}</Button>
+            <Button size="sm" icon="message-forward" busy={busy} onClick={() => void continueShown()}>{t('chat.history.continue')}</Button>
             <Button size="sm" variant="ghost" icon="trash" aria-label={t('chat.history.delete_named', { title: title(shown.entry) })} title={t('chat.history.delete')} onClick={() => void remove(shown.entry)} />
           </div>
         </>

@@ -24,6 +24,10 @@ export const historyKey = (id) => `history:${id}`;
 
 /** Characters kept of a lookup's result and of the text a turn worked on, in an old chat. */
 const KEPT_CHARS = 2000;
+/** A chat too big for the history keeps less, step by step: these many characters of each lookup result, then none. */
+const SHRINK_STEPS = [KEPT_CHARS, 300, 0];
+/** Turn ids a frame removed (Edit, Answer again), kept with the running chat so another frame drops them too. */
+const MAX_REMOVED = 200;
 
 export const newChatId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -64,18 +68,22 @@ export function chatTitle(turns) {
 /** Questions and answers in a chat (the lines that say "now about another message" don't count). */
 export const messageCount = (turns) => (Array.isArray(turns) ? turns : []).filter((turn) => turn?.role === 'user' || turn?.role === 'assistant').length;
 
-/** A chat as the history keeps it: no Retry inputs, shorter lookup results, nothing half done. */
-export function compactTurns(turns) {
+/**
+ * A chat as the history keeps it: no Retry inputs, shorter lookup results
+ * (`keep` characters each; 0 drops them and the text a turn worked on),
+ * nothing half done.
+ */
+export function compactTurns(turns, keep = KEPT_CHARS) {
   return (Array.isArray(turns) ? turns : []).map((turn) => {
     if (turn?.role !== 'assistant') return turn;
     const { input, applying, ...rest } = turn;
     void input; void applying;
-    const out = { ...rest, source: clip(rest.source, KEPT_CHARS) };
+    const out = { ...rest, source: keep ? clip(rest.source, keep) : '' };
     if (out.status === 'running') out.status = out.content ? 'stopped' : 'error';
     if (Array.isArray(out.steps)) {
       out.steps = out.steps.map((step) => ({
         ...step,
-        result: clip(step.result, KEPT_CHARS),
+        result: keep ? clip(step.result, keep) : '',
         ...(step.action ? { action: { ...step.action, undo: null, state: ['waiting', 'running'].includes(step.action.state) ? 'skipped' : step.action.state } } : {}),
       }));
     }
@@ -117,21 +125,48 @@ async function prune(api, list) {
 }
 
 /**
+ * The chat in a form that fits the history's MAX_HISTORY_CHARS: shorter
+ * lookup results first, then none, then only its newest turns.
+ */
+function fitting(turns) {
+  for (const keep of SHRINK_STEPS) {
+    const kept = compactTurns(turns, keep);
+    const size = JSON.stringify(kept).length;
+    if (size <= MAX_HISTORY_CHARS) return { kept, size };
+  }
+  let kept = compactTurns(turns, 0);
+  while (kept.length > 1 && JSON.stringify(kept).length > MAX_HISTORY_CHARS) kept = kept.slice(1);
+  return { kept, size: JSON.stringify(kept).length };
+}
+
+/**
  * Put a chat into the history (under `id`; saving the same chat twice keeps
- * one entry). Chats without a question aren't kept. Resolves to the entry, or null.
+ * one entry). Chats without a question aren't kept. When the plugin's
+ * storage is full, the oldest chats go until it fits. Resolves to the
+ * entry, or null; throws when even without older chats it can't be kept.
  */
 export async function archiveChat(api, turns, { id = newChatId(), at = Date.now(), title } = {}) {
   if (!(Array.isArray(turns) && turns.some((turn) => turn?.role === 'user'))) return null;
-  const kept = compactTurns(turns);
-  const size = JSON.stringify(kept).length;
+  const { kept, size } = fitting(turns);
   const index = await loadIndex(api);
   const old = index.find((e) => e.id === id);
   const entry = { id, title: old?.renamed ? old.title : (title ?? chatTitle(kept)), at, count: messageCount(kept), size, ...(old?.renamed ? { renamed: true } : {}) };
-  // The new one first, so it is never the one dropped for an older chat.
-  const next = await prune(api, [entry, ...index.filter((e) => e.id !== id)]);
-  if (next.some((e) => e.id === id)) await api.storage.set(historyKey(id), { turns: kept });
-  await api.storage.set(INDEX_KEY, next.sort((a, b) => b.at - a.at));
-  return next.find((e) => e.id === id) ?? null;
+  let others = index.filter((e) => e.id !== id);
+  for (;;) {
+    // The new one first, so it is never the one dropped for an older chat.
+    const next = await prune(api, [entry, ...others]);
+    try {
+      await api.storage.set(historyKey(id), { turns: kept });
+      await api.storage.set(INDEX_KEY, next.sort((a, b) => b.at - a.at));
+      return entry;
+    } catch (err) {
+      // Storage full: make room by dropping the oldest chat, as long as there is one.
+      others = next.filter((e) => e.id !== id);
+      const oldest = others.pop();
+      if (!oldest) throw err;
+      await api.storage.remove(historyKey(oldest.id)).catch(() => {});
+    }
+  }
 }
 
 /** An old chat's turns ([] when it is gone). */
@@ -192,19 +227,34 @@ export async function startChat(api, key, turns = [], { id = newChatId(), now = 
 
 /**
  * Move the running chat into the history and start an empty one. `turns`:
- * the frame's own (else the stored ones). Resolves to the history entry or null.
+ * the frame's own, merged with what another frame stored for the same chat
+ * (else the stored ones). Resolves to { entry, stale, turns }: `stale` when
+ * another frame started a different chat since this one loaded; then
+ * nothing moves and `turns` is that chat, to show instead. Throws when the
+ * history can't take the chat (storage full); then nothing changed.
  */
-export async function archiveRunning(api, key, turns) {
+export async function archiveRunning(api, key, turns, now = Date.now()) {
   const state = chatState(api, key);
   let record = null;
   try { record = await api.storage.get(key); } catch { record = null; }
-  const list = Array.isArray(turns) ? turns : (Array.isArray(record?.turns) ? record.turns : []);
-  const id = state.chatId ?? record?.id ?? list[0]?.id ?? newChatId();
-  const at = Math.max(turnsActivity(list), state.touched, typeof record?.at === 'number' ? record.at : 0) || Date.now();
-  for (const turn of list) state.known.add(turn.id);
+  const storedId = typeof record?.id === 'string' ? record.id : null;
+  const storedTurns = Array.isArray(record?.turns) ? record.turns : [];
+  if (storedId && state.chatId && storedId !== state.chatId) {
+    // This frame's chat is gone already (another frame moved it): show the one there is now.
+    state.chatId = storedId;
+    state.started = typeof record.started === 'number' ? record.started : 0;
+    state.touched = typeof record.at === 'number' ? record.at : 0;
+    for (const turn of storedTurns) state.known.add(turn.id);
+    return { entry: null, stale: true, turns: storedTurns };
+  }
+  let list = Array.isArray(turns) ? turns : storedTurns;
+  if (Array.isArray(turns) && record) list = mergeRunning(turns, record, state, now).record.turns;
+  const id = state.chatId ?? storedId ?? list[0]?.id ?? newChatId();
+  const at = Math.max(turnsActivity(list), state.touched, typeof record?.at === 'number' ? record.at : 0) || now;
   const entry = await archiveChat(api, list, { id, at });
-  await startChat(api, key);
-  return entry;
+  for (const turn of list) state.known.add(turn.id);
+  await startChat(api, key, [], { now });
+  return { entry, stale: false, turns: [] };
 }
 
 /**
@@ -225,7 +275,12 @@ export async function openRunning(api, key, { allowed = true, now = Date.now() }
   if (!allowed || !turns.length) return false;
   const last = lastActivity(record);
   if (!last || now - last < IDLE_MS) return false;
-  await archiveRunning(api, key, turns);
+  // When the history can't take it (storage full), the chat stays.
+  try {
+    await archiveRunning(api, key, turns, now);
+  } catch {
+    return false;
+  }
   return true;
 }
 
@@ -266,12 +321,24 @@ export function mergeRunning(local, stored, state, now = Date.now()) {
     state.chatId = storedId ?? newChatId();
     state.started = storedId ? storedStarted : now;
   }
+  // Turns another frame removed (Edit, Answer again) go here too; the ones
+  // this frame removed join that list for the others.
+  const storedRemoved = Array.isArray(stored?.removed) ? stored.removed : [];
+  const before = new Set(base.map((turn) => turn.id));
+  const removedHere = theirs ? [] : storedTurns.filter((turn) => turn && state.known.has(turn.id) && !before.has(turn.id)).map((turn) => turn.id);
+  const removed = new Set([...storedRemoved.filter((id) => typeof id === 'string'), ...removedHere]);
+  if (removed.size) {
+    for (const turn of base) if (removed.has(turn.id)) dropped.add(turn.id);
+    base = base.filter((turn) => !removed.has(turn.id));
+  }
   const mine = new Set(base.map((turn) => turn.id));
-  const foreign = storedTurns.filter((turn) => turn && !mine.has(turn.id) && !state.known.has(turn.id));
+  const foreign = storedTurns.filter((turn) => turn && !mine.has(turn.id) && !state.known.has(turn.id) && !removed.has(turn.id));
   const turns = foreign.length ? byTime([...base, ...foreign]) : base;
   for (const turn of turns) state.known.add(turn.id);
   const at = Math.max(turnsActivity(turns), state.touched) || now;
-  return { record: { id: state.chatId, started: state.started, turns, at }, foreign, dropped };
+  const record = { id: state.chatId, started: state.started, turns, at };
+  if (removed.size) record.removed = [...removed].slice(-MAX_REMOVED);
+  return { record, foreign, dropped };
 }
 
 /** The frame's transcript with another frame's turns added and the dropped ones gone. */

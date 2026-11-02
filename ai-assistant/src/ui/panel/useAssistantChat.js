@@ -212,6 +212,8 @@ export function useAssistantChat(props) {
   const send = useCallback(async ({ label, sent, task, input: taskInput, show, scope, src }) => {
     const endpoint = setup?.endpoint;
     if (!endpoint) return;
+    // Any other request ends an edit (submit() used it already).
+    setEditing(null);
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
@@ -345,7 +347,9 @@ export function useAssistantChat(props) {
       setEditing(null);
       const list = turnsRef.current;
       const i = list.findIndex((x) => x.id === editing);
-      if (i >= 0) {
+      // Only while it is still the last request: otherwise this is a new one.
+      const lastUser = list.reduce((last, x, j) => (x.role === 'user' ? j : last), -1);
+      if (i >= 0 && i === lastUser) {
         // The "now about another message" line before it goes too; send() adds it again when it still fits.
         const from = i > 0 && list[i - 1].role === 'context' ? i - 1 : i;
         turnsRef.current = list.slice(0, from);
@@ -355,20 +359,26 @@ export function useAssistantChat(props) {
     void send({ label: text, scope: source.scope, src: source.text });
   }, [input, running, setup, send, source, editing]);
 
-  // Edit and Regenerate (chat tools): the last typed request and the last answer, while nothing runs.
+  // Edit and Answer again (chat tools): the last typed request and the last
+  // answer, while nothing runs. Not after an answer that did something (or
+  // waits to): asking again would do it a second time.
   const chatTools = areaAllowed(setup?.config ?? {}, 'chat');
+  const openId = mode === 'reader' ? (contextEmail?.id ?? null) : undefined;
   const editable = useMemo(() => {
     if (!chatTools || running) return {};
     const lastAnswer = [...turns].reverse().find((x) => x.role === 'assistant');
     if (!lastAnswer) return {};
+    if ((lastAnswer.steps ?? []).some((s) => s.action && ['done', 'waiting', 'running'].includes(s.action.state))) return {};
     const i = turns.indexOf(lastAnswer);
     const ask = i > 0 && turns[i - 1].role === 'user' ? turns[i - 1] : null;
+    // In the reader, Answer again only while the message the answer was about is the one open.
+    const sameMessage = openId === undefined || lastAnswer.replyTo === undefined || (lastAnswer.replyTo?.id ?? null) === openId;
     return {
-      answerId: lastAnswer.status === 'done' || lastAnswer.status === 'stopped' ? lastAnswer.id : undefined,
+      answerId: (lastAnswer.status === 'done' || lastAnswer.status === 'stopped') && sameMessage ? lastAnswer.id : undefined,
       // Only typed requests: a quick action's bubble is its name, not something to edit.
       userId: ask && (lastAnswer.task ?? 'chat') === 'chat' ? ask.id : undefined,
     };
-  }, [chatTools, running, turns]);
+  }, [chatTools, running, turns, openId]);
 
   /** Put the last request back into the input; sending it replaces that exchange. */
   const edit = useCallback((turn) => {
@@ -486,12 +496,22 @@ export function useAssistantChat(props) {
     const old = turnsRef.current;
     stop();
     setEditing(null);
+    // With chat tools the reader's chat goes into the history instead of
+    // away; it leaves the panel once it is there. When the history can't
+    // take it (storage full) it stays, and the user hears why.
+    if (key && mode === 'reader' && areaAllowed(setup?.config ?? {}, 'chat')) {
+      void archiveRunning(api, key, storedTurns(old, mode)).then(
+        (done) => setTurns(done.stale ? done.turns : []),
+        (err) => {
+          api.log?.warn?.('could not keep the old chat', err?.message ?? err);
+          api.toast?.error?.(t('panel.storage_full'));
+        },
+      );
+      return;
+    }
     setTurns([]);
-    if (!key) return;
-    // With chat tools the reader's chat goes into the history instead of away.
-    if (mode === 'reader' && areaAllowed(setup?.config ?? {}, 'chat')) void archiveRunning(api, key, storedTurns(old, mode)).catch(() => {});
-    else void api.storage.remove(key).catch(() => {});
-  }, [api, key, stop, mode, setup]);
+    if (key) void api.storage.remove(key).catch(() => {});
+  }, [api, key, stop, mode, setup, t]);
 
   const retry = useCallback((turn) => {
     const i = turnsRef.current.findIndex((x) => x.id === turn.id);

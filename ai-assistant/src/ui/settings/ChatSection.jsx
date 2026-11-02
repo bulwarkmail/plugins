@@ -10,6 +10,7 @@ import { Button, Field, Input, Row, RowAction, Section, SettingRow, Stack, Switc
 import { MAX_PROMPTS, MAX_PROMPT_NAME, MAX_PROMPT_TEXT, adminPrompts, promptId, userPrompts } from '../../lib/chat-prompts.js';
 import { MAX_NOTES, MAX_NOTE_CHARS, NoteError, loadNotes, removeNote, updateNote } from '../../lib/chat-memory.js';
 import { memoryAllowed } from '../../lib/config.js';
+import { effectiveActionMode } from '../../lib/actions.js';
 
 const box = { border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px' };
 const rowStyle = { display: 'flex', alignItems: 'flex-start', gap: 4, minWidth: 0 };
@@ -23,7 +24,7 @@ export function ChatSection({ api, setup, prefs = {}, savePrefs }) {
     <Section title={t('chat.settings.title')} description={t('chat.settings.hint')}>
       <Stack gap={6}>
         <PromptsBlock api={api} config={config} prefs={prefs} savePrefs={savePrefs} />
-        {memoryAllowed(config) && <NotesBlock api={api} prefs={prefs} savePrefs={savePrefs} />}
+        {memoryAllowed(config) && <NotesBlock api={api} config={config} prefs={prefs} savePrefs={savePrefs} />}
       </Stack>
     </Section>
   );
@@ -99,7 +100,7 @@ function PromptsBlock({ api, config, prefs, savePrefs }) {
 }
 
 /** The switch for notes, and the notes the assistant keeps. */
-function NotesBlock({ api, prefs, savePrefs }) {
+function NotesBlock({ api, config, prefs, savePrefs }) {
   const t = api.i18n.t;
   const [notes, setNotes] = useState(null);
   const [editing, setEditing] = useState(null); // { id, text }
@@ -132,6 +133,10 @@ function NotesBlock({ api, prefs, savePrefs }) {
         <h4 className="bk text-sm font-medium text-foreground" style={{ margin: 0 }}>{t('chat.notes.title')}</h4>
         <Text tone="muted" size="xs">{t('chat.notes.hint', { max: MAX_NOTES })}</Text>
       </div>
+      {/* New notes come through the remember action, so they need actions on. */}
+      {on && effectiveActionMode(config, prefs) === 'off' && (
+        <Text tone="muted" size="sm" data-notes-actions-off>{t(config.actions === 'off' ? 'chat.notes.actions_off_admin' : 'chat.notes.actions_off')}</Text>
+      )}
       {notes && notes.length === 0 && <Text tone="muted" size="sm">{t('chat.notes.empty')}</Text>}
       {notes && notes.length > 0 && (
         <ul aria-label={t('chat.notes.title')} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>

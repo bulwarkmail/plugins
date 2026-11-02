@@ -2,7 +2,9 @@
 //
 // - remember: keep a note about the user for later chats. Always asks first.
 // - list_templates: the user's message templates (names, subjects, texts).
-// - insert_template: put a template into the open draft, where the cursor is.
+// - insert_template: put a template into the open draft, where the cursor is
+//   (below a selection, never over it). Asks first when the model filled in
+//   placeholders.
 // - save_template: save a written reply as a new template. Always asks first.
 //
 // The panel's chat area (src/ui/panel/areas/chat.js) says in the tools'
@@ -20,6 +22,15 @@ const MAX_TEMPLATE_SUBJECT = 998;
 const MAX_TEMPLATE_BODY = 100_000;
 
 const flat = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+/** Most characters of a text to save as a template the card shows. */
+const SAVE_SHOWN = 1500;
+const escapeHtml = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/** The model's placeholder values, as strings of at most 500 characters. */
+function cleanValues(values) {
+  if (!values || typeof values !== 'object') return {};
+  return Object.fromEntries(Object.entries(values).filter(([k, v]) => /^\w+$/.test(k) && typeof v === 'string' && v.trim()).map(([k, v]) => [k, v.slice(0, 500)]));
+}
 const excerpt = (text, max) => {
   const value = flat(text);
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
@@ -131,19 +142,32 @@ export default {
         required: ['id'],
         additionalProperties: false,
       },
-      available: (ctx) => ctx.chatTemplates === true && !!ctx.chatComposerId,
+      // With lookups on only: the model picks a template from list_templates.
+      available: (ctx) => ctx.chatTemplates === true && !!ctx.chatComposerId && ctx.lookups !== false,
+      // Text the model wrote goes into the draft: the user sees it first.
+      alwaysAsk: (args) => Object.keys(cleanValues(args?.values)).length > 0,
       describe: async (api, args, ctx) => {
         const template = await templateById(api, args.id);
-        const values = args.values && typeof args.values === 'object' ? Object.fromEntries(Object.entries(args.values).filter(([, v]) => typeof v === 'string').map(([k, v]) => [k, v.slice(0, 500)])) : {};
+        const values = cleanValues(args.values);
+        const shown = Object.entries(values).map(([k, v]) => `${k}: “${excerpt(v, 80)}”`).join(', ');
         return {
-          summary: api.i18n.t('chat.template.insert_confirm', { name: flat(template.name) }),
+          summary: shown
+            ? api.i18n.t('chat.template.insert_values', { name: flat(template.name), values: shown })
+            : api.i18n.t('chat.template.insert_confirm', { name: flat(template.name) }),
           plan: { composerId: ctx.chatComposerId, template: { id: template.id, name: template.name, subject: template.subject ?? '', body: template.body ?? '', isHTML: !!template.isHTML }, values },
         };
       },
       perform: async (api, plan) => {
         const { template, values } = plan;
-        const body = fillTemplate(template.body, values);
-        const ok = await api.composer.replaceSelection(plan.composerId, template.isHTML ? { html: body } : { text: body });
+        // In an HTML template the values are text, never markup (no links or images from the model).
+        const body = fillTemplate(template.body, template.isHTML ? Object.fromEntries(Object.entries(values).map(([k, v]) => [k, escapeHtml(v)])) : values);
+        // Below what the user selected, never over it.
+        let selected = false;
+        try {
+          const sel = await api.composer.getSelection?.(plan.composerId);
+          selected = !!sel && sel.empty === false && !!String(sel.text ?? '').trim();
+        } catch { selected = false; }
+        const ok = await api.composer.replaceSelection(plan.composerId, template.isHTML ? { html: body } : { text: body }, ...(selected ? [{ below: true }] : []));
         if (ok === false) throw new Error('the draft did not take the text');
         const left = placeholdersOf({ body }).map((h) => `{{${h}}}`);
         const subject = template.subject ? ` The template's subject is "${fillTemplate(template.subject, values)}"; the draft's subject was not changed.` : '';
@@ -179,8 +203,11 @@ export default {
         const existing = (await api.templates.list()) ?? [];
         if (existing.some((tpl) => flat(tpl.name).toLowerCase() === name.toLowerCase())) throw new Error(`there is already a template called "${name}"; pick another name`);
         const subject = typeof args.subject === 'string' ? args.subject.trim().slice(0, MAX_TEMPLATE_SUBJECT) : '';
+        const cut = body.length > SAVE_SHOWN;
         return {
-          summary: api.i18n.t('chat.template.save_confirm', { name, text: excerpt(body, 120) }),
+          summary: cut
+            ? api.i18n.t('chat.template.save_long', { name, count: body.length, text: body.slice(0, SAVE_SHOWN).trimEnd() })
+            : api.i18n.t('chat.template.save_confirm', { name, text: body }),
           plan: { template: { name, subject, body: body.slice(0, MAX_TEMPLATE_BODY), isHTML: false } },
         };
       },

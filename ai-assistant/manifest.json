@@ -212,7 +212,7 @@
     "allowChatTools": {
       "type": "boolean",
       "label": "Chat tools",
-      "description": "Chat history, saved prompts, slash commands, editing and regenerating answers.",
+      "description": "Earlier chats, saved prompts, / commands, Edit and Answer again, notes the assistant remembers, and reading, inserting and saving templates. Off switches all of these off, notes and templates included.",
       "default": true
     },
     "prompts": {

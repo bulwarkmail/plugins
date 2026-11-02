@@ -29,6 +29,25 @@ const ACTION_ICONS = {
 /** Whether the webmail offers the templates API (all of it the actions use). */
 export const templatesOffered = (api) => ['list', 'get', 'create', 'delete'].every((fn) => typeof api?.templates?.[fn] === 'function');
 
+const templateChecks = new WeakMap();
+/**
+ * Whether the plugin may use the templates: a plugin enabled before the
+ * update that added templates:read and templates:write lacks them until the
+ * user turns it off and on (or the admin installs it again). Asked once per
+ * frame; false after a refusal.
+ */
+export function templatesUsable(api) {
+  if (!api || typeof api !== 'object' || !templatesOffered(api)) return Promise.resolve(false);
+  let check = templateChecks.get(api);
+  if (!check) {
+    check = Promise.resolve()
+      .then(() => api.templates.list())
+      .then(() => true, (err) => !/permission/i.test(String(err?.message ?? err)));
+    templateChecks.set(api, check);
+  }
+  return check;
+}
+
 /**
  * The entries of the / menu: the quick actions that fit what the panel
  * works on, then the areas' entries (saved prompts, Catch me up, ...).
@@ -48,7 +67,7 @@ export function slashEntries(chat, extra = []) {
       return b().quick?.(action);
     },
   }));
-  return [...own, ...extra.map((q) => ({ id: `quick-${q.id}`, label: q.label, icon: q.icon ?? 'sparkles', run: q.run }))]
+  return [...own, ...extra.map((q) => ({ id: `quick-${q.id}`, label: q.label, icon: q.icon ?? 'sparkles', run: q.run, prompt: q.prompt === true }))]
     .map((entry) => ({ ...entry, detail: `/${slashName(entry.label)}` }));
 }
 
@@ -59,7 +78,14 @@ export function useArea(chat, props = {}) {
   const allowed = !!setup?.endpoint && areaAllowed(config, 'chat');
   const reader = allowed && mode === 'reader' && !!key;
   const memory = allowed && memoryOn(config, prefs ?? {});
-  const templates = allowed && templatesOffered(api);
+  const [templatesOk, setTemplatesOk] = useState(false);
+  useEffect(() => {
+    if (!allowed) return undefined;
+    let live = true;
+    void templatesUsable(api).then((ok) => { if (live) setTemplatesOk(ok); });
+    return () => { live = false; };
+  }, [api, allowed]);
+  const templates = allowed && templatesOk && templatesOffered(api);
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
   const running = (turns ?? []).some((turn) => turn.status === 'running');
@@ -85,14 +111,21 @@ export function useArea(chat, props = {}) {
     requestAnimationFrame(() => document.querySelector(`[data-assistant-header] button[aria-label="${t('chat.history.title')}"]`)?.focus());
   }, [t]);
 
-  // After 8 hours without use, opening the panel (or coming back to the tab) starts a fresh chat.
+  // After 8 hours without use, opening the panel (or coming back to the
+  // tab) starts a fresh chat. When another tab started one meanwhile, this
+  // one shows that instead of moving it away; when the history can't take
+  // the chat (storage full), it stays.
+  const archiving = useRef(false);
   useEffect(() => {
     if (!reader) return undefined;
     const check = () => {
       const now = turnsRef.current;
-      if (!now.length || now.some((turn) => turn.status === 'running') || !isIdle(api, key, now)) return;
-      setTurns([]);
-      void archiveRunning(api, key, now).catch((err) => api.log?.warn?.('could not keep the old chat', err?.message ?? err));
+      if (archiving.current || !now.length || now.some((turn) => turn.status === 'running') || !isIdle(api, key, now)) return;
+      archiving.current = true;
+      void archiveRunning(api, key, now).then(
+        (done) => setTurns(done.stale ? done.turns : []),
+        (err) => api.log?.warn?.('could not keep the old chat', err?.message ?? err),
+      ).finally(() => { archiving.current = false; });
     };
     check();
     const onVisible = () => { if (document.visibilityState === 'visible') check(); };
@@ -104,17 +137,22 @@ export function useArea(chat, props = {}) {
   const count = turns?.length ?? 0;
   const lastCount = useRef(count);
   useEffect(() => {
-    if (count > lastCount.current && history) setHistory(false);
+    if ((count > lastCount.current || running) && history) setHistory(false);
     lastCount.current = count;
-  }, [count, history]);
+  }, [count, history, running]);
 
+  /**
+   * An old chat becomes the running one: the current chat (with what other
+   * frames added) goes into the history first, then the old one starts, and
+   * only then leaves the history. Throws when the history is full.
+   */
   const continueChat = useCallback(async (id) => {
     const old = await loadHistoryChat(api, id);
     if (!old.length) return;
     const now = turnsRef.current;
     if (now.some((turn) => turn.role === 'user')) await archiveRunning(api, key, now);
-    await deleteHistoryChat(api, id);
     await startChat(api, key, old, { id });
+    await deleteHistoryChat(api, id);
     setTurns(old);
     closeHistory();
   }, [api, key, setTurns, closeHistory]);
@@ -124,6 +162,7 @@ export function useArea(chat, props = {}) {
   const quick = useMemo(() => prompts.map((p) => ({
     id: `chat-prompt-${p.id}`,
     label: p.name,
+    prompt: true,
     icon: p.admin ? 'building' : 'bookmark',
     run: () => bridge?.current?.sendText?.(p.text),
   })), [prompts, bridge]);
@@ -148,7 +187,8 @@ export function useArea(chat, props = {}) {
     quick,
     menus,
     chips: chat.editing ? [{ key: 'chat-editing', icon: 'pencil', label: t('chat.edit.chip'), title: t('chat.edit.chip'), onRemove: chat.cancelEdit, removeLabel: t('chat.edit.cancel') }] : [],
-    header: reader ? [{ key: 'chat-history', icon: 'history', label: t('chat.history.title'), onClick: () => (history ? closeHistory() : setHistory(true)), pressed: history }] : [],
+    // While an answer runs the list can't open (the answer goes to the running chat).
+    header: reader ? [{ key: 'chat-history', icon: 'history', label: t('chat.history.title'), onClick: () => (history ? closeHistory() : (!running && setHistory(true))), pressed: history && !running }] : [],
     overlay: reader && history && !running ? createElement(HistoryPanel, { api, onClose: closeHistory, onContinue: continueChat }) : null,
     privacyParts: [
       ...(memory ? ['chat.privacy.notes'] : []),

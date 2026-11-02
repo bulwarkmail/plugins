@@ -179,3 +179,100 @@ describe('two frames with the same running chat', () => {
     expect(record.turns).toEqual([]);
   });
 });
+
+describe('fixes after the review', () => {
+  const shared = () => {
+    const one = fakeApi();
+    const two = fakeApi();
+    two.storage.get = one.storage.get;
+    two.storage.set = one.storage.set;
+    two.storage.remove = one.storage.remove;
+    return [one, two];
+  };
+
+  it('a stale tab coming back doesn\'t move away the chat another tab started', async () => {
+    const [one, two] = shared();
+    const t0 = NOW - IDLE_MS - HOUR;
+    await one.storage.set(KEY, { id: 'c1', started: t0, turns: exchange('a', 'Old', t0), at: t0 });
+    await openRunning(one, KEY, { now: t0 + 1 });
+    expect(await openRunning(two, KEY, { now: NOW })).toBe(true);
+    await saveRunning(two, KEY, exchange('m', 'Morning', NOW + 10), NOW + 20);
+    // Tab one becomes visible with its copy of last night's chat.
+    expect(isIdle(one, KEY, exchange('a', 'Old', t0), NOW + 30)).toBe(true);
+    const done = await archiveRunning(one, KEY, exchange('a', 'Old', t0), NOW + 30);
+    expect(done.stale).toBe(true);
+    expect(done.turns.map((t) => t.id)).toEqual(['mu', 'ma']);
+    expect((await one.storage.get(KEY)).turns.map((t) => t.id)).toEqual(['mu', 'ma']);
+    expect((await loadIndex(one)).map((e) => e.id)).toEqual(['c1']);
+    // Tab two saves again: nothing of its chat is lost.
+    const merged = await saveRunning(two, KEY, exchange('m', 'Morning', NOW + 10), NOW + 40);
+    expect([...merged.dropped]).toEqual([]);
+    expect((await one.storage.get(KEY)).turns.map((t) => t.id)).toEqual(['mu', 'ma']);
+  });
+
+  it('New chat keeps what another frame added to the same chat', async () => {
+    const [one, two] = shared();
+    await one.storage.set(KEY, { id: 'c1', started: 1, turns: exchange('a', 'A', 10), at: 10 });
+    await openRunning(one, KEY, { now: 11 });
+    await openRunning(two, KEY, { now: 11 });
+    await saveRunning(two, KEY, [...exchange('a', 'A', 10), ...exchange('b', 'From two', 20)], 21);
+    await archiveRunning(one, KEY, exchange('a', 'A', 10), 30);
+    expect((await loadHistoryChat(one, 'c1')).map((t) => t.id)).toEqual(['au', 'aa', 'bu', 'ba']);
+  });
+
+  it('a turn one frame removed (Edit) doesn\'t come back from another frame', async () => {
+    const [one, two] = shared();
+    const both = [...exchange('a', 'A', 10), ...exchange('b', 'B', 20)];
+    await one.storage.set(KEY, { id: 'c1', started: 1, turns: both, at: 20 });
+    await openRunning(one, KEY, { now: 21 });
+    await openRunning(two, KEY, { now: 21 });
+    // Frame one edits B: the exchange goes, a new one comes.
+    await saveRunning(one, KEY, [...exchange('a', 'A', 10), ...exchange('c', 'B, edited', 30)], 31);
+    // Frame two still shows B and saves.
+    const merged = await saveRunning(two, KEY, both, 40);
+    expect((await one.storage.get(KEY)).turns.map((t) => t.id)).toEqual(['au', 'aa', 'cu', 'ca']);
+    expect([...merged.dropped].sort()).toEqual(['ba', 'bu']);
+    expect(withForeign(both, merged).map((t) => t.id)).toEqual(['au', 'aa', 'cu', 'ca']);
+  });
+
+  it('a chat over 400 KB is kept, smaller', async () => {
+    const api = fakeApi();
+    const big = [];
+    for (let i = 0; i < 20; i += 1) {
+      big.push({ id: `u${i}`, role: 'user', at: i, content: 'q', label: 'q' });
+      big.push({ id: `a${i}`, role: 'assistant', at: i, content: 'x'.repeat(1500), status: 'done', source: 'y'.repeat(2000), steps: Array.from({ length: 8 }, (_, k) => ({ id: `s${i}${k}`, name: 'read_message', result: 'z'.repeat(5000) })) });
+    }
+    const entry = await archiveChat(api, big, { id: 'big', at: 1 });
+    expect(entry).not.toBeNull();
+    expect(entry.size).toBeLessThanOrEqual(MAX_HISTORY_CHARS);
+    const kept = await loadHistoryChat(api, 'big');
+    expect(kept).toHaveLength(40);
+    expect(kept[1].steps[0].result).toHaveLength(300);
+    expect(kept[1].content).toHaveLength(1500);
+  });
+
+  it('makes room by dropping the oldest chats when the storage is full, and fails without changing anything when it can\'t', async () => {
+    const api = fakeApi();
+    const set = api.storage.set;
+    await archiveChat(api, exchange('o', 'Oldest', 1), { id: 'o', at: 1 });
+    await archiveChat(api, exchange('p', 'Older', 2), { id: 'p', at: 2 });
+    // Room for one chat more only after the oldest went.
+    let room = 0;
+    api.storage.set = async (k, v) => {
+      if (k === historyKey('n') && !(await api.storage.get(historyKey('o')) === null)) throw new Error('Plugin storage is full');
+      room += 1;
+      return set(k, v);
+    };
+    await archiveChat(api, exchange('n', 'New', 3), { id: 'n', at: 3 });
+    expect((await loadIndex(api)).map((e) => e.id)).toEqual(['n', 'p']);
+    expect(room).toBeGreaterThan(0);
+
+    // Nothing can be written: the running chat stays as it was.
+    await api.storage.set(KEY, { id: 'c1', started: 1, turns: exchange('r', 'Running', 5), at: 5 });
+    await openRunning(api, KEY, { now: 6 });
+    api.storage.set = async (k, v) => { if (String(k).startsWith('history:')) throw new Error('Plugin storage is full'); return set(k, v); };
+    await expect(archiveRunning(api, KEY, exchange('r', 'Running', 5), 7)).rejects.toThrow(/full/);
+    expect((await api.storage.get(KEY)).turns.map((t) => t.id)).toEqual(['ru', 'ra']);
+    expect(chatState(api, KEY).chatId).toBe('c1');
+  });
+});

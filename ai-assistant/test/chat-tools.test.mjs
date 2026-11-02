@@ -52,6 +52,9 @@ const key = async (el, k, extra = {}) => { await act(async () => { fireEvent.key
 const settled = () => waitFor(() => expect(document.querySelector('[data-turn="assistant"][data-status="running"]')).toBeNull());
 const click = async (el) => { await act(async () => { fireEvent.click(el); }); };
 const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+/** Lets timers and promises run (the / menu asks for its entries after a 0 ms timer). */
+const tick = () => act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+const userTexts = () => [...document.querySelectorAll('[data-turn="user"]')].map((el) => el.textContent);
 
 describe('the history', () => {
   const old = (at) => [
@@ -150,11 +153,16 @@ describe('the history', () => {
   });
 
   it('is not there when the administrator switched chat tools off', async () => {
-    const api = makeApi({ config: { allowChatTools: false } });
-    const box = await mount(api);
-    expect(screen.queryByRole('button', { name: 'Earlier chats' })).toBeNull();
-    await type(box, '/');
-    expect(screen.queryByRole('listbox')).toBeNull();
+    for (const on of [true, false]) {
+      const api = makeApi({ config: { allowChatTools: on } });
+      const box = await mount(api);
+      await type(box, '/');
+      // The list asks for its entries after a moment: wait for that before looking.
+      await tick();
+      expect(!!screen.queryByRole('listbox'), `listbox with chat tools ${on ? 'on' : 'off'}`).toBe(on);
+      expect(!!screen.queryByRole('button', { name: 'Earlier chats' })).toBe(on);
+      cleanup();
+    }
   });
 
   it('is not in the composer, which keeps a chat per draft', async () => {
@@ -173,6 +181,12 @@ describe('slash commands and saved prompts', () => {
     expect(slashName('To-dos and dates')).toBe('to-dos-and-dates');
   });
 
+  it('put a saved prompt named exactly like a quick action first', () => {
+    const list = [{ label: 'Summarize' }, { label: 'Summarize', prompt: true }, { label: 'Summary of the week', prompt: true }];
+    expect(matchCommands(list, 'summarize').map((e) => !!e.prompt)).toEqual([true, false]);
+    expect(matchCommands(list, 'sum').map((e) => e.label)).toEqual(['Summarize', 'Summarize', 'Summary of the week']);
+  });
+
   it('read the administrator\'s prompts one per line', () => {
     expect(adminPrompts({ prompts: 'Weekly: What happened this week?\n\n# note\nNo colon here\n: no name' })).toEqual([
       { id: 'admin-1', name: 'Weekly', text: 'What happened this week?', admin: true },
@@ -181,7 +195,7 @@ describe('slash commands and saved prompts', () => {
   });
 
   it('open with / at the start, filter as the user types, move with arrows, complete with Tab and run with Enter', async () => {
-    const api = makeApi({ prefs: { prompts: [{ id: 'p1', name: 'Polite no', text: 'Write a polite no to this.' }] } });
+    const api = makeApi({ prefs: { prompts: [{ id: 'p1', name: 'Polite no', text: 'Write a polite no to this.' }, { id: 'p2', name: 'Explain the polite words', text: 'EXPLAIN' }] } });
     const box = await mount(api);
     await type(box, '/');
     const list = await screen.findByRole('listbox', { name: 'Commands and saved prompts' });
@@ -202,6 +216,11 @@ describe('slash commands and saved prompts', () => {
     // A saved prompt by keyboard: down to it, Enter runs it with the open message.
     await type(box, '/pol');
     await screen.findByRole('listbox');
+    await tick();
+    expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Polite no/polite-no', 'Explain the polite words/explain-the-polite-words']);
+    await key(box, 'ArrowDown');
+    expect(box.getAttribute('aria-activedescendant')).toBe(within(screen.getByRole('listbox')).getAllByRole('option')[1].id);
+    await key(box, 'ArrowUp');
     await key(box, 'Enter');
     await settled();
     expect(box.value).toBe('');
@@ -288,7 +307,7 @@ describe('edit and regenerate', () => {
     expect(sent(api).messages.at(-1).content).toBe('second');
   });
 
-  it('are not offered for a quick action\'s bubble, nor with chat tools off', async () => {
+  it('are not offered with chat tools off', async () => {
     const api = makeApi({ config: { allowChatTools: 'false' } });
     const box = await mount(api);
     await type(box, 'hi');
@@ -296,6 +315,81 @@ describe('edit and regenerate', () => {
     await settled();
     expect(screen.queryByRole('button', { name: 'Edit this message' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Answer again' })).toBeNull();
+  });
+
+  it('offer no Edit on a quick action\'s bubble, only Answer again', async () => {
+    const api = makeApi();
+    await mount(api);
+    await click(screen.getByRole('button', { name: /Actions/ }));
+    await click(screen.getByRole('menuitem', { name: 'Summarize' }));
+    await settled();
+    expect(userTexts()).toEqual(['Summarize']);
+    expect(screen.queryByRole('button', { name: 'Edit this message' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Answer again' })).toBeTruthy();
+  });
+
+  it('are not offered after an answer that did something, so it is never done twice', async () => {
+    const api = makeApi({
+      turns: [toolCall('create_event', { title: 'Lunch', start: '2026-11-05T12:00' }), anthropicSse(['Added.'])],
+      prefs: { actions: 'auto' },
+      handlers: { 'calendar.createEvent': async () => ({ id: 'e1' }) },
+    });
+    const box = await mount(api);
+    await type(box, 'add lunch on thursday');
+    await key(box, 'Enter');
+    await settled();
+    expect(api.calls('calendar.createEvent')).toHaveLength(1);
+    expect(document.querySelector('[data-action="create_event"]').dataset.actionState).toBe('done');
+    expect(screen.queryByRole('button', { name: 'Answer again' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit this message' })).toBeNull();
+  });
+
+  it('Answer again only while the message the answer was about is open', async () => {
+    const api = makeApi();
+    const box = await mount(api);
+    await type(box, 'what does she want?');
+    await key(box, 'Enter');
+    await settled();
+    expect(screen.getByRole('button', { name: 'Answer again' })).toBeTruthy();
+    await waitFor(async () => expect((await api.storage.get('chat:reader'))?.turns?.length).toBe(2));
+    cleanup();
+    // The same chat with another message open.
+    await mount(api, { email: { ...EMAIL, id: 'M2', subject: 'Other' }, selection: { text: '' }, focusRequest: 0 });
+    await waitFor(() => expect(userTexts()).toEqual(['what does she want?']));
+    expect(screen.queryByRole('button', { name: 'Answer again' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Edit this message' })).toBeTruthy();
+  });
+
+  it('Escape in the input stops editing', async () => {
+    const api = makeApi();
+    const box = await mount(api);
+    await type(box, 'one');
+    await key(box, 'Enter');
+    await settled();
+    await click(screen.getByRole('button', { name: 'Edit this message' }));
+    expect(screen.getByText('Editing your last message')).toBeTruthy();
+    await key(box, 'Escape');
+    expect(screen.queryByText('Editing your last message')).toBeNull();
+    expect(box.value).toBe('');
+    expect(api.calls('ui.closePanel')).toHaveLength(0);
+  });
+
+  it('another request while editing ends the edit and keeps the chat', async () => {
+    const api = makeApi({ prefs: { prompts: [{ id: 'p1', name: 'Weekly', text: 'WEEKLY' }] }, turns: [anthropicSse(['A1']), anthropicSse(['A2']), anthropicSse(['A3'])] });
+    const box = await mount(api);
+    await type(box, 'first');
+    await key(box, 'Enter');
+    await settled();
+    await click(screen.getByRole('button', { name: 'Edit this message' }));
+    // The user runs a saved prompt from the Actions menu instead.
+    await click(screen.getByRole('button', { name: /Actions/ }));
+    await click(screen.getByRole('menuitem', { name: 'Weekly' }));
+    await settled();
+    expect(screen.queryByText('Editing your last message')).toBeNull();
+    await type(box, 'first, edited');
+    await key(box, 'Enter');
+    await settled();
+    expect(userTexts()).toEqual(['first', 'WEEKLY', 'first, edited']);
   });
 });
 
@@ -381,11 +475,17 @@ describe('templates', () => {
   });
 
   it('inserts one into the open draft, with the placeholders the model knows', async () => {
-    const api = fakeApi({ translations: allStrings(), handlers: { 'templates.get': async () => TEMPLATES[0], 'composer.replaceSelection': async () => true } });
+    const api = fakeApi({ translations: allStrings(), handlers: { 'templates.get': async () => TEMPLATES[0], 'composer.replaceSelection': async () => true, 'composer.getSelection': async () => ({ text: '', html: '', empty: true }) } });
     const insert = action('insert_template');
     expect(insert.available({ chatTemplates: true })).toBe(false);
+    expect(insert.available({ chatTemplates: true, chatComposerId: 'c1' })).toBe(true);
+    expect(insert.available({ chatTemplates: true, chatComposerId: 'c1', lookups: false })).toBe(false);
+    // Text the model wrote: ask first, and show it on the card.
+    expect(insert.alwaysAsk({ id: 't1', values: { name: 'Jan' } })).toBe(true);
+    expect(insert.alwaysAsk({ id: 't1' })).toBe(false);
     const { summary, plan } = await insert.describe(api, { id: 't1', values: { name: 'Jan' } }, { chatComposerId: 'c1' });
-    expect(summary).toBe('Put the template “Thanks” into your message?');
+    expect(summary).toBe('Put the template “Thanks” into your message, with name: “Jan”?');
+    expect((await insert.describe(api, { id: 't1' }, { chatComposerId: 'c1' })).summary).toBe('Put the template “Thanks” into your message?');
     const done = await insert.perform(api, plan);
     expect(api.calls('composer.replaceSelection')[0].args).toEqual(['c1', { text: 'Dear Jan,\nthank you for {{thing}}.' }]);
     expect(done.text).toContain('Still to fill in: {{thing}}');
@@ -457,5 +557,172 @@ describe('the chat settings', () => {
   it('hide the notes when the administrator doesn\'t allow them', async () => {
     await show({ allowMemory: false });
     expect(screen.queryByRole('switch', { name: 'Remember notes' })).toBeNull();
+  });
+});
+
+describe('the history, with other tabs and a full storage', () => {
+  const chat = (p, at) => [
+    { id: `${p}u`, role: 'user', at, content: `Question ${p}`, label: `Question ${p}` },
+    { id: `${p}a`, role: 'assistant', at, content: `Answer ${p}`, status: 'done', task: 'chat', show: 'chat', steps: [] },
+  ];
+  const later = async (ms) => {
+    const now = Date.now() + ms;
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    await tick();
+  };
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('moves the chat away when the tab comes back after 8 hours', async () => {
+    const api = makeApi();
+    const at = Date.now();
+    await api.storage.set('chat:reader', { id: 'c1', started: at, turns: chat('a', at), at });
+    await mount(api);
+    expect(userTexts()).toEqual(['Question a']);
+    await later(IDLE_MS + 60_000);
+    await waitFor(() => expect(userTexts()).toEqual([]));
+    expect((await loadIndex(api)).map((e) => e.id)).toEqual(['c1']);
+  });
+
+  it('shows the chat another tab started instead of moving it away', async () => {
+    const api = makeApi();
+    const at = Date.now();
+    await api.storage.set('chat:reader', { id: 'c1', started: at, turns: chat('a', at), at });
+    await mount(api);
+    // Another tab split the chat this morning and asked something new.
+    const then = at + IDLE_MS + 1000;
+    await api.storage.set('chat:reader', { id: 'c2', started: then, turns: chat('m', then), at: then });
+    await later(IDLE_MS + 60_000);
+    await waitFor(() => expect(userTexts()).toEqual(['Question m']));
+    const stored = await api.storage.get('chat:reader');
+    expect(stored.id).toBe('c2');
+    expect(stored.turns.map((t) => t.id)).toEqual(['mu', 'ma']);
+    expect(await loadIndex(api)).toEqual([]);
+  });
+
+  it('keeps the chat on New chat when the storage is full, and says so', async () => {
+    const api = makeApi();
+    const set = api.storage.set;
+    const box = await mount(api);
+    await type(box, 'keep me');
+    await key(box, 'Enter');
+    await settled();
+    api.storage.set = async (k, v) => { if (String(k).startsWith('history:')) throw new Error('Plugin storage is full (1024 KB per account)'); return set(k, v); };
+    await click(screen.getByRole('button', { name: 'New chat' }));
+    await waitFor(() => expect(api.calls('toast.error').map((c) => c.args[0])).toEqual(["The assistant's storage is full. Start a new chat to free space."]));
+    expect(userTexts()).toEqual(['keep me']);
+    await tick();
+    await new Promise((r) => setTimeout(r, 350));
+    expect((await api.storage.get('chat:reader')).turns.map((t) => t.label ?? t.content)).toContain('keep me');
+  });
+
+  it('keeps the old chat in the history when Continue can\'t start it', async () => {
+    const api = makeApi();
+    await archiveChat(api, chat('h', 1), { id: 'h1', at: 1 });
+    await mount(api);
+    const set = api.storage.set;
+    await click(screen.getByRole('button', { name: 'Earlier chats' }));
+    await click(screen.getByText('Question h').closest('button'));
+    api.storage.set = async (k, v) => { if (k === 'chat:reader') throw new Error('Plugin storage is full (1024 KB per account)'); return set(k, v); };
+    const go = await screen.findByRole('button', { name: 'Continue this chat' });
+    await click(go);
+    await waitFor(() => expect(api.calls('toast.error')).toHaveLength(1));
+    expect(go.disabled).toBe(false);
+    expect((await loadIndex(api)).map((e) => e.id)).toEqual(['h1']);
+    expect(await api.storage.get('history:h1')).not.toBeNull();
+  });
+
+  it('doesn\'t show the list as open while an answer runs', async () => {
+    let release;
+    const api = makeApi({ handlers: { 'proxy.fetch': async () => { await new Promise((r) => { release = r; }); return streamResponse(anthropicSse(['Late.'])); } } });
+    const box = await mount(api);
+    await type(box, 'slow one');
+    await key(box, 'Enter');
+    const button = screen.getByRole('button', { name: 'Earlier chats' });
+    await click(button);
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.queryByRole('list', { name: 'Earlier chats' })).toBeNull();
+    await act(async () => { release(); });
+    await settled();
+  });
+});
+
+describe('templates, more', () => {
+  const action = (name) => chatArea.actions.find((a) => a.name === name);
+
+  it('put the model\'s values into an HTML template as text, below a selection', async () => {
+    const api = fakeApi({ translations: allStrings(), handlers: {
+      'templates.get': async () => ({ id: 't1', name: 'Hi', body: '<p>Dear {{name}}</p>', isHTML: true }),
+      'composer.replaceSelection': async () => true,
+      'composer.getSelection': async () => ({ text: 'my own words', html: '<p>my own words</p>', empty: false }),
+    } });
+    const insert = action('insert_template');
+    const { plan } = await insert.describe(api, { id: 't1', values: { name: '<a href="https://evil.example/x">Jan</a>' } }, { chatComposerId: 'c1' });
+    await insert.perform(api, plan);
+    const [id, content, options] = api.calls('composer.replaceSelection')[0].args;
+    expect(id).toBe('c1');
+    expect(content.html).toBe('<p>Dear &lt;a href=&quot;https://evil.example/x&quot;&gt;Jan&lt;/a&gt;</p>');
+    expect(options).toEqual({ below: true });
+  });
+
+  it('show a long text to save, with its length', async () => {
+    const body = 'word '.repeat(600).trim();
+    const api = fakeApi({ translations: allStrings(), handlers: { 'templates.list': async () => [] } });
+    const { summary } = await action('save_template').describe(api, { name: 'Long', body }, {});
+    expect(summary).toContain(`(${body.length} characters`);
+    expect(summary).toContain(body.slice(0, 1400));
+    const short = await action('save_template').describe(api, { name: 'Short', body: 'Thanks a lot,\nsee you' }, {});
+    expect(short.summary).toContain('Thanks a lot,\nsee you');
+  });
+
+  it('ask before saving one, even in automatic mode', async () => {
+    const api = makeApi({
+      turns: [toolCall('save_template', { name: 'Helping', body: 'Happy to help!' }), anthropicSse(['Saved.'])],
+      prefs: { actions: 'auto' },
+      handlers: { 'templates.list': async () => [], 'templates.create': async (tpl) => ({ id: 't9', ...tpl }) },
+    });
+    const box = await mount(api);
+    await type(box, 'save this as a template called Helping');
+    await key(box, 'Enter');
+    const card = await waitFor(() => { const el = document.querySelector('[data-action="save_template"]'); if (el?.dataset.actionState !== 'waiting') throw new Error('not waiting'); return el; });
+    expect(card.textContent).toContain('“Helping”');
+    expect(api.calls('templates.create')).toHaveLength(0);
+    await click(screen.getByRole('button', { name: 'Do it' }));
+    await settled();
+    expect(api.calls('templates.create')).toHaveLength(1);
+  });
+
+  it('are left out when the plugin may not use them (enabled before the update)', async () => {
+    const api = makeApi({ handlers: { 'templates.list': async () => { throw new Error('Plugin "ai-assistant" lacks permission "templates:read"'); } }, prefs: { actions: 'auto' } });
+    const box = await mount(api);
+    await tick();
+    await type(box, 'hi');
+    await key(box, 'Enter');
+    await settled();
+    const names = sent(api).tools.map((t) => t.name);
+    expect(names).not.toContain('list_templates');
+    expect(names).not.toContain('save_template');
+    expect(sent(api).system).toBeTruthy();
+  });
+});
+
+describe('the notes settings with actions off', () => {
+  async function show(config, prefs) {
+    const api = fakeApi({ translations: allStrings(), handlers: { 'admin.getAllConfig': async () => ({ ...CONFIG, ...config }) } });
+    if (prefs) await api.storage.set('prefs', prefs);
+    await act(async () => { render(React.createElement(SettingsPanel, { api })); });
+    await screen.findByText('Saved prompts');
+  }
+
+  it('say why no new notes come', async () => {
+    await show({ actions: 'off' });
+    expect(screen.getByText("Your administrator turned the assistant's actions off, so it can't keep new notes.")).toBeTruthy();
+    cleanup();
+    await show({});
+    expect(screen.getByText(/only with actions on/)).toBeTruthy();
+    cleanup();
+    await show({}, { actions: 'manual' });
+    expect(document.querySelector('[data-notes-actions-off]')).toBeNull();
   });
 });
