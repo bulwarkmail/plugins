@@ -54,8 +54,9 @@ test('the panel button sits at the end of the h-14 row in every view, where Mail
     for (const view of VIEWS) {
       await openView(page, view);
       const button = toggle(page);
-      // Named for screen readers, and says whether the panel is open.
-      await expect(button).toHaveAccessibleName('Show plugin panel');
+      // One name for screen readers; aria-pressed says whether the panel is open.
+      await expect(button).toHaveAccessibleName('Plugin panel');
+      await expect(button).toHaveAttribute('title', 'Plugin panel (Alt+A)');
       await expect(button).toHaveAttribute('aria-pressed', 'false');
       expect(await rowOf(button), `${view}: the button ends an h-14 row`).toEqual({ height: 56, last: true });
       expect(await placeFromRight(page, button), `${view}: the same place as in Mail`).toEqual(mailEmpty);
@@ -63,8 +64,9 @@ test('the panel button sits at the end of the h-14 row in every view, where Mail
       const { host, frame } = viewPanel(page);
       await expect(host).toBeVisible();
       await expect(chatInput(frame)).toBeVisible({ timeout: 60_000 });
-      // Open, it stays where it was, under its new name.
-      await expect(button).toHaveAccessibleName('Hide plugin panel');
+      // Open, it stays where it was, pressed; the panel is a named landmark.
+      await expect(button).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('complementary', { name: 'AI Assistant' })).toBeVisible();
       expect(await placeFromRight(page, button), `${view}: open`).toEqual(mailEmpty);
       // The panel runs from under the row to the bottom, at the window's right edge.
       const panelBox = await host.boundingBox();
@@ -129,8 +131,11 @@ test('Catch me up lists the unread mail and today\'s events', async ({ page }) =
     expect(request, 'the request reached the mock').toBeTruthy();
     const last = request.body.messages.at(-1);
     const sent = typeof last.content === 'string' ? last.content : last.content.map((b) => b.text ?? '').join('\n');
-    expect(sent).toContain(subject);
-    expect(sent).toContain(title);
+    const system = typeof request.body.system === 'string' ? request.body.system : request.body.system.map((b) => b.text).join(' ');
+    // The mail and the event go as data with this request, not as the user's message.
+    expect(system).toContain(subject);
+    expect(system).toContain(title);
+    expect(sent).not.toContain(subject);
 
     const turn = frame.locator('[data-turn="assistant"]').last();
     await expect(turn.locator('[data-widget="emails"]').first()).toContainText(subject);
@@ -161,6 +166,17 @@ test('on a phone the header button opens the assistant as a dialog with the view
     const dialogBox = await box.boundingBox();
     expect(dialogBox.x).toBeGreaterThanOrEqual(0);
     expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(390);
+    // A small phone (390 x 667) with the keyboard up: the dialog and the chat's input stay in view.
+    await page.setViewportSize({ width: 390, height: 667 });
+    await page.setViewportSize({ width: 390, height: 380 });
+    await expect(async () => {
+      const dialog = await box.boundingBox();
+      expect(dialog.y).toBeGreaterThanOrEqual(0);
+      expect(dialog.y + dialog.height).toBeLessThanOrEqual(380);
+    }).toPass({ timeout: 10_000 });
+    const input = await chatInput(frame).boundingBox();
+    expect(input.y).toBeGreaterThanOrEqual(0);
+    expect(input.y + input.height).toBeLessThanOrEqual(380);
   } finally {
     await uninstallPlugin(api, ID);
   }

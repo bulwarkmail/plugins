@@ -18,7 +18,7 @@
   "view.empty.contacts": "Kérdezzen a névjegyeiről, vagy nyisson meg egyet, hogy dolgozzon vele.",
   "view.empty.files": "Kérdezzen a fájljairól, vagy jelöljön ki néhányat, hogy dolgozzon velük.",
   "view.empty.settings": "Kérdezze meg, hogyan állíthat be valamit, vagy kérdezzen a megnyitott oldalról.",
-  "view.privacy": "A Naptárban, a Névjegyekben, a Fájlokban és a Beállításokban azt is elküldi, ami ott meg van nyitva: az eseményt, a névjegyet, a kijelölt fájlok nevét és a mappát, vagy a beállítási oldalt.",
+  "view.privacy": "A Naptárban, a Névjegyekben, a Fájlokban és a Beállításokban azt is elküldi, ami ott meg van nyitva: az eseményt, a névjegyet, a kijelölt fájlok nevét, típusát, méretét és módosítási dátumát és a mappát, vagy a beállítási oldalt.",
   "view.settings.title": "Más nézetek és Mi újság",
   "view.settings.everywhere": "Megjelenítés a Naptárban, a Névjegyekben, a Fájlokban és a Beállításokban",
   "view.settings.everywhere_hint": "Egy panel e nézetek mellett. A gombja vagy az Alt+A nyitja meg.",
@@ -29,9 +29,10 @@
   "brief.tasks": "Esedékes feladatok",
   "brief.waiting": "Válaszra vár",
   "brief.no_waiting": "Semmi sem vár válaszra.",
-  "brief.privacy": "A Mi újság elküldi az utolsó látogatása óta érkezett olvasatlan leveleket is (feladó, tárgy és első sorok), a mai eseményeket, a nyitott feladatokat és az elmúlt hét elküldött leveleit, amelyek válaszra várnak.",
+  "brief.privacy": "A Mi újság elküldi az utolsó látogatása óta érkezett olvasatlan leveleket is (feladó, címzettek, dátum, tárgy, első sorok és üzenetazonosító), a mai eseményeket, a nyitott feladatokat és az elmúlt hét elküldött leveleit, amelyek válaszra várnak.",
   "brief.settings.catch_up": "Mi újság felajánlása",
-  "brief.settings.catch_up_hint": "Összefoglaló az új levelekről, a mai eseményekről és a nyitott feladatokról, ha nincs megnyitott üzenet.",
+  "brief.settings.catch_up_hint": "Összefoglaló az új levelekről, a mai eseményekről és a nyitott feladatokról, ha nincs megnyitott üzenet. A keresésekre van szüksége.",
   "brief.settings.waiting": "Válaszra váró levelek keresése",
-  "brief.settings.waiting_hint": "A Mi újság átnézi az elmúlt hét elküldött leveleit, és megkeresi azokat, amelyekre senki sem válaszolt."
+  "brief.settings.waiting_hint": "A Mi újság átnézi az elmúlt hét elküldött leveleit, és megkeresi azokat, amelyekre senki sem válaszolt.",
+  "view.settings.grant": "Ahhoz, hogy az asszisztens ott is megjelenjen, kapcsolja ki és be újra a {place} alatt, és engedélyezze az új jogosultságot."
 }

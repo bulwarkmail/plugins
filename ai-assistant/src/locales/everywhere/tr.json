@@ -18,7 +18,7 @@
   "view.empty.contacts": "Kişilerinizle ilgili soru sorun veya üzerinde çalışmak için birini açın.",
   "view.empty.files": "Dosyalarınızla ilgili soru sorun veya üzerinde çalışmak için birkaçını seçin.",
   "view.empty.settings": "Bir şeyin nasıl ayarlandığını veya açık sayfayı sorun.",
-  "view.privacy": "Takvim, Kişiler, Dosyalar ve Ayarlar'da orada açık olanı da gönderir: etkinliği, kişiyi, seçili dosyaların adlarını ve klasörü ya da ayarlar sayfasını.",
+  "view.privacy": "Takvim, Kişiler, Dosyalar ve Ayarlar'da orada açık olanı da gönderir: etkinliği, kişiyi, seçili dosyaların adlarını, türlerini, boyutlarını ve değişiklik tarihlerini ve klasörü ya da ayarlar sayfasını.",
   "view.settings.title": "Diğer görünümler ve Beni bilgilendir",
   "view.settings.everywhere": "Takvim, Kişiler, Dosyalar ve Ayarlar'da göster",
   "view.settings.everywhere_hint": "Bu görünümlerin yanında bir panel. Düğmesi veya Alt+A açar.",
@@ -29,9 +29,10 @@
   "brief.tasks": "Süresi gelen görevler",
   "brief.waiting": "Yanıt bekliyor",
   "brief.no_waiting": "Yanıt bekleyen bir şey yok.",
-  "brief.privacy": "Beni bilgilendir, son ziyaretinizden beri okunmamış e-postaları (gönderen, konu ve ilk satırlar), bugünün etkinliklerini, açık görevlerinizi ve geçen hafta gönderilip yanıt bekleyen e-postaları da gönderir.",
+  "brief.privacy": "Beni bilgilendir, son ziyaretinizden beri okunmamış e-postaları (gönderen, alıcılar, tarih, konu, ilk satırlar ve ileti kimliği), bugünün etkinliklerini, açık görevlerinizi ve geçen hafta gönderilip yanıt bekleyen e-postaları da gönderir.",
   "brief.settings.catch_up": "Beni bilgilendir'i sun",
-  "brief.settings.catch_up_hint": "Hiçbir ileti açık değilken yeni e-postaların, bugünün etkinliklerinin ve açık görevlerin özeti.",
+  "brief.settings.catch_up_hint": "Hiçbir ileti açık değilken yeni e-postaların, bugünün etkinliklerinin ve açık görevlerin özeti. Aramaların açık olması gerekir.",
   "brief.settings.waiting": "Yanıt bekleyen e-postaları ara",
-  "brief.settings.waiting_hint": "Beni bilgilendir, geçen hafta gönderdiğiniz e-postalarda kimsenin yanıtlamadığı iletileri arar."
+  "brief.settings.waiting_hint": "Beni bilgilendir, geçen hafta gönderdiğiniz e-postalarda kimsenin yanıtlamadığı iletileri arar.",
+  "view.settings.grant": "Asistanı orada göstermek için {place}'de kapatıp yeniden açın ve yeni izni verin."
 }

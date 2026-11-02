@@ -69,17 +69,19 @@ as a chip in the input. Its Actions offer what fits: **What's on this
 week?** in Calendar, **Last mails with** the open contact, **Summarize
 this file** for one selected file (when the webmail can read files), and
 **Explain this page** in Settings. In Files the assistant and the details
-panel take turns. On phones, and in Settings below 1024 px, the button in
-the header opens the assistant as a dialog.
+panel take turns. On phones, and in Settings below 1024 px, the panel
+button in the header (in Contacts also over an open contact) opens the
+assistant as a dialog that fits above the keyboard.
 
 **Catch me up** (in the Actions menu, and as a button in the empty panel
-whenever no message is open) lists what came in and what is due: unread
-mail in the inbox since your last visit, sorted by the model into what
+whenever no message is open, while lookups are on) lists what came in and
+what is due: unread mail in the inbox since your last visit, sorted by the model into what
 needs an answer and what is for your information, then today's events,
 open tasks due today or earlier, and (on webmails that can read whole
 conversations) mail you sent in the last week that nobody answered yet.
-The last visit is when you last closed an assistant panel, or ten minutes
-ago while one stays open; the first time, the last day.
+Your last visit is when the webmail was last open before this time (the
+assistant notes the time every few minutes while it is open), or your
+last Catch me up; the first time, the last day.
 
 ## Lookups
 
@@ -223,7 +225,7 @@ encrypted on the server and only sent to the address they approved there.
 | Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, the message you reply to, and the settings it reads |
 | Let it do something (actions on) | What the action did, and the names of your folders when it files a message |
 | Ask in Calendar, Contacts, Files or Settings | What you have open there: the event (title, time, place, participants, description), the contact (name, addresses, phones, company, dates, notes) and how many contacts are ticked, the names, types, sizes and dates of up to 20 selected files and the folder's path, or the settings page's name |
-| Use Catch me up | Your unread inbox mail since your last visit (sender, recipients, date, subject, preview), today's events (time, title, place), your open tasks due today or earlier, and the sent mail of the last week that is waiting for a reply (same fields) |
+| Use Catch me up | Your unread inbox mail since your last visit (sender, recipients, date, subject, preview, message id), today's events (time, title, place), your open tasks (title, due date) due today or earlier, and the sent mail of the last week that is waiting for a reply (same fields as the unread mail). They go with that one request as data; the chat keeps only the answer and its cards |
 
 The privacy notice before the first request lists the same, and names
 lookups and actions only when they are switched on. When an update makes
@@ -231,8 +233,8 @@ the assistant send more, the notice comes once more.
 
 Nothing else leaves the webmail. In the browser the plugin keeps your
 choices, which services you confirmed, the chats of the open composer and
-of the messages you talked about, when you last closed its panel (for
-Catch me up), and, while a composer is open, the
+of the messages you talked about, when the webmail was last open and
+your last Catch me up (for "unread since"), and, while a composer is open, the
 draft's subject and what the composer is a reply to (removed when the
 composer closes).
 

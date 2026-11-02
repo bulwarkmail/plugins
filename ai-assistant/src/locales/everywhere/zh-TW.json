@@ -18,7 +18,7 @@
   "view.empty.contacts": "詢問你的聯絡人，或開啟一位聯絡人來處理。",
   "view.empty.files": "詢問你的檔案，或選取一些檔案來處理。",
   "view.empty.settings": "詢問如何設定某項功能，或詢問目前開啟的頁面。",
-  "view.privacy": "在行事曆、聯絡人、檔案和設定中，它也會傳送你在那裡開啟的內容：活動、聯絡人、所選檔案的名稱和資料夾，或設定頁面。",
+  "view.privacy": "在行事曆、聯絡人、檔案和設定中，它也會傳送你在那裡開啟的內容：活動、聯絡人、所選檔案的名稱、類型、大小和修改日期以及資料夾，或設定頁面。",
   "view.settings.title": "其他檢視與近況摘要",
   "view.settings.everywhere": "在行事曆、聯絡人、檔案和設定中顯示",
   "view.settings.everywhere_hint": "這些檢視旁的面板。按它的按鈕或 Alt+A 開啟。",
@@ -29,9 +29,10 @@
   "brief.tasks": "到期工作",
   "brief.waiting": "等待回覆",
   "brief.no_waiting": "沒有等待回覆的郵件。",
-  "brief.privacy": "近況摘要也會傳送你上次造訪以來的未讀郵件（寄件者、主旨和前幾行）、今天的活動、未完成的工作，以及上週寄出且仍在等待回覆的郵件。",
+  "brief.privacy": "近況摘要也會傳送你上次造訪以來的未讀郵件（寄件者、收件者、日期、主旨、前幾行和郵件 ID）、今天的活動、未完成的工作，以及上週寄出且仍在等待回覆的郵件。",
   "brief.settings.catch_up": "提供近況摘要",
-  "brief.settings.catch_up_hint": "沒有開啟郵件時，摘要新郵件、今天的活動和未完成的工作。",
+  "brief.settings.catch_up_hint": "沒有開啟郵件時，摘要新郵件、今天的活動和未完成的工作。需要開啟查詢。",
   "brief.settings.waiting": "尋找等待回覆的郵件",
-  "brief.settings.waiting_hint": "近況摘要會檢查你上週寄出的郵件，找出沒有人回覆的郵件。"
+  "brief.settings.waiting_hint": "近況摘要會檢查你上週寄出的郵件，找出沒有人回覆的郵件。",
+  "view.settings.grant": "若要在那裡顯示助理，請在{place}中將其關閉後重新開啟，並允許新的權限。"
 }

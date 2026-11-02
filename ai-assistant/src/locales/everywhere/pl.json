@@ -18,7 +18,7 @@
   "view.empty.contacts": "Zapytaj o kontakty lub otwórz jeden, aby z nim pracować.",
   "view.empty.files": "Zapytaj o pliki lub zaznacz kilka, aby z nimi pracować.",
   "view.empty.settings": "Zapytaj, jak coś ustawić, albo o otwartą stronę.",
-  "view.privacy": "W Kalendarzu, Kontaktach, Plikach i Ustawieniach wysyła też to, co masz tam otwarte: wydarzenie, kontakt, nazwy zaznaczonych plików i folder albo stronę ustawień.",
+  "view.privacy": "W Kalendarzu, Kontaktach, Plikach i Ustawieniach wysyła też to, co masz tam otwarte: wydarzenie, kontakt, nazwy, typy, rozmiary i daty zmian zaznaczonych plików i folder albo stronę ustawień.",
   "view.settings.title": "Inne widoki i Co nowego",
   "view.settings.everywhere": "Pokazuj w Kalendarzu, Kontaktach, Plikach i Ustawieniach",
   "view.settings.everywhere_hint": "Panel obok tych widoków. Otwiera go jego przycisk lub Alt+A.",
@@ -29,9 +29,10 @@
   "brief.tasks": "Zadania do wykonania",
   "brief.waiting": "Czeka na odpowiedź",
   "brief.no_waiting": "Nic nie czeka na odpowiedź.",
-  "brief.privacy": "Co nowego wysyła też nieprzeczytaną pocztę od Twojej ostatniej wizyty (nadawca, temat i pierwsze wiersze), dzisiejsze wydarzenia, otwarte zadania i wysłaną w ostatnim tygodniu pocztę, która czeka na odpowiedź.",
+  "brief.privacy": "Co nowego wysyła też nieprzeczytaną pocztę od Twojej ostatniej wizyty (nadawca, odbiorcy, data, temat, pierwsze wiersze i identyfikator wiadomości), dzisiejsze wydarzenia, otwarte zadania i wysłaną w ostatnim tygodniu pocztę, która czeka na odpowiedź.",
   "brief.settings.catch_up": "Oferuj Co nowego",
-  "brief.settings.catch_up_hint": "Podsumowanie nowej poczty, dzisiejszych wydarzeń i otwartych zadań, gdy nie jest otwarta żadna wiadomość.",
+  "brief.settings.catch_up_hint": "Podsumowanie nowej poczty, dzisiejszych wydarzeń i otwartych zadań, gdy nie jest otwarta żadna wiadomość. Wymaga wyszukiwania.",
   "brief.settings.waiting": "Szukaj poczty czekającej na odpowiedź",
-  "brief.settings.waiting_hint": "Co nowego przegląda pocztę wysłaną w ostatnim tygodniu i szuka wiadomości, na które nikt nie odpowiedział."
+  "brief.settings.waiting_hint": "Co nowego przegląda pocztę wysłaną w ostatnim tygodniu i szuka wiadomości, na które nikt nie odpowiedział.",
+  "view.settings.grant": "Aby asystent pojawił się tam, wyłącz go i włącz ponownie w {place} i zezwól na nowe uprawnienie."
 }

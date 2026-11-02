@@ -18,7 +18,7 @@
   "view.empty.contacts": "Pregunta por tus contactos, o abre uno para trabajar con él.",
   "view.empty.files": "Pregunta por tus archivos, o selecciona algunos para trabajar con ellos.",
   "view.empty.settings": "Pregunta cómo configurar algo, o por la página abierta.",
-  "view.privacy": "En Calendario, Contactos, Archivos y Ajustes también envía lo que tienes abierto allí: el evento, el contacto, los nombres de los archivos seleccionados y la carpeta, o la página de ajustes.",
+  "view.privacy": "En Calendario, Contactos, Archivos y Ajustes también envía lo que tienes abierto allí: el evento, el contacto, los nombres, tipos, tamaños y fechas de cambio de los archivos seleccionados y la carpeta, o la página de ajustes.",
   "view.settings.title": "Otras vistas y Ponme al día",
   "view.settings.everywhere": "Mostrar en Calendario, Contactos, Archivos y Ajustes",
   "view.settings.everywhere_hint": "Un panel junto a estas vistas. Su botón o Alt+A lo abre.",
@@ -29,9 +29,10 @@
   "brief.tasks": "Tareas pendientes",
   "brief.waiting": "Esperando respuesta",
   "brief.no_waiting": "Nada espera respuesta.",
-  "brief.privacy": "Ponme al día también envía el correo sin leer desde tu última visita (remitente, asunto y primeras líneas), los eventos de hoy, tus tareas abiertas y el correo enviado la última semana que espera respuesta.",
+  "brief.privacy": "Ponme al día también envía el correo sin leer desde tu última visita (remitente, destinatarios, fecha, asunto, primeras líneas e identificador del mensaje), los eventos de hoy, tus tareas abiertas y el correo enviado la última semana que espera respuesta.",
   "brief.settings.catch_up": "Ofrecer Ponme al día",
-  "brief.settings.catch_up_hint": "Un resumen del correo nuevo, los eventos de hoy y las tareas abiertas cuando no hay ningún mensaje abierto.",
+  "brief.settings.catch_up_hint": "Un resumen del correo nuevo, los eventos de hoy y las tareas abiertas cuando no hay ningún mensaje abierto. Necesita las consultas.",
   "brief.settings.waiting": "Buscar correo que espera respuesta",
-  "brief.settings.waiting_hint": "Ponme al día revisa el correo que enviaste la última semana en busca de mensajes que nadie ha respondido."
+  "brief.settings.waiting_hint": "Ponme al día revisa el correo que enviaste la última semana en busca de mensajes que nadie ha respondido.",
+  "view.settings.grant": "Para mostrar el asistente allí, desactívalo y vuelve a activarlo en {place} y concede el nuevo permiso."
 }

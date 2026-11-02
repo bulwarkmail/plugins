@@ -5,11 +5,11 @@
 // nothing is open (those views, and the reader with no message) it offers
 // Catch me up.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { areaAllowed } from '../../../lib/config.js';
 import { has } from '../../../lib/caps.js';
 import { userZone } from '../../../lib/clock.js';
-import { LAST_VISIT_EVERY_MS, LAST_VISIT_KEY, briefParts, briefRequest, gatherBrief, viewBlock, viewOf } from '../../../lib/areas/everywhere.js';
+import { LAST_VISIT_KEY, briefParts, briefRequest, gatherBrief, viewBlock, viewOf } from '../../../lib/areas/everywhere.js';
 import { NOTHING } from './nothing.js';
 
 /** The chip of what the view shows, or null. */
@@ -50,17 +50,10 @@ export function useArea(chat, props) {
   const { api, t, mode, email, setup, prefs, person, locale, bridge } = chat;
   const view = mode === 'reader' ? viewOf(props) : null;
   const allowed = !!setup?.endpoint && areaAllowed(setup.config ?? {}, 'everywhere');
-  const briefOn = allowed && mode === 'reader' && !email && prefs?.catchUp !== false;
+  // Catch me up reads mail, the calendar and tasks: only with lookups on.
+  const briefAllowed = allowed && prefs?.catchUp !== false && prefs?.lookups !== false;
+  const briefOn = briefAllowed && mode === 'reader' && !email;
   const [gathering, setGathering] = useState(false);
-
-  // When the user last looked, for "unread since": when a reader or view
-  // panel goes away, and every 10 minutes while one is open.
-  useEffect(() => {
-    if (mode !== 'reader') return undefined;
-    const mark = () => { void Promise.resolve(api.storage.set(LAST_VISIT_KEY, Date.now())).catch(() => {}); };
-    const timer = setInterval(mark, LAST_VISIT_EVERY_MS);
-    return () => { clearInterval(timer); mark(); };
-  }, [api, mode]);
 
   const zone = userZone(api, person?.timeZone);
   const live = useRef({ zone, person, prefs, locale });
@@ -70,6 +63,7 @@ export function useArea(chat, props) {
     setGathering(true);
     try {
       const now = live.current;
+      const startedAt = Date.now();
       const stored = await Promise.resolve(api.storage.get(LAST_VISIT_KEY)).catch(() => null);
       const brief = await gatherBrief(api, {
         zone: now.zone,
@@ -77,17 +71,32 @@ export function useArea(chat, props) {
         ownEmails: now.person?.emails ?? [],
         waiting: now.prefs?.briefWaiting !== false,
       });
+      const { instruction, data } = briefRequest(brief, now.zone);
+      // The user's turn is the instruction alone; the mail and events go
+      // into this request's system prompt as data and are not kept.
       await bridge.current.send?.({
         label: t('brief.label'),
-        sent: briefRequest(brief, now.zone),
-        finish: (text) => `${text}\n${briefParts(brief, text, { t, zone: now.zone, locale: now.locale })}`,
+        sent: instruction,
+        data,
+        finish: (text) => {
+          // Caught up: the next Catch me up starts from here.
+          void Promise.resolve(api.storage.set(LAST_VISIT_KEY, startedAt)).catch(() => {});
+          return `${text}\n${briefParts(brief, text, { t, zone: now.zone, locale: now.locale })}`;
+        },
       });
     } finally {
       setGathering(false);
     }
   }, [api, bridge, gathering, t]);
 
-  if (!allowed || mode !== 'reader' || (!view && !briefOn)) return NOTHING;
+  if (!allowed) return NOTHING;
+  // The privacy notice names what this area may send wherever it is asked
+  // for first (it is asked once per service, maybe in Mail or the composer).
+  const privacyParts = [
+    ...(prefs?.everywhere !== false && has(api, 'sidePanel') ? ['view.privacy'] : []),
+    ...(briefAllowed ? ['brief.privacy'] : []),
+  ];
+  if (mode !== 'reader' || (!view && !briefOn)) return { privacyParts };
 
   const context = props?.context ?? {};
   const brief = briefOn ? [{ id: 'catch-up', icon: 'list-details', label: t('brief.label'), run: () => { void catchUp(); } }] : [];
@@ -100,6 +109,6 @@ export function useArea(chat, props) {
     promptBlocks: view ? [viewBlock(view, context, zone)] : [],
     quick: [...brief, ...quick],
     empty: view || brief.length ? { text: view ? t(`view.empty.${view}`) : undefined, actions: brief.map((b) => ({ ...b, busy: gathering })) } : null,
-    privacyParts: [...(view ? ['view.privacy'] : []), ...(briefOn ? ['brief.privacy'] : [])],
+    privacyParts,
   };
 }

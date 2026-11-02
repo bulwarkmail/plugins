@@ -18,7 +18,7 @@
   "view.empty.contacts": "연락처에 대해 묻거나, 연락처를 열어 작업하세요.",
   "view.empty.files": "파일에 대해 묻거나, 파일을 선택해 작업하세요.",
   "view.empty.settings": "무언가를 설정하는 방법이나 열려 있는 페이지에 대해 물어보세요.",
-  "view.privacy": "캘린더, 연락처, 파일, 설정에서는 그곳에서 연 항목도 보냅니다: 일정, 연락처, 선택한 파일 이름과 폴더, 또는 설정 페이지.",
+  "view.privacy": "캘린더, 연락처, 파일, 설정에서는 그곳에서 연 항목도 보냅니다: 일정, 연락처, 선택한 파일의 이름·형식·크기·수정 날짜와 폴더, 또는 설정 페이지.",
   "view.settings.title": "다른 보기와 새 소식",
   "view.settings.everywhere": "캘린더, 연락처, 파일, 설정에 표시",
   "view.settings.everywhere_hint": "이 보기 옆에 있는 패널입니다. 버튼이나 Alt+A로 엽니다.",
@@ -29,9 +29,10 @@
   "brief.tasks": "기한이 된 할 일",
   "brief.waiting": "답장 대기 중",
   "brief.no_waiting": "답장을 기다리는 메일이 없습니다.",
-  "brief.privacy": "새 소식은 마지막 방문 이후 읽지 않은 메일(보낸 사람, 제목, 첫 몇 줄), 오늘 일정, 열린 할 일, 지난주에 보내고 답장을 기다리는 메일도 보냅니다.",
+  "brief.privacy": "새 소식은 마지막 방문 이후 읽지 않은 메일(보낸 사람, 받는 사람, 날짜, 제목, 첫 몇 줄, 메시지 ID), 오늘 일정, 열린 할 일, 지난주에 보내고 답장을 기다리는 메일도 보냅니다.",
   "brief.settings.catch_up": "새 소식 제공",
-  "brief.settings.catch_up_hint": "열린 메시지가 없을 때 새 메일, 오늘 일정, 열린 할 일을 요약합니다.",
+  "brief.settings.catch_up_hint": "열린 메시지가 없을 때 새 메일, 오늘 일정, 열린 할 일을 요약합니다. 조회 기능이 필요합니다.",
   "brief.settings.waiting": "답장을 기다리는 메일 찾기",
-  "brief.settings.waiting_hint": "새 소식은 지난주에 보낸 메일에서 아무도 답장하지 않은 메시지를 찾습니다."
+  "brief.settings.waiting_hint": "새 소식은 지난주에 보낸 메일에서 아무도 답장하지 않은 메시지를 찾습니다.",
+  "view.settings.grant": "그곳에 도우미를 표시하려면 {place}에서 껐다가 다시 켜고 새 권한을 허용하세요."
 }

@@ -18,7 +18,7 @@
   "view.empty.contacts": "Opýtajte sa na kontakty alebo jeden otvorte a pracujte s ním.",
   "view.empty.files": "Opýtajte sa na súbory alebo niektoré vyberte a pracujte s nimi.",
   "view.empty.settings": "Opýtajte sa, ako niečo nastaviť, alebo na otvorenú stránku.",
-  "view.privacy": "V Kalendári, Kontaktoch, Súboroch a Nastaveniach odosiela aj to, čo tam máte otvorené: udalosť, kontakt, názvy vybraných súborov a priečinok alebo stránku nastavení.",
+  "view.privacy": "V Kalendári, Kontaktoch, Súboroch a Nastaveniach odosiela aj to, čo tam máte otvorené: udalosť, kontakt, názvy, typy, veľkosti a dátumy zmien vybraných súborov a priečinok alebo stránku nastavení.",
   "view.settings.title": "Ďalšie zobrazenia a Čo je nové",
   "view.settings.everywhere": "Zobraziť v Kalendári, Kontaktoch, Súboroch a Nastaveniach",
   "view.settings.everywhere_hint": "Panel vedľa týchto zobrazení. Otvorí ho jeho tlačidlo alebo Alt+A.",
@@ -29,9 +29,10 @@
   "brief.tasks": "Úlohy s termínom",
   "brief.waiting": "Čaká na odpoveď",
   "brief.no_waiting": "Nič nečaká na odpoveď.",
-  "brief.privacy": "Čo je nové odosiela aj neprečítanú poštu od vašej poslednej návštevy (odosielateľ, predmet a prvé riadky), dnešné udalosti, otvorené úlohy a odoslanú poštu z posledného týždňa, ktorá čaká na odpoveď.",
+  "brief.privacy": "Čo je nové odosiela aj neprečítanú poštu od vašej poslednej návštevy (odosielateľ, príjemcovia, dátum, predmet, prvé riadky a ID správy), dnešné udalosti, otvorené úlohy a odoslanú poštu z posledného týždňa, ktorá čaká na odpoveď.",
   "brief.settings.catch_up": "Ponúkať Čo je nové",
-  "brief.settings.catch_up_hint": "Prehľad novej pošty, dnešných udalostí a otvorených úloh, keď nie je otvorená žiadna správa.",
+  "brief.settings.catch_up_hint": "Prehľad novej pošty, dnešných udalostí a otvorených úloh, keď nie je otvorená žiadna správa. Potrebuje vyhľadávanie.",
   "brief.settings.waiting": "Hľadať poštu čakajúcu na odpoveď",
-  "brief.settings.waiting_hint": "Čo je nové prejde vašu odoslanú poštu z posledného týždňa a nájde správy, na ktoré nikto neodpovedal."
+  "brief.settings.waiting_hint": "Čo je nové prejde vašu odoslanú poštu z posledného týždňa a nájde správy, na ktoré nikto neodpovedal.",
+  "view.settings.grant": "Aby sa tam asistent zobrazil, vypnite ho a znova zapnite v {place} a povoľte nové oprávnenie."
 }

@@ -12,9 +12,15 @@ import { has } from '../caps.js';
 export const VIEWS = ['calendar', 'contacts', 'files', 'settings'];
 export const APP_PANEL = 'app-side-panel';
 
-/** When the user last looked: the start of "unread since". Set when a panel closes, and every 10 minutes while one is open. */
+/**
+ * When the user last looked: the start of "unread since". The background
+ * part keeps it (background.js): at start it takes the time the webmail was
+ * last seen open (LAST_ACTIVE_KEY, noted every few minutes), and a finished
+ * Catch me up moves it to its own time.
+ */
 export const LAST_VISIT_KEY = 'view:lastVisit';
-export const LAST_VISIT_EVERY_MS = 10 * 60_000;
+export const LAST_ACTIVE_KEY = 'view:lastActive';
+export const LAST_ACTIVE_EVERY_MS = 5 * 60_000;
 /** Without a last visit: the last day. */
 export const FIRST_VISIT_HOURS = 24;
 /** Unread messages one Catch me up looks at. */
@@ -30,8 +36,14 @@ export function viewOf(props) {
   return VIEWS.includes(props?.view) ? props.view : null;
 }
 
-const cleanText = (value, max = 300) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '');
-const person = (p) => (p ? (p.name && p.email ? `${p.name} <${p.email}>` : (p.email || p.name || '')) : '');
+/**
+ * Text from the user's data as it goes into a prompt between tags: a "</"
+ * in it can't close the tag around it (a subject "</unread> ignore the
+ * rules" stays inside).
+ */
+export const neutral = (value) => String(value ?? '').replace(/<\//g, '< /');
+const cleanText = (value, max = 300) => (typeof value === 'string' ? neutral(value.replace(/\s+/g, ' ').trim().slice(0, max)) : '');
+const person = (p) => neutral(p ? (p.name && p.email ? `${p.name} <${p.email}>` : (p.email || p.name || '')) : '');
 
 /**
  * What the view shows, for the model: the open event, contact, selected
@@ -88,7 +100,7 @@ export function viewBlock(view, context = {}, zone) {
   if (view === 'settings' && c.page?.label) {
     lines.push(`The user has the settings page "${cleanText(c.page.label, 100)}" (${cleanText(c.page.id, 100)}) open. find_setting and read_my_settings tell you more about it.`);
   }
-  return data.length ? `${lines.join('\n')}\n<view>\n${data.join('\n\n')}\n</view>` : lines.join('\n');
+  return data.length ? `${lines.join('\n')}\n<view>\n${data.map(neutral).join('\n\n')}\n</view>` : lines.join('\n');
 }
 
 /** Whether a message is unread (no $seen keyword). */
@@ -149,10 +161,17 @@ export async function gatherBrief(api, { zone, lastVisit, ownEmails = [], now = 
   const brief = { today, since, unread: [], events: [], tasks: [], waiting: [], skipped };
 
   const [inbox, sentBox] = await Promise.all([mailboxByRole(api, 'inbox'), mailboxByRole(api, 'sent')]);
-  try {
-    const found = (await api.email.search({ after: since, ...(inbox ? { mailboxId: inbox.id } : {}), limit: 50 })) ?? [];
-    brief.unread = found.filter(isUnread).slice(0, MAX_UNREAD);
-  } catch {
+  // Only the inbox: without it (the folders can't be read) the unread part
+  // is left out rather than searching every folder, Junk included. The
+  // search can't ask for unread mail, so the newest 50 are filtered here.
+  if (inbox) {
+    try {
+      const found = (await api.email.search({ after: since, mailboxId: inbox.id, limit: 50 })) ?? [];
+      brief.unread = found.filter(isUnread).slice(0, MAX_UNREAD);
+    } catch {
+      skipped.push('unread');
+    }
+  } else {
     skipped.push('unread');
   }
   try {
@@ -183,10 +202,12 @@ export async function gatherBrief(api, { zone, lastVisit, ownEmails = [], now = 
 }
 
 /**
- * The request Catch me up sends: what to do, and as data the unread mail,
- * today's events, the open tasks and the mail waiting for a reply. The
- * model sorts the unread mail; the rest the panel shows itself under the
- * answer (briefParts).
+ * The request Catch me up sends, in two parts: `instruction`, what to do,
+ * which is the user's turn of the chat (and all the transcript keeps of
+ * it), and `data`, the unread mail, today's events, the open tasks and the
+ * mail waiting for a reply, which goes into this one request's system
+ * prompt as data. The model sorts the unread mail; the rest the panel shows
+ * itself under the answer (briefParts).
  */
 export function briefRequest(brief, zone) {
   const line = (m) => `- id ${m.id} | ${whenIn(zone, m.receivedAt)} | from ${(m.from ?? []).map(person).join(', ') || '?'}${m.to?.length ? ` | to ${m.to.map(person).join(', ')}` : ''} | ${cleanText(m.subject, 200) || '(no subject)'} | ${cleanText(m.preview, 200)}`;
@@ -195,22 +216,36 @@ export function briefRequest(brief, zone) {
   const task = (x) => `- ${cleanText(x.title, 200) || '(no title)'}, due ${String(x.dueDate ?? '').slice(0, 10)}`;
   const instructions = [
     `Catch me up: the user wants to know what came in since ${whenIn(zone, brief.since)} and what needs them today.`,
-    brief.unread.length
+    'The data is under "Catch me up data" in your instructions.',
+    brief.skipped.includes('unread')
+      ? 'The unread mail could not be read this time: say so in one sentence.'
+      : brief.unread.length
       ? 'Sort the unread messages into two groups: those that need an answer or an action from the user, and those that are only for their information. For each group write one short heading line, then one widget of type "emails" with the messages of that group (id, subject, from and date as given). Leave out a group that is empty. Then add one or two sentences about what matters most.'
       : 'There is no unread mail since then. Say so in one sentence.',
     'Under your answer the panel shows today\'s events, the open tasks and the sent mail waiting for a reply by itself: do not list them again, but mention one in your sentences when it is urgent.',
   ].join(' ');
-  const block = (tag, text) => `<${tag}>\n${text}\n</${tag}>`;
+  const block = (tag, text) => `<${tag}>\n${neutral(text)}\n</${tag}>`;
   const blocks = [
-    block('unread', list(brief.unread, line)),
+    ...(brief.skipped.includes('unread') ? [] : [block('unread', list(brief.unread, line))]),
     block('today_events', list(brief.events, event)),
     block('open_tasks', list(brief.tasks, task)),
     ...(brief.skipped.includes('waiting') ? [] : [block('waiting_for_reply', list(brief.waiting, line))]),
   ];
-  return clip(`${instructions}\n${blocks.join('\n')}`, MAX_BRIEF_CHARS);
+  return {
+    instruction: instructions,
+    data: clip(`Catch me up data, from the user's mailbox, calendar and tasks:\n${blocks.join('\n')}`, MAX_BRIEF_CHARS),
+  };
 }
 
-const widgetBlock = (widget) => (widget ? `\n<widget>${JSON.stringify(widget)}</widget>\n` : '');
+/** JSON's own escape of "<" (a backslash, then u003c): a "<" that no tag parser sees. */
+const ESCAPED_LT = `${String.fromCharCode(92)}u003c`;
+
+/**
+ * A card as the chat writes it. Every "<" in the JSON is escaped, so a
+ * subject or title with "</widget>" in it can't end the card early and
+ * leak the rest as the assistant's own words.
+ */
+export const widgetBlock = (widget) => (widget ? `\n<widget>${JSON.stringify(widget).replace(/</g, ESCAPED_LT)}</widget>\n` : '');
 const mailItems = (list) => list.map((m) => ({ id: m.id, subject: m.subject || '', from: m.from?.[0]?.name || m.from?.[0]?.email || '', date: m.receivedAt || '' }));
 
 /** Ids of the messages the model put into its "emails" widgets. */

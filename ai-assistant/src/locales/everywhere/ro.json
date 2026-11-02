@@ -18,7 +18,7 @@
   "view.empty.contacts": "Întrebați despre contacte sau deschideți unul ca să lucrați cu el.",
   "view.empty.files": "Întrebați despre fișiere sau selectați câteva ca să lucrați cu ele.",
   "view.empty.settings": "Întrebați cum se configurează ceva sau despre pagina deschisă.",
-  "view.privacy": "În Calendar, Contacte, Fișiere și Setări trimite și ce aveți deschis acolo: evenimentul, contactul, numele fișierelor selectate și dosarul sau pagina de setări.",
+  "view.privacy": "În Calendar, Contacte, Fișiere și Setări trimite și ce aveți deschis acolo: evenimentul, contactul, numele, tipurile, dimensiunile și datele de modificare ale fișierelor selectate și dosarul sau pagina de setări.",
   "view.settings.title": "Alte vizualizări și Pune-mă la curent",
   "view.settings.everywhere": "Afișează în Calendar, Contacte, Fișiere și Setări",
   "view.settings.everywhere_hint": "Un panou lângă aceste vizualizări. Butonul lui sau Alt+A îl deschide.",
@@ -29,9 +29,10 @@
   "brief.tasks": "Sarcini scadente",
   "brief.waiting": "Așteaptă răspuns",
   "brief.no_waiting": "Nimic nu așteaptă răspuns.",
-  "brief.privacy": "Pune-mă la curent trimite și e-mailurile necitite de la ultima vizită (expeditor, subiect și primele rânduri), evenimentele de azi, sarcinile deschise și e-mailurile trimise în ultima săptămână care așteaptă răspuns.",
+  "brief.privacy": "Pune-mă la curent trimite și e-mailurile necitite de la ultima vizită (expeditor, destinatari, dată, subiect, primele rânduri și ID-ul mesajului), evenimentele de azi, sarcinile deschise și e-mailurile trimise în ultima săptămână care așteaptă răspuns.",
   "brief.settings.catch_up": "Oferă Pune-mă la curent",
-  "brief.settings.catch_up_hint": "Un rezumat al e-mailurilor noi, al evenimentelor de azi și al sarcinilor deschise când nu este deschis niciun mesaj.",
+  "brief.settings.catch_up_hint": "Un rezumat al e-mailurilor noi, al evenimentelor de azi și al sarcinilor deschise când nu este deschis niciun mesaj. Necesită căutările.",
   "brief.settings.waiting": "Caută e-mailuri care așteaptă răspuns",
-  "brief.settings.waiting_hint": "Pune-mă la curent verifică e-mailurile trimise în ultima săptămână pentru mesaje la care nu a răspuns nimeni."
+  "brief.settings.waiting_hint": "Pune-mă la curent verifică e-mailurile trimise în ultima săptămână pentru mesaje la care nu a răspuns nimeni.",
+  "view.settings.grant": "Ca asistentul să apară acolo, dezactivați-l și reactivați-l în {place} și permiteți noua permisiune."
 }

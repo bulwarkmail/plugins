@@ -9,7 +9,7 @@ import { loadSetup } from './assistant.js';
 import { withStrings } from './i18n.js';
 import { areaAllowed } from './config.js';
 import { has } from './caps.js';
-import { APP_PANEL, viewOf } from './areas/everywhere.js';
+import { APP_PANEL, LAST_ACTIVE_EVERY_MS, LAST_ACTIVE_KEY, LAST_VISIT_KEY, viewOf } from './areas/everywhere.js';
 
 export const DRAFT_KEY = 'draft';
 /** What the open composer is: { mode, inReplyToId, originalSubject, at } (onComposerOpen). */
@@ -23,6 +23,8 @@ export const READER_PANEL = 'email-detail-sidebar';
 export const ACTION_ID = 'assistant';
 export const SHORTCUT = 'Alt+A';
 const REFRESH_EVERY_MS = 30_000;
+/** Closed for longer than this, the webmail's next start is a new visit (Catch me up's "since"). */
+const VISIT_GAP_MS = 2 * LAST_ACTIVE_EVERY_MS;
 
 /** The saved transcript of a chat. */
 export const chatKey = (mode, id) => `chat:${mode === 'composer' ? 'composer' : 'email'}:${id}`;
@@ -37,7 +39,7 @@ export const COMPOSER_MENU_ACTIONS = ['improve', 'grammar', 'shorter', 'translat
 export const READER_MENU_ACTIONS = ['explain', 'translate', 'reply', 'ask'];
 const MENU_ICONS = { improve: 'sparkles', grammar: 'text-spellcheck', shorter: 'text-decrease', translate: 'language', ask: 'message-circle', explain: 'help-circle', reply: 'arrow-back-up' };
 
-export function createBackground(api, { now = () => Date.now() } = {}) {
+export function createBackground(api, { now = () => Date.now(), every = (fn, ms) => setInterval(fn, ms) } = {}) {
   withStrings(api);
   const state = { configured: false, showInReader: true, everywhere: false, checkedAt: 0, composerOpen: false };
   let shownActions = null;
@@ -120,6 +122,9 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
         title: t('composer.title'),
         slot: 'plugin-dialog',
         width: 560,
+        // Webmail 1.20 and later: the dialog is as tall as the visible window
+        // (a phone's keyboard included) and the chat fills it; older ones ignore it.
+        fill: true,
         extraProps: { view, context: context && typeof context === 'object' ? context : {} },
       });
     } catch (err) {
@@ -219,6 +224,23 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
     } catch { /* nothing to forget */ }
   }
 
+  /**
+   * When the user was last here, for Catch me up: the background part runs
+   * as long as the webmail is open, so it notes the time every few minutes;
+   * at the next start that time becomes the last visit. A start within a
+   * few notes of the last one (a reload, another tab) is the same visit and
+   * keeps it. (A panel's frame can't do this: the host removes it without
+   * running its cleanup.)
+   */
+  async function markVisit() {
+    try {
+      const last = await api.storage.get(LAST_ACTIVE_KEY);
+      if (Number.isFinite(last) && now() - last > VISIT_GAP_MS) await api.storage.set(LAST_VISIT_KEY, last);
+      await api.storage.set(LAST_ACTIVE_KEY, now());
+    } catch { /* storage full or blocked: Catch me up then looks a day back */ }
+    every(() => { void Promise.resolve(api.storage.set(LAST_ACTIVE_KEY, now())).catch(() => {}); }, LAST_ACTIVE_EVERY_MS);
+  }
+
   return {
     state,
     refresh,
@@ -232,6 +254,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       await forgetComposerChats();
       await forgetOldReaderChats();
       await api.storage.remove(COMPOSER_CONTEXT_KEY).catch(() => {});
+      await markVisit();
       await refresh(true);
     },
     hooks: {

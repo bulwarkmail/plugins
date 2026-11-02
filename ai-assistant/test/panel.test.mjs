@@ -1013,7 +1013,8 @@ describe('the Actions menu with nothing to work on', () => {
     const api = makeApi();
     await api.storage.set('prefs', { lookups: false });
     await mount(api, { email: null, selection: null, focusRequest: 0 });
-    expect(await entries()).toEqual(['Find a message', 'Catch me up']);
+    // Catch me up reads mail, the calendar and tasks: not with lookups off.
+    expect(await entries()).toEqual(['Find a message']);
     await click(screen.getByRole('menuitem', { name: 'Find a message' }));
     const box = screen.getByRole('textbox', { name: 'Message to the assistant' });
     expect(box.value).toBe('Find the message about ');

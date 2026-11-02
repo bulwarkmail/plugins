@@ -201,7 +201,7 @@ export function useAssistantChat(props) {
    * (the chat). `label` is what the user turn shows; `sent` what the chat
    * sends when it differs.
    */
-  const send = useCallback(async ({ label, sent, task, input: taskInput, show, scope, src, finish }) => {
+  const send = useCallback(async ({ label, sent, task, input: taskInput, show, scope, src, finish, data }) => {
     const endpoint = setup?.endpoint;
     if (!endpoint) return;
     controller.current?.abort();
@@ -237,7 +237,9 @@ export function useAssistantChat(props) {
       if (abort.signal.aborted) throw new AiError('cancelled');
       const onText = (full) => patchTurn(turn.id, { content: full });
       let text;
-      const extra = extraContext();
+      // `data`: what this one request carries as data in its system prompt
+      // (Catch me up's mail and events), kept out of the transcript.
+      const extra = data ? `${extraContext()}\n\n${data}` : extraContext();
       const now = clock(userZone(api, person?.timeZone));
       if (task) {
         const prompt = buildPrompt(task, { language: locale, extra, ...taskInput, ...(task === 'actions' ? { now } : {}) });

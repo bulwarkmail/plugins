@@ -18,7 +18,7 @@
   "view.empty.contacts": "Stel een vraag over je contacten, of open er een om ermee te werken.",
   "view.empty.files": "Stel een vraag over je bestanden, of selecteer er een paar om ermee te werken.",
   "view.empty.settings": "Vraag hoe je iets instelt, of stel een vraag over de geopende pagina.",
-  "view.privacy": "In Agenda, Contacten, Bestanden en Instellingen stuurt hij ook mee wat je daar open hebt: de afspraak, het contact, de namen van de geselecteerde bestanden en de map, of de instellingenpagina.",
+  "view.privacy": "In Agenda, Contacten, Bestanden en Instellingen stuurt hij ook mee wat je daar open hebt: de afspraak, het contact, namen, typen, groottes en wijzigingsdata van de geselecteerde bestanden en de map, of de instellingenpagina.",
   "view.settings.title": "Andere weergaven en Bijpraten",
   "view.settings.everywhere": "Tonen in Agenda, Contacten, Bestanden en Instellingen",
   "view.settings.everywhere_hint": "Een paneel naast deze weergaven. De knop of Alt+A opent het.",
@@ -29,9 +29,10 @@
   "brief.tasks": "Taken met deadline",
   "brief.waiting": "Wacht op antwoord",
   "brief.no_waiting": "Niets wacht op antwoord.",
-  "brief.privacy": "Bijpraten stuurt ook je ongelezen mail sinds je vorige bezoek (afzender, onderwerp en eerste regels), de afspraken van vandaag, je open taken en de verzonden mail van de afgelopen week die op antwoord wacht.",
+  "brief.privacy": "Bijpraten stuurt ook je ongelezen mail sinds je vorige bezoek (afzender, ontvangers, datum, onderwerp, eerste regels en bericht-id), de afspraken van vandaag, je open taken en de verzonden mail van de afgelopen week die op antwoord wacht.",
   "brief.settings.catch_up": "Bijpraten aanbieden",
-  "brief.settings.catch_up_hint": "Een overzicht van nieuwe mail, de afspraken van vandaag en open taken als er geen bericht open is.",
+  "brief.settings.catch_up_hint": "Een overzicht van nieuwe mail, de afspraken van vandaag en open taken als er geen bericht open is. Werkt alleen met opzoeken aan.",
   "brief.settings.waiting": "Zoeken naar mail die op antwoord wacht",
-  "brief.settings.waiting_hint": "Bijpraten doorzoekt je verzonden mail van de afgelopen week op berichten waar niemand op heeft geantwoord."
+  "brief.settings.waiting_hint": "Bijpraten doorzoekt je verzonden mail van de afgelopen week op berichten waar niemand op heeft geantwoord.",
+  "view.settings.grant": "Om de assistent daar te tonen, zet je hem uit en weer aan in {place} en sta je de nieuwe toestemming toe."
 }

@@ -18,7 +18,7 @@
   "view.empty.contacts": "Chiedi dei tuoi contatti, o aprine uno per lavorarci.",
   "view.empty.files": "Chiedi dei tuoi file, o selezionane alcuni per lavorarci.",
   "view.empty.settings": "Chiedi come impostare qualcosa, o della pagina aperta.",
-  "view.privacy": "In Calendario, Contatti, File e Impostazioni invia anche ciò che hai aperto lì: l'evento, il contatto, i nomi dei file selezionati e la cartella, o la pagina delle impostazioni.",
+  "view.privacy": "In Calendario, Contatti, File e Impostazioni invia anche ciò che hai aperto lì: l'evento, il contatto, nomi, tipi, dimensioni e date di modifica dei file selezionati e la cartella, o la pagina delle impostazioni.",
   "view.settings.title": "Altre viste e Aggiornami",
   "view.settings.everywhere": "Mostra in Calendario, Contatti, File e Impostazioni",
   "view.settings.everywhere_hint": "Un pannello accanto a queste viste. Il suo pulsante o Alt+A lo apre.",
@@ -29,9 +29,10 @@
   "brief.tasks": "Attività in scadenza",
   "brief.waiting": "In attesa di risposta",
   "brief.no_waiting": "Nulla è in attesa di risposta.",
-  "brief.privacy": "Aggiornami invia anche la posta non letta dalla tua ultima visita (mittente, oggetto e prime righe), gli eventi di oggi, le attività aperte e la posta inviata nell'ultima settimana in attesa di risposta.",
+  "brief.privacy": "Aggiornami invia anche la posta non letta dalla tua ultima visita (mittente, destinatari, data, oggetto, prime righe e ID del messaggio), gli eventi di oggi, le attività aperte e la posta inviata nell'ultima settimana in attesa di risposta.",
   "brief.settings.catch_up": "Offri Aggiornami",
-  "brief.settings.catch_up_hint": "Un riepilogo della nuova posta, degli eventi di oggi e delle attività aperte quando nessun messaggio è aperto.",
+  "brief.settings.catch_up_hint": "Un riepilogo della nuova posta, degli eventi di oggi e delle attività aperte quando nessun messaggio è aperto. Richiede le ricerche.",
   "brief.settings.waiting": "Cerca posta in attesa di risposta",
-  "brief.settings.waiting_hint": "Aggiornami controlla la posta inviata nell'ultima settimana per trovare i messaggi a cui nessuno ha risposto."
+  "brief.settings.waiting_hint": "Aggiornami controlla la posta inviata nell'ultima settimana per trovare i messaggi a cui nessuno ha risposto.",
+  "view.settings.grant": "Per mostrare lì l'assistente, disattivalo e riattivalo in {place} e concedi il nuovo permesso."
 }
