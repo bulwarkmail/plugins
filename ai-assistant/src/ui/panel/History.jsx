@@ -199,7 +199,8 @@ export function HistoryPanel({ api, onClose, onContinue }) {
                             onClick={() => void openChat(entry)}
                           >
                             <span className="bk text-sm text-foreground" style={oneLine}>{title(entry)}</span>
-                            <span id={`assistant-history-${entry.id}`} className="bk text-xs text-muted-foreground" style={oneLine}>{detail(entry)}</span>
+                            {/* Read as the button's description, not twice as part of its name. */}
+                            <span id={`assistant-history-${entry.id}`} aria-hidden="true" className="bk text-xs text-muted-foreground" style={oneLine}>{detail(entry)}</span>
                           </button>
                           <RowAction icon="pencil" label={t('chat.history.rename_named', { title: title(entry) })} onClick={() => { setName(entry.title ?? ''); setRenaming(entry.id); }} />
                           <RowAction icon="trash" danger label={t('chat.history.delete_named', { title: title(entry) })} onClick={() => void remove(entry)} />
