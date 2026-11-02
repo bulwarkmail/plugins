@@ -104,6 +104,10 @@ export function InputBox({ chat, composerId }) {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) {
               e.preventDefault();
               chat.submit();
+            } else if (e.key === 'Escape' && chat.editing) {
+              // Escape stops editing the last message first (chat tools).
+              e.preventDefault();
+              chat.cancelEdit();
             } else if (e.key === 'Escape' && !input) {
               // Back to the message; Alt+A or the toolbar button brings the panel back.
               e.preventDefault();

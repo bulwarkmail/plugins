@@ -41,7 +41,7 @@ export function Transcript({ chat, onExample }) {
           turn.role === 'context'
             ? <ContextMarker key={turn.id} api={api} turn={turn} />
             : turn.role === 'user'
-            ? <UserTurn key={turn.id} turn={turn} />
+            ? <UserTurn key={turn.id} turn={turn} onEdit={turn.id === chat.editable?.userId ? () => chat.edit(turn) : undefined} editLabel={t('chat.edit.label')} />
             : (
               <AssistantTurn
                 key={turn.id}
@@ -58,6 +58,7 @@ export function Transcript({ chat, onExample }) {
                 onInsert={chat.insertText}
                 onAnswerAction={chat.answerAction}
                 onUndo={chat.undoStep}
+                onRegenerate={turn.id === chat.editable?.answerId ? () => chat.retry(turn) : undefined}
               />
             )
         ))}

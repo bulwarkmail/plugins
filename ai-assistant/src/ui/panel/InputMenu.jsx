@@ -2,7 +2,8 @@
 // `/` at the start (commands, saved prompts) or `@` (a message, contact or
 // file to add). The 2.2 areas give the menus (chat.areas.menus): their
 // trigger, a label, `items(query)` and `onPick(item, { rest })`. Arrow keys
-// move, Enter or Tab pick, Escape closes; the text field keeps the focus and
+// move, Enter or Tab pick, Escape closes; a menu with `complete(item)` (the
+// text the entry stands for) completes on Tab instead. The text field keeps the focus and
 // points at the active entry (aria-activedescendant), so screen readers read it.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -81,6 +82,14 @@ export function useInputMenu({ menus, input, setInput, inputRef, idBase = 'assis
       setIndex((i) => (i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length);
       return true;
     }
+    if (e.key === 'Tab' && !e.shiftKey && typeof state.menu.complete === 'function') {
+      e.preventDefault();
+      const text = state.menu.complete(items[index]);
+      setInput(input.slice(0, state.start) + text + input.slice(state.end));
+      const caret = state.start + text.length;
+      requestAnimationFrame(() => inputRef.current?.setSelectionRange?.(caret, caret));
+      return true;
+    }
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
       pick(items[index]);
@@ -92,7 +101,7 @@ export function useInputMenu({ menus, input, setInput, inputRef, idBase = 'assis
       return true;
     }
     return false;
-  }, [open, items, index, pick, input, state]);
+  }, [open, items, index, pick, input, state, setInput, inputRef]);
 
   const listId = `${idBase}-list`;
   const optionId = (i) => `${idBase}-opt-${i}`;

@@ -148,6 +148,41 @@ Mail text is put between tags and the model is told that it is data, not
 instructions, so a message that says "ignore your instructions" is
 summarised, not obeyed. Very long texts are cut at 30 000 characters.
 
+## Chat tools
+
+- **Earlier chats.** Next to a message the assistant keeps one running
+  chat. After 8 hours without use, the next time the panel opens the chat
+  moves to Earlier chats (the clock button in the panel's header) and a
+  fresh one starts; New chat does the same at once. There you can search
+  the chats, read one, continue it, rename it or delete it. The newest 30
+  chats are kept, at most 400 KB together. The composer keeps its own
+  chat per draft.
+- **Saved prompts.** Add your own in Settings > AI Assistant > Chat; the
+  administrator can add some for everyone. They are in the Actions menu
+  and run like a typed request, on the message or text the panel works on.
+- **Slash commands.** Type `/` at the start of the input for a list of the
+  quick actions and saved prompts. Type to filter, arrow keys to move,
+  Enter runs, Tab completes the name, Escape closes the list.
+- **Edit and Answer again.** The pencil next to your last question puts it
+  back into the input; sending it replaces that question and its answer
+  (Escape stops editing). Answer again asks for a new last answer, while
+  the message it was about is open. Neither is offered after an answer
+  that did something (an event, a note), so nothing happens twice.
+- **Remember.** "Remember that my manager is Jan": the assistant asks
+  before it keeps a note. Notes (at most 50, 200 characters each) go with
+  every request; see, change and delete them in the settings, or switch
+  them off there.
+- **Templates.** With lookups on, the assistant can read your message
+  templates. In the composer it can put one into the draft at the cursor,
+  below what you selected, never over it. When it fills in placeholders it
+  shows the values and asks first. It can save a written reply as a new
+  template after you agree. A plugin enabled before this update needs to
+  be turned off and on (or installed again by the administrator) to get
+  the templates permissions; until then the templates tools stay hidden.
+- When the browser storage is full, New chat and the 8-hour split keep
+  the chat and say so, after dropping the oldest earlier chats did not
+  make room. A chat too big for the history keeps shorter lookup results.
+
 ## Setting it up (administrator)
 
 Install `ai-assistant.zip` in the admin dashboard, then fill in its
@@ -171,7 +206,7 @@ settings. Set up one or both services:
 | Most messages per batch | 1 to 200, default 50 |
 | Change settings | Let users allow the assistant to change their app settings (appearance, reading, composing, list, notifications, calendar view). Off by default |
 | Files | Find, read and attach the user's files, save attachments to Files, create files and folders. Never deletes or shares. On by default |
-| Chat tools | History, saved prompts, slash commands, edit and regenerate. On by default |
+| Chat tools | Earlier chats, saved prompts, / commands, Edit and Answer again, notes and templates. Off switches all of these off. On by default |
 | Prompts for everyone | Saved prompts all users get, one per line: `Name: what to ask` |
 | Remember notes | Users can have the assistant keep short notes about them. On by default |
 | Every view | The assistant in Calendar, Contacts, Files and Settings, and Catch me up. On by default |
@@ -226,6 +261,10 @@ encrypted on the server and only sent to the address they approved there.
 | Let it do something (actions on) | What the action did, and the names of your folders when it files a message |
 | Ask in Calendar, Contacts, Files or Settings | What you have open there: the event (title, time, place, participants, description), the contact (name, addresses, phones, company, dates, notes) and how many contacts are ticked, the names, types, sizes and dates of up to 20 selected files and the folder's path, or the settings page's name |
 | Use Catch me up | Your unread inbox mail since your last visit (sender, recipients, date, subject, preview, message id), today's events (time, title, place), your open tasks (title, due date) due today or earlier, and the sent mail of the last week that is waiting for a reply (same fields as the unread mail). They go with that one request as data; the chat keeps only the answer and its cards |
+| Anything, with notes kept (chat tools) | The notes you asked it to remember |
+| Run a saved prompt or a / command | The prompt's text, as if you typed it, with the message or text the panel works on |
+| Ask about your templates (lookups on) | The names, categories, subjects, placeholders and the first 300 characters of your templates |
+| Have it save a template | Nothing more: the text it saves is your draft's own text or what it wrote |
 
 The privacy notice before the first request lists the same, and names
 lookups and actions only when they are switched on. When an update makes
@@ -233,7 +272,8 @@ the assistant send more, the notice comes once more.
 
 Nothing else leaves the webmail. In the browser the plugin keeps your
 choices, which services you confirmed, the chats of the open composer and
-of the messages you talked about, when the webmail was last open and
+of the messages you talked about, the earlier chats, your saved prompts
+and the notes you asked it to remember, when the webmail was last open and
 your last Catch me up (for "unread since"), and, while a composer is open, the
 draft's subject and what the composer is a reply to (removed when the
 composer closes).
@@ -267,6 +307,8 @@ composer closes).
 | `ui:side-panel` | The panel next to Calendar, Contacts, Files and Settings (`app-side-panel`; asked for as an optional permission, so older webmails install the plugin without it) |
 | `ui:keyboard` | Alt+A outside the composer: the panel of the view you are in |
 | `tasks:read` | Catch me up: your open tasks due today or earlier |
+| `templates:read` | Your message templates, for the templates lookup and to put one into the draft |
+| `templates:write` | Save a written reply as a template when you agree (and delete it again on Undo) |
 
 ## Credentials
 

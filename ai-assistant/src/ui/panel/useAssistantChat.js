@@ -22,6 +22,8 @@ import { defaultTarget, languageOptions } from '../../lib/languages.js';
 import { diffSuggestions } from '../../lib/grammar.js';
 import { COMPOSER_CONTEXT_KEY, DRAFT_KEY, READER_CHAT_KEY, chatKey, pendingKey } from '../../lib/background.js';
 import { viewOf } from '../../lib/areas/everywhere.js';
+import { areaAllowed } from '../../lib/config.js';
+import { archiveRunning, openRunning, saveRunning, withForeign } from '../../lib/chat-history.js';
 import {
   MAX_TURNS, PENDING_TTL_MS, appLabels, storedTurns, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, topicSubject, uid,
 } from './model.js';
@@ -81,7 +83,10 @@ export function useAssistantChat(props) {
   // What the 2.2 areas add (chips, prompt, lookups' context, menus, ...).
   // They reach the chat's functions through `bridge` once those exist.
   const bridge = useRef({});
-  const areas = useAreas({ api, t, mode, email, source, turns, setTurns, key, setup, prefs, person, locale, setInput, inputRef, bridge, props }, props);
+  // Editing the last message (chat tools): the id of the user turn whose exchange the next send replaces.
+  const [editing, setEditing] = useState(null);
+  const cancelEdit = useCallback(() => { setEditing(null); setInput(''); }, []);
+  const areas = useAreas({ api, t, mode, email, source, turns, setTurns, key, setup, prefs, person, locale, setInput, inputRef, bridge, props, editing, cancelEdit }, props);
   const areasRef = useRef(areas);
   areasRef.current = areas;
   // Actions waiting for the user's OK: step id → answer(ok).
@@ -103,9 +108,11 @@ export function useAssistantChat(props) {
     setLoaded(false);
     setTurns([]);
     void (async () => {
+      const setupLoad = loadSetup(api).catch(() => ({ endpoint: null, prefs: {} }));
       const [next, saved, ctx, draft, who] = await Promise.all([
-        loadSetup(api).catch(() => ({ endpoint: null, prefs: {} })),
-        key ? loadTurns(api, key) : [],
+        setupLoad,
+        // The reader's chat moves into the history after 8 hours without use (chat tools).
+        key ? (mode === 'reader' ? setupLoad.then((s) => openRunning(api, key, { allowed: areaAllowed(s.config ?? {}, 'chat') })).catch(() => false) : Promise.resolve()).then(() => loadTurns(api, key)) : [],
         api.storage.get(COMPOSER_CONTEXT_KEY).catch(() => null),
         api.storage.get(DRAFT_KEY).catch(() => null),
         loadPerson(api, locale).catch(() => null),
@@ -135,8 +142,13 @@ export function useAssistantChat(props) {
   useEffect(() => {
     if (!loaded || !key || running) return;
     const timer = setTimeout(() => {
-      void Promise.resolve(api.storage.set(key, { turns: storedTurns(turns, mode), at: Date.now() })).then(
-        () => { storageWarned.current = false; },
+      // The reader's chat may be open in two frames: keep the turns the other one added.
+      const saving = mode === 'reader' ? saveRunning(api, key, storedTurns(turns, mode)) : api.storage.set(key, { turns: storedTurns(turns, mode), at: Date.now() });
+      void Promise.resolve(saving).then(
+        (merged) => {
+          storageWarned.current = false;
+          if (merged?.foreign?.length || merged?.dropped?.size) setTurns((prev) => (prev.some((x) => x.status === 'running') ? prev : withForeign(prev, merged)));
+        },
         (err) => {
           api.log?.warn?.('could not save the chat', err?.message ?? err);
           if (storageWarned.current) return;
@@ -204,6 +216,8 @@ export function useAssistantChat(props) {
   const send = useCallback(async ({ label, sent, task, input: taskInput, show, scope, src, finish, data }) => {
     const endpoint = setup?.endpoint;
     if (!endpoint) return;
+    // Any other request ends an edit (submit() used it already).
+    setEditing(null);
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
@@ -217,20 +231,21 @@ export function useAssistantChat(props) {
     // The user took the message out: the line says so, instead of leaving "Now about" standing.
     const left = mode === 'reader' && !contextEmail && !!topic;
     const marker = switched
-      ? [{ id: uid(), role: 'context', emailId: contextEmail.id, subject: contextEmail.subject ?? '' }]
-      : left ? [{ id: uid(), role: 'context', emailId: null, left: true, subject: topicSubject(previous, topic) }] : [];
+      ? [{ id: uid(), role: 'context', at: Date.now(), emailId: contextEmail.id, subject: contextEmail.subject ?? '' }]
+      : left ? [{ id: uid(), role: 'context', at: Date.now(), emailId: null, left: true, subject: topicSubject(previous, topic) }] : [];
     const note = switched
       ? `(Now about another message: "${contextEmail.subject ?? ''}" from ${contextEmail.from?.[0]?.name || contextEmail.from?.[0]?.email || 'unknown'}.)\n`
       : left ? '(The user took the message out of the conversation: this is not about it.)\n' : '';
+    const at = Date.now();
     const userTurn = {
-      id: uid(), role: 'user', content: note + (sent ?? label), label,
+      id: uid(), role: 'user', at, content: note + (sent ?? label), label,
       ...(emailId !== undefined ? { emailId } : {}),
       ...(mode === 'reader' && contextEmail ? { subject: contextEmail.subject ?? '' } : {}),
     };
     // A reader answer replies to the message it was about; replyTo null: there
     // was none (or the user took it out), so a draft opens as a new message.
     const replyTo = mode === 'reader' ? (contextEmail ? { id: contextEmail.id, subject: contextEmail.subject ?? '' } : null) : undefined;
-    const turn = { id: uid(), role: 'assistant', content: '', status: 'running', task: task ?? 'chat', show: show ?? 'chat', scope, source: src ?? '', steps: [], ...(task ? { input: taskInput ?? {} } : {}), ...(replyTo !== undefined ? { replyTo } : {}) };
+    const turn = { id: uid(), role: 'assistant', at, content: '', status: 'running', task: task ?? 'chat', show: show ?? 'chat', scope, source: src ?? '', steps: [], ...(task ? { input: taskInput ?? {} } : {}), ...(replyTo !== undefined ? { replyTo } : {}) };
     setTurns([...previous, ...marker, userTurn, turn]);
     try {
       if (!(await ensureConsent(api, endpoint, askConsent))) throw new AiError('declined');
@@ -330,13 +345,54 @@ export function useAssistantChat(props) {
     void send({ label: named(name), task, input: taskInput, show, scope: src.scope, src: src.text });
   }, [api, mode, source, target, email, languages, send, person, t]);
 
-  /** The typed request. */
+  /** The typed request. While the user edits their last message, it replaces that exchange. */
   const submit = useCallback(() => {
     const text = input.trim();
     if (!text || running || !setup?.endpoint) return;
     setInput('');
+    if (editing) {
+      setEditing(null);
+      const list = turnsRef.current;
+      const i = list.findIndex((x) => x.id === editing);
+      // Only while it is still the last request: otherwise this is a new one.
+      const lastUser = list.reduce((last, x, j) => (x.role === 'user' ? j : last), -1);
+      if (i >= 0 && i === lastUser) {
+        // The "now about another message" line before it goes too; send() adds it again when it still fits.
+        const from = i > 0 && list[i - 1].role === 'context' ? i - 1 : i;
+        turnsRef.current = list.slice(0, from);
+        setTurns(turnsRef.current);
+      }
+    }
     void send({ label: text, scope: source.scope, src: source.text });
-  }, [input, running, setup, send, source]);
+  }, [input, running, setup, send, source, editing]);
+
+  // Edit and Answer again (chat tools): the last typed request and the last
+  // answer, while nothing runs. Not after an answer that did something (or
+  // waits to): asking again would do it a second time.
+  const chatTools = areaAllowed(setup?.config ?? {}, 'chat');
+  const openId = mode === 'reader' ? (contextEmail?.id ?? null) : undefined;
+  const editable = useMemo(() => {
+    if (!chatTools || running) return {};
+    const lastAnswer = [...turns].reverse().find((x) => x.role === 'assistant');
+    if (!lastAnswer) return {};
+    if ((lastAnswer.steps ?? []).some((s) => s.action && ['done', 'waiting', 'running'].includes(s.action.state))) return {};
+    const i = turns.indexOf(lastAnswer);
+    const ask = i > 0 && turns[i - 1].role === 'user' ? turns[i - 1] : null;
+    // In the reader, Answer again only while the message the answer was about is the one open.
+    const sameMessage = openId === undefined || lastAnswer.replyTo === undefined || (lastAnswer.replyTo?.id ?? null) === openId;
+    return {
+      answerId: (lastAnswer.status === 'done' || lastAnswer.status === 'stopped') && sameMessage ? lastAnswer.id : undefined,
+      // Only typed requests: a quick action's bubble is its name, not something to edit.
+      userId: ask && (lastAnswer.task ?? 'chat') === 'chat' ? ask.id : undefined,
+    };
+  }, [chatTools, running, turns, openId]);
+
+  /** Put the last request back into the input; sending it replaces that exchange. */
+  const edit = useCallback((turn) => {
+    setEditing(turn.id);
+    setInput(turn.label ?? turn.content ?? '');
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
 
   // ─── Requests from the toolbar button and the right-click menu ───
   // The input takes the focus when the panel is asked for (a new
@@ -447,10 +503,25 @@ export function useAssistantChat(props) {
   }, [api, mode, props.composerId, refreshBody, t]);
 
   const clear = useCallback(() => {
+    const old = turnsRef.current;
     stop();
+    setEditing(null);
+    // With chat tools the reader's chat goes into the history instead of
+    // away; it leaves the panel once it is there. When the history can't
+    // take it (storage full) it stays, and the user hears why.
+    if (key && mode === 'reader' && areaAllowed(setup?.config ?? {}, 'chat')) {
+      void archiveRunning(api, key, storedTurns(old, mode)).then(
+        (done) => setTurns(done.stale ? done.turns : []),
+        (err) => {
+          api.log?.warn?.('could not keep the old chat', err?.message ?? err);
+          api.toast?.error?.(t('panel.storage_full'));
+        },
+      );
+      return;
+    }
     setTurns([]);
     if (key) void api.storage.remove(key).catch(() => {});
-  }, [api, key, stop]);
+  }, [api, key, stop, mode, setup, t]);
 
   const retry = useCallback((turn) => {
     const i = turnsRef.current.findIndex((x) => x.id === turn.id);
@@ -468,13 +539,13 @@ export function useAssistantChat(props) {
     }
   }, [send]);
 
-  bridge.current = { send, sendText, quick, setInput, focus: () => inputRef.current?.focus() };
+  bridge.current = { send, sendText, quick, setInput, focus: () => inputRef.current?.focus(), areas: () => areasRef.current };
 
   return {
     areas,
     api, t, locale, mode, view, email, setup, loaded, turns, consent, source, input, setInput, inputRef,
     target, setTarget, languages, running, translating, setTranslating, lookups,
     removeContext, restoreContext, quick, submit, stop, apply, replyFor, sendText, insertText, clear, retry,
-    patchTurn, answerAction, undoStep,
+    patchTurn, answerAction, undoStep, editing, editable, edit, cancelEdit,
   };
 }
