@@ -28,6 +28,7 @@ with the tools to build and test them:
 | [hello-world](hello-world/) | The smallest example: logs app and mail events to the console | `email:read` |
 | [impersonation-notice](impersonation-notice/) | A banner while an admin is signed in as another user (Stalwart master user), with a way back | `account:read` `auth:emit` `ui:app-top-banner` `admin:config` |
 | [jitsi-meet](jitsi-meet/) | An "Add Jitsi Meeting" button in the event form | `calendar:read` `calendar:write` `ui:calendar-action` `http:post` |
+| [languagetool](languagetool/) | Underlines spelling, grammar and style mistakes while you write, checked by your own LanguageTool server (or the public API, if the admin allows it); never for signed or encrypted mail | `compose:check` `http:proxy` `ui:settings-section` |
 | [libravatar](libravatar/) | Sender pictures from Libravatar | `email:read` `http:fetch` |
 | [nextcloud](nextcloud/) | Attach files from Nextcloud, send large files as share links, save attachments and messages there, add Talk meetings to events | `http:proxy` `ui:settings-section` `ui:composer-toolbar` `email:read` `email:send` `email:blob-write` `email:blob-read` `ui:toolbar` `ui:app-page` `compose:open` `ui:download-file` `calendar:read` `ui:calendar-action` |
 | [outlook-style-headers](outlook-style-headers/) | Outlook-style From / Sent / To / Subject block above quoted replies and forwards | `email:send` |
