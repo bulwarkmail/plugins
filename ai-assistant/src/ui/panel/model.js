@@ -140,7 +140,7 @@ function proposalParts(text) {
   for (const piece of (text ? parseAnswer(text) : [])) {
     if (piece.kind === 'say') out.push({ kind: 'say', text: piece.text });
     else if (piece.kind === 'widget') out.push({ kind: 'widget', widget: piece.widget, open: piece.open });
-    else out.push({ kind: 'proposal', text: piece.text, open: piece.open, plain: false });
+    else out.push({ kind: 'proposal', text: piece.text, open: piece.open, plain: false, to: piece.to, subject: piece.subject });
   }
   return out;
 }

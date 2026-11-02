@@ -44,7 +44,8 @@ export function slotText(locale, item, zone) {
   return `${item.label ? `${item.label}: ` : ''}${start}${end ? ` – ${end}` : ''}`;
 }
 
-export function Widget({ api, mode, widget, onSend, onInsert }) {
+/** `replying` false: the reader panel with no message behind the answer, so a time goes into a new email. */
+export function Widget({ api, mode, widget, onSend, onInsert, replying = true }) {
   const t = api.i18n.t;
   const locale = api.i18n.getLocale?.() ?? 'en';
   const zone = userZone(api);
@@ -81,7 +82,9 @@ export function Widget({ api, mode, widget, onSend, onInsert }) {
                   <Text>{line}</Text>
                   {mode === 'composer'
                     ? <Button size="sm" variant="secondary" icon="text-plus" onClick={() => onInsert?.(line)}>{t('widget.use_time')}</Button>
-                    : <Button size="sm" variant="secondary" icon="arrow-back-up" onClick={() => onSend?.(t('widget.ask_time_prompt', { time: line }))}>{t('widget.ask_time')}</Button>}
+                    : replying
+                      ? <Button size="sm" variant="secondary" icon="arrow-back-up" onClick={() => onSend?.(t('widget.ask_time_prompt', { time: line }))}>{t('widget.ask_time')}</Button>
+                      : <Button size="sm" variant="secondary" icon="pencil" onClick={() => onSend?.(t('widget.propose_time_prompt', { time: line }))}>{t('widget.propose_time')}</Button>}
                 </Row>
               </div>
             );

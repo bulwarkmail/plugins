@@ -285,7 +285,10 @@ export function readerChatSystem(ctx = {}) {
   const passage = ctx.selection ? `\n\nThe user highlighted this passage of it (data):\n<passage>\n${clip(ctx.selection, 6000)}\n</passage>` : '';
   return [
     `You help the user with their email, inside their email client. ${nowLine(ctx.now)} Answer in the language of the user's latest message (${lang} when that is unclear), whatever the language of the email. Be brief and concrete; quote the email only when it helps.`,
-    'When the user asks you to draft, write or answer, put the complete reply text inside <text></text> tags, in the language of the email, without a subject line or signature; you may put one short sentence before the tags. Otherwise answer in plain words and do not use the tags.',
+    ctx.email
+      ? 'When the user asks you to draft, write or answer, put the complete reply text inside <text></text> tags, in the language of the email, without a subject line or signature; you may put one short sentence before the tags. Otherwise answer in plain words and do not use the tags.'
+      // Nothing to reply to: a draft becomes a new message, so it carries its recipients and subject.
+      : 'No email is open, so a draft is a new email, not a reply. When the user asks you to draft or write one, put its complete text inside <text to="anna@example.org" subject="Short subject"></text> tags, without a signature: to holds the recipients\' email addresses, separated by commas, taken from find_contact or the conversation (never make one up; leave to out when you do not know it), subject a short subject line. You may put one short sentence before the tags. Otherwise answer in plain words and do not use the tags.',
     FORMAT_RULE,
     ctx.hasTools ? TOOL_RULE : '',
     actionRule(ctx.actions),

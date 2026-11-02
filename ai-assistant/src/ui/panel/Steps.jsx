@@ -78,7 +78,7 @@ export function ActionCard({ api, step, onAnswer, onUndo }) {
  * per lookup (Mail, Calendar, Message), a spinner while they run. Clicking
  * the box opens the details with the cards of what was found.
  */
-export function StepsGroup({ api, mode, steps, running, onSend, onInsert }) {
+export function StepsGroup({ api, mode, replying, steps, running, onSend, onInsert }) {
   const t = api.i18n.t;
   const [open, setOpen] = useState(false);
   const busy = running && steps.some((s) => s.status === 'running');
@@ -110,7 +110,7 @@ export function StepsGroup({ api, mode, steps, running, onSend, onInsert }) {
       {open && (
         <div style={{ padding: '2px 8px 8px' }}>
           <Stack gap={2}>
-            {steps.map((step) => <StepRow key={step.id} api={api} mode={mode} step={step} onSend={onSend} onInsert={onInsert} />)}
+            {steps.map((step) => <StepRow key={step.id} api={api} mode={mode} replying={replying} step={step} onSend={onSend} onInsert={onInsert} />)}
           </Stack>
         </div>
       )}
@@ -119,7 +119,7 @@ export function StepsGroup({ api, mode, steps, running, onSend, onInsert }) {
 }
 
 /** One lookup the model made, with a card of what it found. */
-function StepRow({ api, mode, step, onSend, onInsert }) {
+function StepRow({ api, mode, replying, step, onSend, onInsert }) {
   const t = api.i18n.t;
   const icon = step.status === 'running' ? 'loader-2' : step.status === 'failed' ? 'alert-circle' : (STEP_ICONS[step.name] ?? 'mail');
   return (
@@ -129,7 +129,7 @@ function StepRow({ api, mode, step, onSend, onInsert }) {
         <Icon name={icon} size="sm" className="text-muted-foreground" />
         <Text size="xs" tone="muted">{stepLabel(t, step)}{step.status === 'failed' ? ` · ${t('panel.step.failed')}` : ''}</Text>
       </Row>
-      {step.widget && <Widget api={api} mode={mode} widget={step.widget} onSend={onSend} onInsert={onInsert} />}
+      {step.widget && <Widget api={api} mode={mode} replying={replying} widget={step.widget} onSend={onSend} onInsert={onInsert} />}
       {step.result && !step.widget && <Text size="xs" tone="muted" className="whitespace-pre-wrap">{step.result.slice(0, 1200)}</Text>}
     </Stack>
     </div>

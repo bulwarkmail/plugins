@@ -47,6 +47,16 @@ describe('parseAnswer', () => {
   it('ignores case and spacing of the tags', () => {
     expect(parseAnswer('<TEXT>  Hello </TEXT>')).toEqual([{ kind: 'proposal', text: 'Hello', open: false }]);
   });
+
+  it('reads the recipients and subject of a new email, addresses only', () => {
+    expect(parseAnswer('Here:\n<text to="Jannis Gollwitzer <info@it-media-hof.de>, not-an-address, bo@example.org" subject=" Kurzes Gespräch ">\nHallo Jannis,\n</text>')).toEqual([
+      { kind: 'say', text: 'Here:' },
+      { kind: 'proposal', text: 'Hallo Jannis,', open: false, to: ['info@it-media-hof.de', 'bo@example.org'], subject: 'Kurzes Gespräch' },
+    ]);
+    // Streaming: the opening tag and its attributes are not shown as talk while they come in.
+    expect(parseAnswer('Here:\n<text to="info@it-me')).toEqual([{ kind: 'say', text: 'Here:' }]);
+    expect(parseAnswer('<text to="info@it-media-hof.de">Hallo')).toEqual([{ kind: 'proposal', text: 'Hallo', open: true, to: ['info@it-media-hof.de'] }]);
+  });
 });
 
 describe('historyMessages', () => {

@@ -39,16 +39,18 @@ export function UserTurn({ turn }) {
 }
 
 /** The model's answer: what it says, what it proposes, what it looked up. */
-export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply, onRetry, onReview, onSend, onInsert, onAnswerAction, onUndo }) {
+export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply, onReply, onRetry, onReview, onSend, onInsert, onAnswerAction, onUndo }) {
   const t = api.i18n.t;
   const running = turn.status === 'running';
   const parts = useMemo(() => partsOf(turn), [turn]);
   const lookupSteps = (turn.steps ?? []).filter((s) => !isActionTool(s.name));
   const actionSteps = (turn.steps ?? []).filter((s) => isActionTool(s.name) && (s.action || s.status === 'failed'));
+  // In the reader with no message behind the answer there is nothing to reply to.
+  const replying = !(mode === 'reader' && turn.replyTo === null);
   return (
     <div data-turn="assistant" data-status={turn.status}>
     <Stack gap={2}>
-      {lookupSteps.length > 0 && <StepsGroup api={api} mode={mode} steps={lookupSteps} running={running} onSend={onSend} onInsert={onInsert} />}
+      {lookupSteps.length > 0 && <StepsGroup api={api} mode={mode} replying={replying} steps={lookupSteps} running={running} onSend={onSend} onInsert={onInsert} />}
       {actionSteps.map((step) => (
         <ActionCard key={step.id} api={api} step={step} onAnswer={(ok) => onAnswerAction(step.id, ok)} onUndo={() => onUndo(turn.id, step)} />
       ))}
@@ -60,11 +62,11 @@ export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply
           part.kind === 'say'
             ? <SayPart key={i} api={api} mode={mode} turn={turn} text={part.text} onApply={onApply} />
             : part.kind === 'widget'
-              ? (part.widget ? <Widget key={i} api={api} mode={mode} widget={part.widget} onSend={onSend} onInsert={onInsert} /> : null)
+              ? (part.widget ? <Widget key={i} api={api} mode={mode} replying={replying} widget={part.widget} onSend={onSend} onInsert={onInsert} /> : null)
             : part.kind === 'actions'
               ? <ActionItems key={i} api={api} answer={part.text} />
               : part.kind === 'replies'
-                ? <Replies key={i} api={api} answer={part.text} email={email} />
+                ? <Replies key={i} api={api} answer={part.text} email={email} onReply={onReply ? (text) => onReply(turn, text) : undefined} />
                 : (
                   <ProposalCard
                     key={i}
@@ -72,6 +74,8 @@ export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply
                     mode={mode}
                     turn={turn}
                     text={part.text}
+                    headers={{ to: part.to, subject: part.subject }}
+                    replying={replying}
                     streaming={running || part.open}
                     plain={part.plain}
                     onApply={onApply}
@@ -80,7 +84,7 @@ export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply
         ))}
       {turn.status === 'stopped' && <Text tone="muted" size="xs">{t('common.stopped')}</Text>}
       {turn.status === 'error' && <ErrorMessage api={api} error={Object.assign(new AiError(turn.error?.code ?? 'unreachable', turn.error ?? {}), {})} onRetry={() => onRetry(turn)} />}
-      {turn.applyFailed && <Alert tone="danger">{t('assistant.apply_failed')}</Alert>}
+      {turn.applyFailed && <Alert tone="danger">{t(mode === 'reader' ? 'panel.open_failed' : 'assistant.apply_failed')}</Alert>}
     </Stack>
     </div>
   );
@@ -104,7 +108,7 @@ function SayPart({ api, mode, turn, text, onApply }) {
 }
 
 /** A proposal: the change marked against the text it replaces, and the buttons to take it. */
-function ProposalCard({ api, mode, turn, text, streaming, onApply }) {
+function ProposalCard({ api, mode, turn, text, headers = {}, replying = true, streaming, onApply }) {
   const t = api.i18n.t;
   const source = turn.source ?? '';
   const scope = turn.scope;
@@ -117,15 +121,23 @@ function ProposalCard({ api, mode, turn, text, streaming, onApply }) {
   return (
     <div data-proposal>
     <Stack gap={2}>
+      {mode === 'reader' && !replying && (headers.to?.length > 0 || headers.subject) && (
+        <div data-draft-headers style={{ display: 'flex', flexDirection: 'column' }}>
+          {headers.to?.length > 0 && <Text size="xs" tone="muted">{t('panel.draft_to', { to: headers.to.join(', ') })}</Text>}
+          {headers.subject && <Text size="xs" tone="muted">{t('panel.draft_subject', { subject: headers.subject })}</Text>}
+        </div>
+      )}
       <DiffView parts={parts} streaming={streaming} label={t('assistant.preview_label')} />
       {applied ? (
         <Row gap={2}>
-          <Badge tone="success">{t(applied === 'reply' ? 'panel.applied.reply' : applied === 'replace' ? 'panel.applied.replace' : 'panel.applied.insert')}</Badge>
-          {applied !== 'reply' && <Text size="xs" tone="muted">{t('panel.undo_hint')}</Text>}
+          <Badge tone="success">{t(applied === 'reply' ? 'panel.applied.reply' : applied === 'new' ? 'panel.applied.new' : applied === 'replace' ? 'panel.applied.replace' : 'panel.applied.insert')}</Badge>
+          {applied !== 'reply' && applied !== 'new' && <Text size="xs" tone="muted">{t('panel.undo_hint')}</Text>}
         </Row>
       ) : (
         <Row gap={1}>
-          {mode === 'reader' ? (
+          {mode === 'reader' && !replying ? (
+            <Button size="sm" icon="pencil" disabled={!ready} busy={turn.applying === 'new'} onClick={() => onApply(turn, 'new', final, headers)}>{t('panel.open_new')}</Button>
+          ) : mode === 'reader' ? (
             <Button size="sm" icon="arrow-back-up" disabled={!ready} busy={turn.applying === 'reply'} onClick={() => onApply(turn, 'reply', final)}>{t('panel.open_reply')}</Button>
           ) : scope === 'selection' ? (
             <>

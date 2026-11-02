@@ -100,6 +100,16 @@ describe('the context every request carries', () => {
     expect(composerChatSystem({ language: 'de', scope: 'body', text: 'x' })).toContain('in the language of their latest message (German when that is unclear)');
   });
 
+  it('asks for a reply next to a message, and for a new email with recipients without one', () => {
+    const withMail = readerChatSystem({ email: { subject: 'Hi', text: 'x' } });
+    expect(withMail).toContain('the complete reply text inside <text></text>');
+    expect(withMail).not.toContain('to="');
+    const without = readerChatSystem({ email: null });
+    expect(without).toContain('No email is open, so a draft is a new email, not a reply');
+    expect(without).toContain('<text to="anna@example.org" subject="Short subject">');
+    expect(without).not.toContain('the complete reply text');
+  });
+
   it('goes to the end of the task prompts and the chat prompts', () => {
     expect(buildPrompt('write', { prompt: 'hi', extra: 'CONTEXT' }).system.endsWith('CONTEXT')).toBe(true);
     expect(buildPrompt('rewrite', { text: 'hi', style: 'shorter', extra: 'CONTEXT' }).system).toContain('CONTEXT');

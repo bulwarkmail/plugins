@@ -22,7 +22,26 @@ export const HISTORY_CHARS = 6000;
 /** How often the model may call tools before it has to answer. */
 export const MAX_TOOL_ROUNDS = 4;
 
-const TAGS = { text: /<text>\s*/i, widget: /<widget>\s*/i };
+// A new email (no message to reply to) names its recipients and subject:
+// <text to="anna@example.org, bo@example.org" subject="Our call">.
+const TAGS = { text: /<text((?:\s+[a-z]+\s*=\s*"[^"]*")*)\s*>\s*/i, widget: /<widget>\s*/i };
+const ADDRESS = /^[^\s@<>",]+@[^\s@<>",]+\.[^\s@<>",]+$/;
+
+/** The to and subject of a <text> tag; addresses only, at most 20. */
+function draftHeaders(attrs) {
+  const out = {};
+  for (const [, name, value] of String(attrs ?? '').matchAll(/([a-z]+)\s*=\s*"([^"]*)"/gi)) {
+    const key = name.toLowerCase();
+    if (key === 'to') {
+      // "Anna <anna@example.org>" is taken as its address.
+      const to = value.split(/[,;]/).map((a) => (/<([^<>]+)>/.exec(a)?.[1] ?? a).trim()).filter((a) => ADDRESS.test(a)).slice(0, 20);
+      if (to.length) out.to = to;
+    } else if (key === 'subject' && value.trim()) {
+      out.subject = value.trim().slice(0, 200);
+    }
+  }
+  return out;
+}
 const CLOSE = { text: /\s*<\/text>/i, widget: /\s*<\/widget>/i };
 
 function stripFence(text) {
@@ -35,7 +54,7 @@ function nextTag(rest) {
   let best = null;
   for (const kind of Object.keys(TAGS)) {
     const m = TAGS[kind].exec(rest);
-    if (m && (!best || m.index < best.index)) best = { kind, index: m.index, length: m[0].length };
+    if (m && (!best || m.index < best.index)) best = { kind, index: m.index, length: m[0].length, attrs: m[1] };
   }
   return best;
 }
@@ -53,21 +72,23 @@ export function parseAnswer(answer) {
   for (;;) {
     const open = nextTag(rest);
     if (!open) {
-      say(rest);
+      // An opening tag still coming in (its attributes take a while) is not talk.
+      say(rest.replace(/<text\s[^>]*$/i, ''));
       break;
     }
     say(rest.slice(0, open.index));
     const after = rest.slice(open.index + open.length);
     const close = CLOSE[open.kind].exec(after);
+    const headers = open.kind === 'text' ? draftHeaders(open.attrs) : {};
     if (!close) {
       // Still streaming, or the model forgot the closing tag.
       const body = after.replace(/<\/?(?:te?x?t?|wi?d?g?e?t?)$/i, '');
-      if (open.kind === 'text') out.push({ kind: 'proposal', text: stripFence(body).replace(/^\n+/, ''), open: true });
+      if (open.kind === 'text') out.push({ kind: 'proposal', text: stripFence(body).replace(/^\n+/, ''), open: true, ...headers });
       else out.push({ kind: 'widget', widget: null, open: true });
       break;
     }
     const body = after.slice(0, close.index);
-    if (open.kind === 'text') out.push({ kind: 'proposal', text: stripFence(body).trim(), open: false });
+    if (open.kind === 'text') out.push({ kind: 'proposal', text: stripFence(body).trim(), open: false, ...headers });
     else {
       const widget = parseWidgetJson(stripFence(body));
       if (widget) out.push({ kind: 'widget', widget, open: false });

@@ -562,6 +562,51 @@ describe('the reader panel', () => {
     expect(screen.getByText('Reply opened')).toBeTruthy();
   });
 
+  it('with no message open, opens a draft as a new message to the recipients the model named', async () => {
+    const api = makeApi({
+      answers: ['Here is a draft.\n<text to="info@it-media-hof.de" subject="Kurzes Gespräch">Hallo Jannis,\nhast du Zeit?</text>'],
+      handlers: { 'compose.open': async () => 'opened' },
+    });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    await type('Schreib Jannis eine Mail');
+    await pressEnter();
+    await settled();
+    expect(screen.queryByRole('button', { name: 'Open as reply' })).toBeNull();
+    expect(screen.getByText('To: info@it-media-hof.de')).toBeTruthy();
+    expect(screen.getByText('Subject: Kurzes Gespräch')).toBeTruthy();
+    await click(button('Open as new message'));
+    await waitFor(() => expect(api.calls('compose.open').map((c) => c.args)).toEqual([[{ to: ['info@it-media-hof.de'], subject: 'Kurzes Gespräch', body: 'Hallo Jannis,\nhast du Zeit?' }]]));
+    expect(api.calls('compose.reply')).toEqual([]);
+    expect(screen.getByText('New message opened')).toBeTruthy();
+    expect(screen.queryByText(/couldn't change your message/)).toBeNull();
+  });
+
+  it('with no message open, offers a time for a new email, not a reply', async () => {
+    const api = makeApi({ answers: ['Free then:\n<widget>{"type":"times","items":[{"start":"2026-10-30T15:00:00","end":"2026-10-30T16:00:00"}]}</widget>'] });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    await type('when am I free?');
+    await pressEnter();
+    await settled();
+    expect(screen.queryByRole('button', { name: 'Reply with this time' })).toBeNull();
+    await click(button('Propose this time'));
+    await settled();
+    expect(sentPrompt(api).messages.at(-1).content).toMatch(/^Draft an email proposing .+\.$/);
+  });
+
+  it('opens a drafted reply to the message it was written for, after another one was opened', async () => {
+    const OTHER = { id: 'M2', subject: 'Invoice 42', receivedAt: '2026-10-13T09:00:00Z', from: [{ name: 'Dan', email: 'dan@example.org' }], text: 'Please pay invoice 42.' };
+    const api = makeApi({ answers: ['<text>Hi Carol, Thursday works.</text>'], handlers: { 'ui.openEmail': async () => true } });
+    const view = await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('draft a reply');
+    await pressEnter();
+    await settled();
+    await act(async () => { view.rerender(React.createElement(AssistantPanel, { api, email: OTHER, selection: { text: '' }, focusRequest: 0 })); });
+    await click(button('Open as reply'));
+    // The host replies only to the open message: the panel opens M1 first.
+    await waitFor(() => expect(api.calls('compose.reply').map((c) => c.args)).toEqual([['M1', { text: 'Hi Carol, Thursday works.' }]]));
+    expect(api.calls('ui.openEmail').map((c) => c.args[0])).toEqual(['M1']);
+  });
+
   it('shows the model\'s lookups as steps', async () => {
     const ev = (event, data) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     const toolTurn = ev('message_start', { type: 'message_start' })

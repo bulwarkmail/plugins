@@ -200,7 +200,10 @@ export function useAssistantChat(props) {
       ...(emailId !== undefined ? { emailId } : {}),
       ...(mode === 'reader' && contextEmail ? { subject: contextEmail.subject ?? '' } : {}),
     };
-    const turn = { id: uid(), role: 'assistant', content: '', status: 'running', task: task ?? 'chat', show: show ?? 'chat', scope, source: src ?? '', steps: [], ...(task ? { input: taskInput ?? {} } : {}) };
+    // A reader answer replies to the message it was about; replyTo null: there
+    // was none (or the user took it out), so a draft opens as a new message.
+    const replyTo = mode === 'reader' ? (contextEmail ? { id: contextEmail.id, subject: contextEmail.subject ?? '' } : null) : undefined;
+    const turn = { id: uid(), role: 'assistant', content: '', status: 'running', task: task ?? 'chat', show: show ?? 'chat', scope, source: src ?? '', steps: [], ...(task ? { input: taskInput ?? {} } : {}), ...(replyTo !== undefined ? { replyTo } : {}) };
     setTurns([...previous, ...marker, userTurn, turn]);
     try {
       if (!(await ensureConsent(api, endpoint, askConsent))) throw new AiError('declined');
@@ -340,13 +343,37 @@ export function useAssistantChat(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, id, props.focusRequest]);
 
+  /**
+   * Reply to the message an answer was about, with `text`. The host only
+   * replies to the message open in the reader, so another one is opened first.
+   */
+  const replyFor = useCallback(async (turn, text) => {
+    // Answers saved before replyTo was kept reply to the open message.
+    const target = turn.replyTo !== undefined ? turn.replyTo?.id : email?.id;
+    if (!target) throw new Error('no message to reply to');
+    if (target === email?.id || typeof api.ui?.openEmail !== 'function') return api.compose.reply(target, { text });
+    await api.ui.openEmail(target);
+    // The reader needs a moment to show it.
+    for (let i = 0; ; i += 1) {
+      try {
+        return await api.compose.reply(target, { text });
+      } catch (err) {
+        if (i >= 15) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+  }, [api, email]);
+
   // ─── Applying a proposal ───
-  const apply = useCallback(async (turn, how, text) => {
+  const apply = useCallback(async (turn, how, text, headers = {}) => {
     patchTurn(turn.id, { applying: how });
     try {
       let ok;
-      if (mode === 'reader') {
-        ok = await api.compose.reply(email.id, { text: text.trim() });
+      if (how === 'new') {
+        const opened = await api.compose.open({ to: headers.to ?? [], subject: headers.subject ?? '', body: text.trim() });
+        ok = opened !== false;
+      } else if (mode === 'reader') {
+        ok = await replyFor(turn, text.trim());
       } else if (how === 'below') {
         ok = await api.composer.replaceSelection(props.composerId, { text: text.trim() }, { below: true });
       } else if (how === 'cursor') {
@@ -363,7 +390,7 @@ export function useAssistantChat(props) {
       api.log?.warn?.('could not change the message', err?.message ?? err);
       patchTurn(turn.id, { applying: null, applyFailed: true });
     }
-  }, [api, mode, email, props.composerId, patchTurn, refreshBody]);
+  }, [api, mode, props.composerId, patchTurn, refreshBody, replyFor]);
 
   /** A widget's request: into the chat, on the current text. */
   const sendText = useCallback((text) => {
@@ -410,7 +437,7 @@ export function useAssistantChat(props) {
   return {
     api, t, locale, mode, email, setup, loaded, turns, consent, source, input, setInput, inputRef,
     target, setTarget, languages, running, translating, setTranslating, lookups,
-    removeContext, restoreContext, quick, submit, stop, apply, sendText, insertText, clear, retry,
+    removeContext, restoreContext, quick, submit, stop, apply, replyFor, sendText, insertText, clear, retry,
     patchTurn, answerAction, undoStep,
   };
 }

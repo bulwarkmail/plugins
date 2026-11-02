@@ -167,7 +167,8 @@ export function formatDate(locale, date, time) {
 }
 
 /** Reply ideas: each opens a reply that already says it. */
-export function Replies({ api, answer, email }) {
+/** `onReply(text)`: how a reply opens (the panel replies to the message the answer was about). */
+export function Replies({ api, answer, email, onReply }) {
   const t = api.i18n.t;
   const replies = parseReplies(answer);
   const [opening, setOpening] = useState(-1);
@@ -175,7 +176,8 @@ export function Replies({ api, answer, email }) {
   const reply = async (text, i) => {
     setOpening(i);
     try {
-      await api.compose.reply(email.id, { text });
+      if (onReply) await onReply(text);
+      else await api.compose.reply(email.id, { text });
     } catch (err) {
       api.log?.warn?.('reply failed', err?.message ?? err);
       api.toast.error(t('reader.reply_failed'));
