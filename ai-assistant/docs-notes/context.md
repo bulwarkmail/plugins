@@ -39,7 +39,10 @@ webmails don't send it) and check `typeof api.email.x === 'function'`.
 - Returns `{ name, type, width, height, data, status, alt?, exif? }`.
   - `status`: `ok`, `tracker` (1-2 px), `tiny` (a side under 64 px or
     less than 128×128 in area), `too_big`, `unsupported` (not a picture the
-    browser can show: HEIC, TIFF, SVG, not an image), `failed`.
+    browser can show: HEIC, TIFF, AVIF, SVG, not an image; the size is
+    read from the file's header before decoding), `failed`. A picture
+    that declares more than 50 megapixels answers `too_big` without being
+    decoded.
   - When ok: `data` is base64 (no `data:` prefix), `type` image/jpeg
     (quality 0.85, on white) or image/png for pictures with see-through
     parts, at most 1.5 MB; `width`/`height` the size of `data`.
@@ -56,8 +59,26 @@ webmails don't send it) and check `typeof api.email.x === 'function'`.
 
 - Permission `email:read`. Flag `threads`. 60 calls a minute.
 - Returns `EmailReadView[]`, oldest first, at most 50 (the newest 50 of a
-  longer conversation), each with `accountId`. A message the server lists
-  in no thread comes back alone.
+  longer conversation; only those are fetched, with Thread/get first),
+  each with `accountId`. A message the server lists in no thread comes
+  back alone.
+
+### api.email.getThreadCount(emailId, { accountId? })
+
+- Permission `email:read`. Flag `threads`. Its own limit of 120 calls a
+  minute, apart from getThread's.
+- Returns how many messages the conversation has (a number; 1 for a
+  message in no thread). Reads no message bodies.
+- Refuses a message it can't find or an account this login doesn't show
+  ("email.getThreadCount: no message with id …").
+
+### EmailReadView.blobsReadable?
+
+`false` on the slot props (email-detail-sidebar and the other viewer
+slots) when this login can't read the open message's attachments, text or
+conversation through the host: a message of another connected login in a
+unified view or a Pro tab. Left out otherwise; views returned by host
+calls never carry it.
 
 ### EmailReadView.attachments: `cid?`, `alt?`
 
@@ -67,6 +88,7 @@ Inline images now carry `cid` (the Content-ID without angle brackets) and
 ### Reader panel prop `listSelection`
 
 `email-detail-sidebar` gets `listSelection: { emails: [{ id, accountId }], total } | null`
+(not in a Pro email tab)
 (gated by `email:read`): the messages ticked in the list when two or more
 are, at most 50 in `emails`, `total` the real count. Rows of another
 connected login are counted but not listed. Flag `listSelection`. The

@@ -79,10 +79,15 @@ const toolResults = (request) => (request.body.messages.at(-1).content ?? []).fi
 /** Open a message by its subject and wait until the reader shows it. */
 async function open(page, subject) {
   const row = () => page.getByText(subject, { exact: true }).locator('visible=true').first();
-  await openMessage(page, subject, row());
   const shown = page.getByRole('heading', { name: subject });
-  if (!(await shown.isVisible({ timeout: 10_000 }).catch(() => false))) await row().click();
-  await expect(shown).toBeVisible({ timeout: 30_000 });
+  try {
+    await openMessage(page, subject, row());
+  } catch { /* the list re-rendered under the click; the loop below clicks again */ }
+  // The list re-renders while results come in; click again until the message shows.
+  await expect(async () => {
+    if (!(await shown.isVisible())) await row().click({ timeout: 5_000 });
+    await expect(shown).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 60_000 });
 }
 
 async function openAttachMessage(page) {
@@ -104,7 +109,7 @@ test('an attachment\'s text reaches the AI service', async ({ page }) => {
       { text: 'The agenda starts with the launch plan.' },
     ]);
     await ask(frame, '[[mock:ctx-pdf]] What is on the agenda?');
-    await acceptPrivacy(page, { frame, expectText: 'it sends the attachment\'s text' });
+    await acceptPrivacy(page, { frame, expectText: 'the names of its attachments and the descriptions of its pictures' });
     await waitDone(frame);
     const requests = await mockRequests('ctx-pdf');
     expect(requests.length).toBeGreaterThanOrEqual(2);
@@ -172,7 +177,7 @@ test('three messages ticked in the list become one context', async ({ page }) =>
     await expect(frame.getByRole('group', { name: '3 selected messages' })).toBeVisible({ timeout: 30_000 });
     await frame.getByRole('button', { name: 'Actions' }).click();
     await frame.getByRole('menuitem', { name: 'Summarize these' }).click();
-    await acceptPrivacy(page, { frame, expectText: 'the messages you selected in the list' });
+    await acceptPrivacy(page, { frame, expectText: 'When you select messages in the list, it says how many' });
     await waitDone(frame);
     const requests = await mockRequests('ctx-select');
     expect(bodyText(requests[0])).toContain('The user selected 3 messages in the list');
