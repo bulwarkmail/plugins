@@ -4,7 +4,10 @@ import { expect } from '@playwright/test';
 import { setPluginConfig } from '../../e2e/helpers.mjs';
 
 export const ID = 'ai-assistant';
-export const MOCK = 'http://localhost:18099';
+/** The mock AI services (test-env/mocks/server.py); BULWARK_MOCK_URL when it runs elsewhere. */
+export const MOCK = (process.env.BULWARK_MOCK_URL || 'http://localhost:18099').replace(/\/+$/, '');
+/** host:port of the mock, as the privacy notice names it. */
+export const MOCK_HOST = new URL(MOCK).host;
 const SLOT_FRAME = `iframe[title="plugin-${ID}-slot"]`;
 
 /** Admin config: Anthropic mock by default; pass overrides (null clears a key). */

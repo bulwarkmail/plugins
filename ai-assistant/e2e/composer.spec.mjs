@@ -3,7 +3,7 @@ import { adminApi, install } from './admin.mjs';
 import { installPlugin, uninstallPlugin, preparePage, signIn, waitForPlugin, shoot } from '../../e2e/helpers.mjs';
 import {
   ID, ask, assistantButton, assistantDialog, chatInput, composerPanel, configure, acceptPrivacy, composeWith, editor, editorText,
-  lastProposal, openAssistant, selectLastLine, waitDone, OLLAMA_CONFIG, mockReadsChunked, ollamaUp,
+  lastProposal, openAssistant, selectLastLine, waitDone, OLLAMA_CONFIG, mockReadsChunked, ollamaUp, MOCK, MOCK_HOST,
 } from './common.mjs';
 
 // The composer: the Assistant button in the composer's bottom bar (Alt+A)
@@ -20,12 +20,12 @@ const DRAFT = 'hi bob, can we meet on tuesday? i has some questions';
 const SERVICES = [
   {
     name: 'the Anthropic mock', theme: 'light', available: mockReadsChunked,
-    config: {}, provider: 'Anthropic at localhost:18099 (model mock-claude)', answer: MOCK_REPLY,
+    config: {}, provider: `Anthropic at ${MOCK_HOST} (model mock-claude)`, answer: MOCK_REPLY,
   },
   {
     name: 'the OpenAI mock', theme: 'dark', available: mockReadsChunked,
-    config: { anthropicBaseUrl: '', anthropicKey: '', openaiBaseUrl: 'http://localhost:18099/openai/v1', openaiKey: 'test-openai-key', openaiModel: 'mock-gpt-small', defaultProvider: 'openai' },
-    provider: 'OpenAI-compatible at localhost:18099 (model mock-gpt-small)', answer: MOCK_REPLY,
+    config: { anthropicBaseUrl: '', anthropicKey: '', openaiBaseUrl: `${MOCK}/openai/v1`, openaiKey: 'test-openai-key', openaiModel: 'mock-gpt-small', defaultProvider: 'openai' },
+    provider: `OpenAI-compatible at ${MOCK_HOST} (model mock-gpt-small)`, answer: MOCK_REPLY,
   },
   // The small Ollama model may answer with the text unchanged; the mocks always change it.
   {
@@ -291,7 +291,7 @@ test('on a phone the assistant opens as a dialog', async ({ page }) => {
 const ERRORS = [
   ['a rate limit with its wait time', { anthropicKey: 'rate-limited' }, /too many requests\. You can try again in [1-7] s\./],
   ['a refused key (Anthropic)', { anthropicKey: 'wrong-key' }, /didn't accept the API key/],
-  ['a refused key (OpenAI)', { anthropicBaseUrl: '', openaiBaseUrl: 'http://localhost:18099/openai/v1', openaiKey: 'wrong-key', defaultProvider: 'openai' }, /didn't accept the API key/],
+  ['a refused key (OpenAI)', { anthropicBaseUrl: '', openaiBaseUrl: `${MOCK}/openai/v1`, openaiKey: 'wrong-key', defaultProvider: 'openai' }, /didn't accept the API key/],
 ];
 
 for (const [name, config, message] of ERRORS) {

@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test';
 import { adminApi, install } from './admin.mjs';
 import { installPlugin, uninstallPlugin, preparePage, signIn, waitForPlugin, shoot } from '../../e2e/helpers.mjs';
 import { ID, ask, configure, acceptPrivacy, editor, readerPanel, waitDone, OLLAMA_CONFIG, ollamaUp, mockReadsChunked } from './common.mjs';
+import { seedReaderMail } from './jmap.mjs';
 
 // The reader: a panel next to the open message with Summarize, To-dos and
 // dates, Reply ideas and Translate, a chat about the message, and the
@@ -16,6 +17,12 @@ import { ID, ask, configure, acceptPrivacy, editor, readerPanel, waitDone, OLLAM
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+// The mail these tests open: through JMAP on any server (BULWARK_JMAP_URL),
+// else the Docker test-env's seed (seed_mail.py already has the question).
+test.beforeAll(async () => {
+  if (process.env.BULWARK_JMAP_URL) await seedReaderMail();
+});
 
 async function service() {
   if (await mockReadsChunked()) return { config: {}, answer: /Mock reply/ };
@@ -218,7 +225,7 @@ test('on a phone the bar above the message has the actions', async ({ page }) =>
 });
 
 test('on a phone a conversation gets a summary', async ({ page }) => {
-  execFileSync('python', [path.join(HERE, 'seed_thread.py')], { stdio: 'inherit' });
+  if (!process.env.BULWARK_JMAP_URL) execFileSync('python', [path.join(HERE, 'seed_thread.py')], { stdio: 'inherit' });
   const api = await install(await adminApi(), ID, installPlugin);
   try {
     const svc = await setUp(page, api, { viewport: { width: 390, height: 844 } });
