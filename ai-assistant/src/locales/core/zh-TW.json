@@ -224,6 +224,8 @@
   "action.undo_failed": "無法復原",
   "panel.context.remove": "從上下文中移除",
   "panel.context.add_message": "加入這封郵件",
+  "panel.context.add_named": "加入「{subject}」",
+  "panel.context.left": "不再討論：{subject}",
   "app.nav.mail": "郵件",
   "app.nav.calendar": "行事曆",
   "app.nav.contacts": "聯絡人",

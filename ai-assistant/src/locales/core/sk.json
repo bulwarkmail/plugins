@@ -224,6 +224,8 @@
   "action.undo_failed": "Nepodarilo sa vrátiť späť",
   "panel.context.remove": "Odstrániť z kontextu",
   "panel.context.add_message": "Pridať túto správu",
+  "panel.context.add_named": "Pridať „{subject}“",
+  "panel.context.left": "Už nie o: {subject}",
   "app.nav.mail": "Pošta",
   "app.nav.calendar": "Kalendár",
   "app.nav.contacts": "Kontakty",

@@ -224,6 +224,8 @@
   "action.undo_failed": "无法撤销",
   "panel.context.remove": "从上下文中移除",
   "panel.context.add_message": "添加这封邮件",
+  "panel.context.add_named": "添加“{subject}”",
+  "panel.context.left": "不再讨论：{subject}",
   "app.nav.mail": "邮件",
   "app.nav.calendar": "日历",
   "app.nav.contacts": "联系人",

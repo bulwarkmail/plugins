@@ -224,6 +224,8 @@
   "action.undo_failed": "실행 취소하지 못했습니다",
   "panel.context.remove": "컨텍스트에서 제거",
   "panel.context.add_message": "이 메시지 추가",
+  "panel.context.add_named": "‘{subject}’ 추가",
+  "panel.context.left": "더 이상 이 메일 이야기가 아님: {subject}",
   "app.nav.mail": "메일",
   "app.nav.calendar": "캘린더",
   "app.nav.contacts": "연락처",

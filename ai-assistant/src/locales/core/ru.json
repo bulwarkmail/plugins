@@ -224,6 +224,8 @@
   "action.undo_failed": "Не удалось отменить",
   "panel.context.remove": "Убрать из контекста",
   "panel.context.add_message": "Добавить это письмо",
+  "panel.context.add_named": "Добавить «{subject}»",
+  "panel.context.left": "Больше не о письме: {subject}",
   "app.nav.mail": "Почта",
   "app.nav.calendar": "Календарь",
   "app.nav.contacts": "Контакты",

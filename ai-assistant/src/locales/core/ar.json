@@ -224,6 +224,8 @@
   "action.undo_failed": "تعذّر التراجع",
   "panel.context.remove": "إزالة من السياق",
   "panel.context.add_message": "إضافة هذه الرسالة",
+  "panel.context.add_named": "إضافة «{subject}»",
+  "panel.context.left": "لم يعد عن: {subject}",
   "app.nav.mail": "البريد",
   "app.nav.calendar": "التقويم",
   "app.nav.contacts": "جهات الاتصال",

@@ -224,6 +224,8 @@
   "action.undo_failed": "No se pudo deshacer",
   "panel.context.remove": "Quitar del contexto",
   "panel.context.add_message": "Añadir este mensaje",
+  "panel.context.add_named": "Añadir «{subject}»",
+  "panel.context.left": "Ya no trata de: {subject}",
   "app.nav.mail": "Correo",
   "app.nav.calendar": "Calendario",
   "app.nav.contacts": "Contactos",

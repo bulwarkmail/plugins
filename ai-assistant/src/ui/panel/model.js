@@ -72,6 +72,15 @@ export function effectiveSource(mode, { selection, body, email }, removed, owner
   return { scope: 'none', text: '', removed: true };
 }
 
+/** The subject of message `emailId`, from the newest user turn or marker that names it. */
+export function topicSubject(turns, emailId) {
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    const turn = turns[i];
+    if (turn.emailId === emailId && typeof turn.subject === 'string') return turn.subject;
+  }
+  return '';
+}
+
 /** The message the conversation was last about (user turns and markers carry it). */
 export function lastTopic(turns) {
   for (let i = turns.length - 1; i >= 0; i--) {

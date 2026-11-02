@@ -224,6 +224,8 @@
   "action.undo_failed": "Kunne ikke angres",
   "panel.context.remove": "Fjern fra konteksten",
   "panel.context.add_message": "Legg til denne meldingen",
+  "panel.context.add_named": "Legg til «{subject}»",
+  "panel.context.left": "Ikke lenger om: {subject}",
   "app.nav.mail": "E-post",
   "app.nav.calendar": "Kalender",
   "app.nav.contacts": "Kontakter",

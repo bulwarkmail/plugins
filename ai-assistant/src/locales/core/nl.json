@@ -224,6 +224,8 @@
   "action.undo_failed": "Kon dit niet ongedaan maken",
   "panel.context.remove": "Uit de context halen",
   "panel.context.add_message": "Dit bericht toevoegen",
+  "panel.context.add_named": "‘{subject}’ toevoegen",
+  "panel.context.left": "Niet meer over: {subject}",
   "app.nav.mail": "E-mail",
   "app.nav.calendar": "Agenda",
   "app.nav.contacts": "Contacten",

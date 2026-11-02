@@ -224,6 +224,8 @@
   "action.undo_failed": "Konnte nicht rückgängig gemacht werden",
   "panel.context.remove": "Aus dem Kontext entfernen",
   "panel.context.add_message": "Diese Nachricht hinzufügen",
+  "panel.context.add_named": "„{subject}“ hinzufügen",
+  "panel.context.left": "Nicht mehr zu: {subject}",
   "app.nav.mail": "E-Mail",
   "app.nav.calendar": "Kalender",
   "app.nav.contacts": "Kontakte",

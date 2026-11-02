@@ -224,6 +224,8 @@
   "action.undo_failed": "واگرد ممکن نشد",
   "panel.context.remove": "حذف از زمینه",
   "panel.context.add_message": "افزودن این پیام",
+  "panel.context.add_named": "افزودن «{subject}»",
+  "panel.context.left": "دیگر درباره این نیست: {subject}",
   "app.nav.mail": "ایمیل",
   "app.nav.calendar": "تقویم",
   "app.nav.contacts": "مخاطبین",

@@ -224,6 +224,8 @@
   "action.undo_failed": "Não foi possível anular",
   "panel.context.remove": "Remover do contexto",
   "panel.context.add_message": "Adicionar esta mensagem",
+  "panel.context.add_named": "Adicionar «{subject}»",
+  "panel.context.left": "Já não é sobre: {subject}",
   "app.nav.mail": "E-mail",
   "app.nav.calendar": "Calendário",
   "app.nav.contacts": "Contatos",

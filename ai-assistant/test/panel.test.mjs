@@ -396,7 +396,7 @@ describe('taking context out', () => {
     expect(system).not.toContain('Can we meet on Thursday');
     expect(system).toContain('(not available)');
     // Brought back by hand...
-    await click(screen.getByRole('button', { name: 'Add this message' }));
+    await click(screen.getByRole('button', { name: 'Add “Thursday”' }));
     expect(screen.getByText('This message')).toBeTruthy();
     // ...or by opening another message.
     await click(removeButton());
@@ -468,6 +468,35 @@ describe('the reader panel across messages', () => {
     expect(sent.at(-1).content).toContain('Now about another message: "Invoice 42" from Dan');
     expect(sent.some((msg) => msg.content === 'On Thursday at 3.')).toBe(true);
     await waitFor(async () => expect((await api.storage.get('chat:reader'))?.turns.filter((turn) => turn.role === 'context')).toHaveLength(1));
+  });
+
+  it('says in the transcript when the message leaves the conversation, and names it on the chip that brings it back', async () => {
+    const api = makeApi({ answers: ['On Thursday.', 'Sure.', 'Again.', 'Back.'] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('when?');
+    await pressEnter();
+    await settled();
+    await click(screen.getByRole('button', { name: 'Remove from context' }));
+    // The chip names the message it brings back.
+    expect(screen.getByRole('button', { name: 'Add “Thursday”' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Add this message' })).toBeNull();
+    await type('write a haiku');
+    await pressEnter();
+    await settled();
+    const markers = () => [...document.querySelectorAll('[data-turn="context"]')].map((el) => el.textContent);
+    expect(markers()).toEqual(['No longer about: Thursday']);
+    expect(sentPrompt(api).messages.at(-1).content).toContain('took the message out');
+    // Only once.
+    await type('another');
+    await pressEnter();
+    await settled();
+    expect(markers()).toEqual(['No longer about: Thursday']);
+    // Back to the message: the switch is marked again.
+    await click(screen.getByRole('button', { name: 'Add “Thursday”' }));
+    await type('and now?');
+    await pressEnter();
+    await settled();
+    expect(markers()).toEqual(['No longer about: Thursday', 'Now about: Thursday']);
   });
 
   it('works with no message open: chat yes, actions to start with', async () => {

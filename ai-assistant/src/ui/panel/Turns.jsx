@@ -15,14 +15,14 @@ import { diffWords, plainParts } from '../../lib/diff.js';
 import { partsOf } from './model.js';
 import { ActionCard, StepsGroup } from './Steps.jsx';
 
-/** A line in the transcript: from here on the conversation is about another message. */
+/** A line in the transcript: from here on the conversation is about another message, or about none. */
 export function ContextMarker({ api, turn }) {
   const rule = { flex: 1, height: 1, background: 'var(--color-border)' };
   return (
     <div data-turn="context" style={{ display: 'flex', alignItems: 'center', gap: 8 }} title={turn.subject}>
       <span style={rule} />
-      <Icon name="mail" size="xs" className="text-muted-foreground" />
-      <Text size="xs" tone="muted" className="truncate">{api.i18n.t('panel.context.now', { subject: turn.subject || '…' })}</Text>
+      <Icon name={turn.left ? 'mail-off' : 'mail'} size="xs" className="text-muted-foreground" />
+      <Text size="xs" tone="muted" className="truncate">{api.i18n.t(turn.left ? 'panel.context.left' : 'panel.context.now', { subject: turn.subject || '…' })}</Text>
       <span style={rule} />
     </div>
   );

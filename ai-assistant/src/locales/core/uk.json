@@ -224,6 +224,8 @@
   "action.undo_failed": "Не вдалося скасувати",
   "panel.context.remove": "Прибрати з контексту",
   "panel.context.add_message": "Додати цей лист",
+  "panel.context.add_named": "Додати «{subject}»",
+  "panel.context.left": "Більше не про лист: {subject}",
   "app.nav.mail": "Пошта",
   "app.nav.calendar": "Календар",
   "app.nav.contacts": "Контакти",

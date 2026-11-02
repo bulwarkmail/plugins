@@ -21,7 +21,7 @@ import { defaultTarget, languageOptions } from '../../lib/languages.js';
 import { diffSuggestions } from '../../lib/grammar.js';
 import { COMPOSER_CONTEXT_KEY, DRAFT_KEY, READER_CHAT_KEY, chatKey, pendingKey } from '../../lib/background.js';
 import {
-  MAX_TURNS, PENDING_TTL_MS, appLabels, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, uid,
+  MAX_TURNS, PENDING_TTL_MS, appLabels, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, topicSubject, uid,
 } from './model.js';
 
 /** Scopes that are part of the text; a quick action on them says so in its bubble. */
@@ -185,10 +185,21 @@ export function useAssistantChat(props) {
     // messages: a line in the transcript names the message a question is
     // about when it is not the one before, and the model hears of it.
     const emailId = mode === 'reader' ? (contextEmail?.id ?? null) : undefined;
-    const switched = mode === 'reader' && contextEmail && previous.length > 0 && lastTopic(previous) !== contextEmail.id;
-    const marker = switched ? [{ id: uid(), role: 'context', emailId: contextEmail.id, subject: contextEmail.subject ?? '' }] : [];
-    const note = switched ? `(Now about another message: "${contextEmail.subject ?? ''}" from ${contextEmail.from?.[0]?.name || contextEmail.from?.[0]?.email || 'unknown'}.)\n` : '';
-    const userTurn = { id: uid(), role: 'user', content: note + (sent ?? label), label, ...(emailId !== undefined ? { emailId } : {}) };
+    const topic = mode === 'reader' ? lastTopic(previous) : null;
+    const switched = mode === 'reader' && contextEmail && previous.length > 0 && topic !== contextEmail.id;
+    // The user took the message out: the line says so, instead of leaving "Now about" standing.
+    const left = mode === 'reader' && !contextEmail && !!topic;
+    const marker = switched
+      ? [{ id: uid(), role: 'context', emailId: contextEmail.id, subject: contextEmail.subject ?? '' }]
+      : left ? [{ id: uid(), role: 'context', emailId: null, left: true, subject: topicSubject(previous, topic) }] : [];
+    const note = switched
+      ? `(Now about another message: "${contextEmail.subject ?? ''}" from ${contextEmail.from?.[0]?.name || contextEmail.from?.[0]?.email || 'unknown'}.)\n`
+      : left ? '(The user took the message out of the conversation: this is not about it.)\n' : '';
+    const userTurn = {
+      id: uid(), role: 'user', content: note + (sent ?? label), label,
+      ...(emailId !== undefined ? { emailId } : {}),
+      ...(mode === 'reader' && contextEmail ? { subject: contextEmail.subject ?? '' } : {}),
+    };
     const turn = { id: uid(), role: 'assistant', content: '', status: 'running', task: task ?? 'chat', show: show ?? 'chat', scope, source: src ?? '', steps: [], ...(task ? { input: taskInput ?? {} } : {}) };
     setTurns([...previous, ...marker, userTurn, turn]);
     try {

@@ -224,6 +224,8 @@
   "action.undo_failed": "Nem sikerült visszavonni",
   "panel.context.remove": "Eltávolítás a kontextusból",
   "panel.context.add_message": "Az üzenet hozzáadása",
+  "panel.context.add_named": "„{subject}” hozzáadása",
+  "panel.context.left": "Már nem erről: {subject}",
   "app.nav.mail": "Levelek",
   "app.nav.calendar": "Naptár",
   "app.nav.contacts": "Névjegyek",

@@ -224,6 +224,8 @@
   "action.undo_failed": "Couldn't undo that",
   "panel.context.remove": "Remove from context",
   "panel.context.add_message": "Add this message",
+  "panel.context.add_named": "Add “{subject}”",
+  "panel.context.left": "No longer about: {subject}",
   "app.nav.mail": "Mail",
   "app.nav.calendar": "Calendar",
   "app.nav.contacts": "Contacts",

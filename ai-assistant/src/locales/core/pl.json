@@ -224,6 +224,8 @@
   "action.undo_failed": "Nie udało się cofnąć",
   "panel.context.remove": "Usuń z kontekstu",
   "panel.context.add_message": "Dodaj tę wiadomość",
+  "panel.context.add_named": "Dodaj „{subject}”",
+  "panel.context.left": "Już nie o: {subject}",
   "app.nav.mail": "Poczta",
   "app.nav.calendar": "Kalendarz",
   "app.nav.contacts": "Kontakty",

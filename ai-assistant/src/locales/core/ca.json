@@ -224,6 +224,8 @@
   "action.undo_failed": "No s'ha pogut desfer",
   "panel.context.remove": "Treu del context",
   "panel.context.add_message": "Afegeix aquest missatge",
+  "panel.context.add_named": "Afegeix «{subject}»",
+  "panel.context.left": "Ja no tracta de: {subject}",
   "app.nav.mail": "Correu",
   "app.nav.calendar": "Calendari",
   "app.nav.contacts": "Contactes",

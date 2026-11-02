@@ -224,6 +224,8 @@
   "action.undo_failed": "לא ניתן היה לבטל",
   "panel.context.remove": "הסרה מההקשר",
   "panel.context.add_message": "הוספת ההודעה הזו",
+  "panel.context.add_named": "הוספת „{subject}”",
+  "panel.context.left": "כבר לא בנושא: {subject}",
   "app.nav.mail": "דוֹאַר",
   "app.nav.calendar": "לוּחַ שָׁנָה",
   "app.nav.contacts": "אנשי קשר",

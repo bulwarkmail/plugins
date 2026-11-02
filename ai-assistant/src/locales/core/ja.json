@@ -224,6 +224,8 @@
   "action.undo_failed": "元に戻せませんでした",
   "panel.context.remove": "コンテキストから外す",
   "panel.context.add_message": "このメッセージを追加",
+  "panel.context.add_named": "「{subject}」を追加",
+  "panel.context.left": "この話題は終了: {subject}",
   "app.nav.mail": "メール",
   "app.nav.calendar": "カレンダー",
   "app.nav.contacts": "連絡先",

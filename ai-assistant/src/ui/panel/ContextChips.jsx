@@ -27,7 +27,10 @@ export function ContextChips({ api, source, email, onRemove, onRestore, fit = 'f
   const t = api.i18n.t;
   const chip = contextChip(t, source, email);
   if (source.removed && email) {
-    return <ContextChip icon="plus" label={t('panel.context.add_message')} title={email.subject || chip.label} dashed onClick={onRestore} fit={fit} />;
+    // Names the message, so it can't be mistaken for another one the transcript mentions.
+    const subject = (email.subject ?? '').trim();
+    const label = subject ? t('panel.context.add_named', { subject: excerpt(subject, 40) }) : t('panel.context.add_message');
+    return <ContextChip icon="plus" label={label} title={subject || chip.label} dashed onClick={onRestore} fit={fit} />;
   }
   if (source.scope === 'none' || source.scope === 'empty') return null;
   return (

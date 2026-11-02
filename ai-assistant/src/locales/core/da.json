@@ -224,6 +224,8 @@
   "action.undo_failed": "Kunne ikke fortrydes",
   "panel.context.remove": "Fjern fra konteksten",
   "panel.context.add_message": "Tilføj denne besked",
+  "panel.context.add_named": "Tilføj »{subject}«",
+  "panel.context.left": "Ikke længere om: {subject}",
   "app.nav.mail": "Mail",
   "app.nav.calendar": "Kalender",
   "app.nav.contacts": "Kontakter",

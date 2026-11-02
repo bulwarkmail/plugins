@@ -224,6 +224,8 @@
   "action.undo_failed": "Neizdevās atsaukt",
   "panel.context.remove": "Noņemt no konteksta",
   "panel.context.add_message": "Pievienot šo ziņu",
+  "panel.context.add_named": "Pievienot “{subject}”",
+  "panel.context.left": "Vairs nav par: {subject}",
   "app.nav.mail": "Pasts",
   "app.nav.calendar": "Kalendārs",
   "app.nav.contacts": "Kontakti",

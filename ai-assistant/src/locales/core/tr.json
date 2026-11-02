@@ -224,6 +224,8 @@
   "action.undo_failed": "Geri alınamadı",
   "panel.context.remove": "Bağlamdan çıkar",
   "panel.context.add_message": "Bu iletiyi ekle",
+  "panel.context.add_named": "“{subject}” ekle",
+  "panel.context.left": "Artık bununla ilgili değil: {subject}",
   "app.nav.mail": "Posta",
   "app.nav.calendar": "Takvim",
   "app.nav.contacts": "Kişiler",

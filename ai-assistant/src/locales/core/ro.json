@@ -224,6 +224,8 @@
   "action.undo_failed": "Nu s-a putut anula",
   "panel.context.remove": "Elimină din context",
   "panel.context.add_message": "Adaugă acest mesaj",
+  "panel.context.add_named": "Adaugă „{subject}”",
+  "panel.context.left": "Nu mai este despre: {subject}",
   "app.nav.mail": "E-mail",
   "app.nav.calendar": "Calendar",
   "app.nav.contacts": "Contacte",

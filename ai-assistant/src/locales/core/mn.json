@@ -224,6 +224,8 @@
   "action.undo_failed": "Буцааж чадсангүй",
   "panel.context.remove": "Агуулгаас хасах",
   "panel.context.add_message": "Энэ мессежийг нэмэх",
+  "panel.context.add_named": "«{subject}» нэмэх",
+  "panel.context.left": "Цаашид энэ тухай биш: {subject}",
   "app.nav.mail": "Мэйл",
   "app.nav.calendar": "Хуанли",
   "app.nav.contacts": "Харилцах утас",
