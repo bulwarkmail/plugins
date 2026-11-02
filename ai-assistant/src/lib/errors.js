@@ -8,7 +8,7 @@ export function failureReason(err) {
   if (err && typeof err.reason === 'string') return err.reason;
   const text = String(err?.message ?? err ?? '');
   if (/no message with that id|not ?found|no longer exists|doesn't exist any more|was deleted/i.test(text)) return 'gone';
-  if (/no folder|mailbox/i.test(text)) return 'folder';
+  if (/\bno (?:\w+ )?folder|mailbox/i.test(text)) return 'folder';
   if (/calendar|event/i.test(text) && /refus|reject|invalid|fail/i.test(text)) return 'calendar';
   if (/permission|not allowed|forbidden|denied|refused/i.test(text)) return 'denied';
   return 'other';
