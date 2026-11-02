@@ -31,7 +31,7 @@
   "error.too_long": "Text je pro tento model příliš dlouhý.",
   "error.bad_request": "Služba AI požadavek odmítla.",
   "error.service_said": "Odpověď služby: {detail}",
-  "error.blocked": "Webmail se k této adrese služby AI nesmí připojit.",
+  "error.blocked": "Server blokuje adresu služby AI. Obraťte se na správce.",
   "error.unreachable": "Službu AI se nepodařilo zastihnout.",
   "error.server": "Ve službě AI nastala chyba. Zkuste to později.",
   "error.empty": "Služba AI poslala prázdnou odpověď.",

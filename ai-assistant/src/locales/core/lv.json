@@ -31,7 +31,7 @@
   "error.too_long": "Teksts ir pārāk garš šim modelim.",
   "error.bad_request": "MI pakalpojums noraidīja pieprasījumu.",
   "error.service_said": "Atbilde: {detail}",
-  "error.blocked": "Tīmekļa pasts nedrīkst savienoties ar šo MI pakalpojuma adresi.",
+  "error.blocked": "Serveris bloķē MI pakalpojuma adresi. Jautājiet administratoram.",
   "error.unreachable": "Neizdevās sasniegt MI pakalpojumu.",
   "error.server": "MI pakalpojumā radās problēma. Mēģiniet vēlreiz vēlāk.",
   "error.empty": "MI pakalpojums atsūtīja tukšu atbildi.",

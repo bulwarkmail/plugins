@@ -31,7 +31,7 @@
   "error.too_long": "A szöveg túl hosszú ehhez a modellhez.",
   "error.bad_request": "Az AI-szolgáltatás elutasította a kérést.",
   "error.service_said": "Válasza: {detail}",
-  "error.blocked": "A webmail nem csatlakozhat ehhez az AI-szolgáltatás-címhez.",
+  "error.blocked": "A szerver letiltja az AI-szolgáltatás címét. Forduljon a rendszergazdához.",
   "error.unreachable": "Az AI-szolgáltatás nem érhető el.",
   "error.server": "Hiba történt az AI-szolgáltatásnál. Próbáld újra később.",
   "error.empty": "Az AI-szolgáltatás üres választ küldött.",

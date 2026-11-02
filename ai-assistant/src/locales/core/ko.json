@@ -31,7 +31,7 @@
   "error.too_long": "이 모델에 비해 텍스트가 너무 길어요.",
   "error.bad_request": "AI 서비스가 요청을 거부했어요.",
   "error.service_said": "서비스 응답: {detail}",
-  "error.blocked": "웹메일이 이 AI 서비스 주소에 연결할 수 없어요.",
+  "error.blocked": "서버가 AI 서비스 주소를 차단합니다. 관리자에게 문의하세요.",
   "error.unreachable": "AI 서비스에 연결할 수 없어요.",
   "error.server": "AI 서비스에 문제가 생겼어요. 나중에 다시 시도하세요.",
   "error.empty": "AI 서비스가 빈 응답을 보냈어요.",

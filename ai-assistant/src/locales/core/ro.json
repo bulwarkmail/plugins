@@ -31,7 +31,7 @@
   "error.too_long": "Textul este prea lung pentru acest model.",
   "error.bad_request": "Serviciul AI a refuzat cererea.",
   "error.service_said": "Răspunsul serviciului: {detail}",
-  "error.blocked": "Webmailul nu are voie să se conecteze la această adresă a serviciului AI.",
+  "error.blocked": "Serverul blochează adresa serviciului AI. Întrebați administratorul.",
   "error.unreachable": "Serviciul AI nu a putut fi contactat.",
   "error.server": "Serviciul AI a avut o problemă. Încercați din nou mai târziu.",
   "error.empty": "Serviciul AI a trimis un răspuns gol.",

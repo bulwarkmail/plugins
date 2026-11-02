@@ -31,7 +31,7 @@
   "error.too_long": "De tekst is te lang voor dit model.",
   "error.bad_request": "De AI-dienst heeft het verzoek geweigerd.",
   "error.service_said": "Antwoord: {detail}",
-  "error.blocked": "De webmail mag geen verbinding maken met dit adres van de AI-dienst.",
+  "error.blocked": "De server blokkeert het adres van de AI-dienst. Vraag het je beheerder.",
   "error.unreachable": "De AI-dienst is niet bereikbaar.",
   "error.server": "Er ging iets mis bij de AI-dienst. Probeer het later opnieuw.",
   "error.empty": "De AI-dienst stuurde een leeg antwoord.",

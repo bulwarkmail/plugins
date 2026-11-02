@@ -31,7 +31,7 @@
   "error.too_long": "Tekst jest za długi dla tego modelu.",
   "error.bad_request": "Usługa AI odrzuciła żądanie.",
   "error.service_said": "Odpowiedź: {detail}",
-  "error.blocked": "Poczta nie może łączyć się z tym adresem usługi AI.",
+  "error.blocked": "Serwer blokuje adres usługi AI. Zapytaj administratora.",
   "error.unreachable": "Nie udało się połączyć z usługą AI.",
   "error.server": "Wystąpił problem z usługą AI. Spróbuj ponownie później.",
   "error.empty": "Usługa AI zwróciła pustą odpowiedź.",

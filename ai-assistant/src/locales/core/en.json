@@ -31,7 +31,7 @@
   "error.too_long": "The text is too long for this model.",
   "error.bad_request": "The AI service refused the request.",
   "error.service_said": "It said: {detail}",
-  "error.blocked": "The webmail may not connect to this AI service address.",
+  "error.blocked": "The server blocks the address of the AI service. Ask your administrator.",
   "error.unreachable": "Could not reach the AI service.",
   "error.server": "The AI service had a problem. Try again later.",
   "error.empty": "The AI service sent an empty answer.",

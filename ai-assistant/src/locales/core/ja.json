@@ -31,7 +31,7 @@
   "error.too_long": "このモデルにはテキストが長すぎます。",
   "error.bad_request": "AI サービスがリクエストを拒否しました。",
   "error.service_said": "サービスからのメッセージ: {detail}",
-  "error.blocked": "Web メールはこの AI サービスのアドレスに接続できません。",
+  "error.blocked": "サーバーが AI サービスのアドレスをブロックしています。管理者に問い合わせてください。",
   "error.unreachable": "AI サービスに接続できませんでした。",
   "error.server": "AI サービスで問題が発生しました。後でもう一度お試しください。",
   "error.empty": "AI サービスから空の応答が返されました。",

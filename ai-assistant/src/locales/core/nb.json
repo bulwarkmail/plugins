@@ -31,7 +31,7 @@
   "error.too_long": "Teksten er for lang for denne modellen.",
   "error.bad_request": "KI-tjenesten avviste forespørselen.",
   "error.service_said": "Svar: {detail}",
-  "error.blocked": "Webmailen har ikke lov til å koble til denne adressen for KI-tjenesten.",
+  "error.blocked": "Serveren blokkerer adressen til KI-tjenesten. Spør administratoren din.",
   "error.unreachable": "Fikk ikke kontakt med KI-tjenesten.",
   "error.server": "KI-tjenesten hadde et problem. Prøv igjen senere.",
   "error.empty": "KI-tjenesten sendte et tomt svar.",

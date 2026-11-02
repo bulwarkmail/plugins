@@ -31,7 +31,7 @@
   "error.too_long": "Der Text ist zu lang für dieses Modell.",
   "error.bad_request": "Der KI-Dienst hat die Anfrage abgelehnt.",
   "error.service_said": "Meldung des Dienstes: {detail}",
-  "error.blocked": "Das Webmail darf sich nicht mit dieser Adresse des KI-Dienstes verbinden.",
+  "error.blocked": "Der Server sperrt die Adresse des KI-Dienstes. Wenden Sie sich an Ihren Administrator.",
   "error.unreachable": "Der KI-Dienst ist nicht erreichbar.",
   "error.server": "Beim KI-Dienst ist ein Fehler aufgetreten. Versuchen Sie es später erneut.",
   "error.empty": "Der KI-Dienst hat eine leere Antwort geschickt.",

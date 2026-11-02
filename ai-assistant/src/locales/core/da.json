@@ -31,7 +31,7 @@
   "error.too_long": "Teksten er for lang til denne model.",
   "error.bad_request": "AI-tjenesten afviste forespørgslen.",
   "error.service_said": "Tjenesten svarede: {detail}",
-  "error.blocked": "Webmailen må ikke oprette forbindelse til denne adresse for AI-tjenesten.",
+  "error.blocked": "Serveren blokerer AI-tjenestens adresse. Spørg din administrator.",
   "error.unreachable": "Kunne ikke få forbindelse til AI-tjenesten.",
   "error.server": "AI-tjenesten havde et problem. Prøv igen senere.",
   "error.empty": "AI-tjenesten sendte et tomt svar.",

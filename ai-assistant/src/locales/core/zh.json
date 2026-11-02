@@ -31,7 +31,7 @@
   "error.too_long": "文本对此模型来说太长了。",
   "error.bad_request": "AI 服务拒绝了该请求。",
   "error.service_said": "服务返回：{detail}",
-  "error.blocked": "不允许网页邮箱连接到此 AI 服务地址。",
+  "error.blocked": "服务器屏蔽了 AI 服务的地址。请联系管理员。",
   "error.unreachable": "无法连接到 AI 服务。",
   "error.server": "AI 服务出现问题。请稍后再试。",
   "error.empty": "AI 服务返回了空的回答。",

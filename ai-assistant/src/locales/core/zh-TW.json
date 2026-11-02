@@ -31,7 +31,7 @@
   "error.too_long": "文字對這個模型來說太長了。",
   "error.bad_request": "AI 服務拒絕了這個要求。",
   "error.service_said": "服務回應：{detail}",
-  "error.blocked": "網頁郵件不允許連線到此 AI 服務位址。",
+  "error.blocked": "伺服器封鎖了 AI 服務的位址。請洽詢管理員。",
   "error.unreachable": "無法連線到 AI 服務。",
   "error.server": "AI 服務發生問題。請稍後再試。",
   "error.empty": "AI 服務傳回了空白的回答。",

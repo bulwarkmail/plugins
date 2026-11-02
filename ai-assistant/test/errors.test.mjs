@@ -29,6 +29,9 @@ describe('errorFromResponse', () => {
 
   it('maps the proxy\'s own refusals', () => {
     expect(errorFromResponse({ status: 404, proxyError: 'no_credential', headers: {} }).code).toBe('not_configured');
+    // A plain-http address the server may not reach: blocked, not "not set up".
+    expect(errorFromResponse({ status: 404, proxyError: 'no_credential', headers: {} }, { baseUrl: 'http://10.0.0.5:11434/v1' }).code).toBe('blocked');
+    expect(errorFromResponse({ status: 404, proxyError: 'no_credential', headers: {} }, { baseUrl: 'https://api.openai.com/v1' }).code).toBe('not_configured');
     expect(errorFromResponse({ status: 504, proxyError: 'timeout', headers: {} }).code).toBe('timeout');
     expect(errorFromResponse({ status: 429, proxyError: 'rate_limited', headers: { 'retry-after': '3' } })).toMatchObject({ code: 'rate_limit', retryAfter: 3 });
     expect(errorFromResponse({ status: 403, proxyError: 'blocked_address', headers: {} }).code).toBe('blocked');

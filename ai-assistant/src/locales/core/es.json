@@ -31,7 +31,7 @@
   "error.too_long": "El texto es demasiado largo para este modelo.",
   "error.bad_request": "El servicio de IA rechazó la solicitud.",
   "error.service_said": "Respuesta del servicio: {detail}",
-  "error.blocked": "El webmail no tiene permiso para conectarse a esta dirección del servicio de IA.",
+  "error.blocked": "El servidor bloquea la dirección del servicio de IA. Pregunta a tu administrador.",
   "error.unreachable": "No se pudo contactar con el servicio de IA.",
   "error.server": "El servicio de IA tuvo un problema. Inténtalo más tarde.",
   "error.empty": "El servicio de IA envió una respuesta vacía.",

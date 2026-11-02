@@ -31,7 +31,7 @@
   "error.too_long": "El text és massa llarg per a aquest model.",
   "error.bad_request": "El servei d'IA ha rebutjat la sol·licitud.",
   "error.service_said": "Resposta del servei: {detail}",
-  "error.blocked": "El webmail no té permís per connectar-se a aquesta adreça del servei d'IA.",
+  "error.blocked": "El servidor bloqueja l'adreça del servei d'IA. Pregunta-ho a l'administrador.",
   "error.unreachable": "No s'ha pogut contactar amb el servei d'IA.",
   "error.server": "El servei d'IA ha tingut un problema. Torneu-ho a provar més tard.",
   "error.empty": "El servei d'IA ha enviat una resposta buida.",

@@ -31,7 +31,7 @@
   "error.too_long": "Metin bu model için çok uzun.",
   "error.bad_request": "Yapay zekâ hizmeti isteği reddetti.",
   "error.service_said": "Hizmetin yanıtı: {detail}",
-  "error.blocked": "Web postasının bu yapay zekâ hizmeti adresine bağlanmasına izin verilmiyor.",
+  "error.blocked": "Sunucu yapay zekâ hizmetinin adresini engelliyor. Yöneticinize sorun.",
   "error.unreachable": "Yapay zekâ hizmetine ulaşılamadı.",
   "error.server": "Yapay zekâ hizmetinde bir sorun oluştu. Daha sonra tekrar deneyin.",
   "error.empty": "Yapay zekâ hizmeti boş bir yanıt gönderdi.",

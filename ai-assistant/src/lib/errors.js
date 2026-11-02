@@ -81,10 +81,18 @@ const PROXY_ERRORS = {
   too_large: 'too_long',
 };
 
-/** An AiError for a response that is not ok: { status, headers, body, proxyError }. */
-export function errorFromResponse(res) {
+/**
+ * An AiError for a response that is not ok: { status, headers, body, proxyError }.
+ * `endpoint`: where it went. The proxy finds no credential for a plain-http
+ * address it may not reach (one the server's admin didn't allow), which is a
+ * blocked address, not a missing setup.
+ */
+export function errorFromResponse(res, endpoint) {
   const status = res?.status ?? 0;
   const retryAfter = parseRetryAfter(header(res?.headers, 'retry-after'));
+  if (res?.proxyError === 'no_credential' && /^http:\/\//i.test(String(endpoint?.baseUrl ?? ''))) {
+    return new AiError('blocked', { status });
+  }
   if (res?.proxyError) {
     return new AiError(PROXY_ERRORS[res.proxyError] ?? 'unreachable', { status, retryAfter });
   }
