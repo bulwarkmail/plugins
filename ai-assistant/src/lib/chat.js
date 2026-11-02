@@ -14,6 +14,7 @@ import { streamTurn } from './client.js';
 import { AiError, failureReason } from './errors.js';
 import { clip } from './prompts.js';
 import { parseWidgetJson } from './widgets.js';
+import { withoutImages } from './providers.js';
 
 /** How many turns of the conversation go back to the model. */
 export const HISTORY_TURNS = 12;
@@ -134,16 +135,17 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
   signal,
   timeouts = {},
 } = {}) {
-  const history = [...messages];
+  let history = [...messages];
   const steps = [];
   let lastSaid = '';
+  let imagesRefused = false;
   for (let round = 0; ; round++) {
     const canUseTools = tools.length > 0 && typeof runTool === 'function';
     const allowTools = canUseTools && round < MAX_TOOL_ROUNDS;
     // After the last round the tools stay in the request (the history holds
     // tool calls, and Anthropic refuses those without tools), but the model
     // may not call them any more: it has to answer.
-    const turn = await streamTurn(api, endpoint, {
+    const ask = () => streamTurn(api, endpoint, {
       system,
       messages: history,
       maxTokens,
@@ -153,6 +155,16 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
       ...timeouts,
       onText: (full) => onText(full),
     });
+    let turn;
+    try {
+      turn = await ask();
+    } catch (err) {
+      // A model that can't see images: once more with their names only, and the model says so.
+      if (imagesRefused || !isImageRefusal(err) || !history.some((m) => Array.isArray(m.content))) throw err;
+      imagesRefused = true;
+      history = withoutImages(history, IMAGE_REFUSED);
+      turn = await ask();
+    }
     if (!turn.toolCalls.length || !allowTools) {
       // The answer. A model that only narrated before its last lookup and
       // then fell silent keeps that narration rather than nothing.
@@ -170,12 +182,15 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
       steps.push(step);
       onStep({ ...step });
       let result;
+      // Images a lookup returned go to the model with its text, never into the step (it is stored).
+      let images = [];
       try {
         const out = await runTool(call.name, call.args ?? {}, { id: call.id });
         if (out && typeof out === 'object') {
           result = String(out.text ?? '');
           step.widget = out.widget ?? null;
           if (out.action) step.action = out.action;
+          if (Array.isArray(out.images)) images = out.images.filter((img) => img && img.data);
         } else {
           result = String(out);
         }
@@ -187,7 +202,20 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
       }
       step.result = result;
       onStep({ ...step });
-      history.push({ role: 'tool', toolCallId: call.id, name: call.name, content: result });
+      history.push({
+        role: 'tool', toolCallId: call.id, name: call.name,
+        content: images.length ? [{ type: 'text', text: result }, ...images.map((img) => ({ type: 'image', ...img }))] : result,
+      });
     }
   }
 }
+
+/** Whether the service refused a request because of its images (a model that can't see them). */
+export function isImageRefusal(err) {
+  if (!(err instanceof AiError) || !['bad_request', 'server', 'not_found'].includes(err.code)) return false;
+  const text = String(err.detail ?? '');
+  return /image|vision|multimodal/i.test(text) && /not support|unsupported|invalid|does not|doesn't|cannot|can't/i.test(text);
+}
+
+/** Why the model only hears an image's name after the service refused it. */
+export const IMAGE_REFUSED = 'The AI service refused the image, so you only have its name: tell the user so.';
