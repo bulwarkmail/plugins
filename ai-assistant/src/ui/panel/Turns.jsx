@@ -39,7 +39,7 @@ export function UserTurn({ turn }) {
 }
 
 /** The model's answer: what it says, what it proposes, what it looked up. */
-export function AssistantTurn({ api, mode, turn, email, onApply, onRetry, onReview, onSend, onInsert, onAnswerAction, onUndo }) {
+export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply, onRetry, onReview, onSend, onInsert, onAnswerAction, onUndo }) {
   const t = api.i18n.t;
   const running = turn.status === 'running';
   const parts = useMemo(() => partsOf(turn), [turn]);
@@ -52,7 +52,8 @@ export function AssistantTurn({ api, mode, turn, email, onApply, onRetry, onRevi
       {actionSteps.map((step) => (
         <ActionCard key={step.id} api={api} step={step} onAnswer={(ok) => onAnswerAction(step.id, ok)} onUndo={() => onUndo(turn.id, step)} />
       ))}
-      {running && !turn.content && (!turn.steps || turn.steps.every((s) => s.status !== 'running')) && <Spinner label={t('common.thinking')} />}
+      {/* Nothing is being thought while the privacy notice waits for the user's answer. */}
+      {running && !waiting && !turn.content && (!turn.steps || turn.steps.every((s) => s.status !== 'running')) && <Spinner label={t('common.thinking')} />}
       {turn.show === 'grammar' && turn.review
         ? <GrammarCard api={api} turn={turn} onApply={onApply} onReview={onReview} />
         : parts.map((part, i) => (

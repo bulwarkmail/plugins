@@ -41,6 +41,7 @@ export function Transcript({ chat, onExample }) {
                 mode={mode}
                 turn={turn}
                 email={email}
+                waiting={!!consent}
                 onApply={chat.apply}
                 onRetry={chat.retry}
                 onReview={(review) => chat.patchTurn(turn.id, { review })}

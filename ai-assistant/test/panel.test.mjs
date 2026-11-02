@@ -754,6 +754,21 @@ describe('quick action names', () => {
   });
 });
 
+describe('the privacy notice', () => {
+  it('waits for the answer without saying the assistant is thinking', async () => {
+    const api = makeApi({ consent: false, answers: ['Hello.'] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('hi');
+    await pressEnter();
+    await screen.findByRole('button', { name: 'Continue' });
+    expect(screen.queryByText('Thinking…')).toBeNull();
+    expect(api.calls('proxy.fetch')).toHaveLength(0);
+    await click(button('Continue'));
+    await settled();
+    expect(screen.getByText('Hello.')).toBeTruthy();
+  });
+});
+
 describe('the header', () => {
   it('is as high as the side panel headers of the app, with or without a conversation', async () => {
     const api = makeApi({ answers: ['Sure.'] });
