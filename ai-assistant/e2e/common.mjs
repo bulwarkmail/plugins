@@ -178,3 +178,28 @@ export async function selectLastLine(page) {
   await box.press('Control+End');
   await box.press('Shift+Home');
 }
+
+/** A scripted answer of the mock (test-env/mocks/README.md): name it in a message with [[mock:<name>]]. */
+export async function mockScript(name, steps) {
+  const res = await fetch(`${MOCK}/__ai/scripts`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, steps }) });
+  if (!res.ok) throw new Error(`mock script ${name}: HTTP ${res.status}`);
+}
+
+/** The AI requests the mock got for a script, oldest first: [{ provider, step, tools, body }]. */
+export async function mockRequests(name) {
+  const res = await fetch(`${MOCK}/__ai/requests?marker=${encodeURIComponent(name)}`);
+  if (!res.ok) throw new Error(`mock requests: HTTP ${res.status}`);
+  return res.json();
+}
+
+/** Search for a message by its subject and open it (other suites add mail to the same inbox). */
+export async function openMessage(page, subject, target = page.getByText(subject, { exact: true }).first()) {
+  const opener = page.getByRole('button', { name: /Search mail/ });
+  if (await opener.isVisible().catch(() => false)) await opener.click();
+  const search = page.getByRole('combobox', { name: /Search mail/ });
+  await search.click();
+  await search.fill(subject.replace(/^Re: /, ''));
+  await search.press('Enter');
+  await target.waitFor({ timeout: 60_000 });
+  await target.click({ force: true });
+}
