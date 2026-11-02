@@ -5,6 +5,7 @@
 // composer is about for the chat, and whether a service is set up, so the
 // buttons only show when they can work.
 
+import { registerGrammarChecker } from './underlines.js';
 import { loadSetup } from './assistant.js';
 
 export const DRAFT_KEY = 'draft';
@@ -168,6 +169,9 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       await forgetComposerChats();
       await api.storage.remove(COMPOSER_CONTEXT_KEY).catch(() => {});
       await refresh(true);
+      // Bulwark 1.20 and later: the grammar check's suggestions can show as
+      // underlines in the message. Only when the user runs the check.
+      await registerGrammarChecker(api, t('composer.open'));
     },
     hooks: {
       onAction({ surface, actionId, context } = {}) {

@@ -25,6 +25,7 @@ import { streamCompletion } from '../lib/client.js';
 import { AiError } from '../lib/errors.js';
 import { defaultTarget, languageOptions } from '../lib/languages.js';
 import { acceptAll, applySuggestions, diffSuggestions, pendingSuggestions, reviewParts, reviewStep } from '../lib/grammar.js';
+import { checkText, showUnderlines } from '../lib/underlines.js';
 import { diffWords, plainParts } from '../lib/diff.js';
 import { COMPOSER_CONTEXT_KEY, COMPOSER_PANEL, DRAFT_KEY, READER_CHAT_KEY, chatKey, pendingKey } from '../lib/background.js';
 
@@ -179,6 +180,8 @@ export function AssistantPanel(props) {
   }, [input]);
   const scrollRef = useRef(null);
   const controller = useRef(null);
+  // Grammar checks shown as underlines: turn id → the host's text and the checked text.
+  const underlineRequests = useRef(new Map());
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
 
@@ -374,7 +377,17 @@ export function AssistantPanel(props) {
       }
       if (task === 'grammar') {
         const corrected = keepEdges(src, text) || src;
-        patchTurn(turn.id, { content: text, status: 'done', review: { segments: diffSuggestions(src, corrected), states: {} } });
+        const review = { segments: diffSuggestions(src, corrected), states: {} };
+        patchTurn(turn.id, { content: text, status: 'done', review });
+        // The suggestions as underlines in the message too (Bulwark 1.20+,
+        // where proofreading is on).
+        if (mode === 'composer' && props.composerId) {
+          const request = await checkText(api, props.composerId);
+          if (request) {
+            underlineRequests.current.set(turn.id, { request, source: src });
+            void showUnderlines(api, props.composerId, request, src, review, t('grammar.underline'));
+          }
+        }
       } else {
         patchTurn(turn.id, { content: text, status: 'done' });
       }
@@ -391,7 +404,7 @@ export function AssistantPanel(props) {
     } finally {
       if (controller.current === abort) controller.current = null;
     }
-  }, [api, setup, askConsent, patchTurn, locale, mode, context, lookups, subject, contextEmail, extraContext, t]);
+  }, [api, setup, askConsent, patchTurn, locale, mode, context, lookups, subject, contextEmail, extraContext, t, props.composerId]);
 
   /** A quick action on the current source (or on `text` from a right-click). */
   const quick = useCallback((action, { text, targetTag } = {}) => {
@@ -605,7 +618,12 @@ export function AssistantPanel(props) {
                   email={email}
                   onApply={apply}
                   onRetry={retry}
-                  onReview={(review) => patchTurn(turn.id, { review })}
+                  onReview={(review) => {
+                    patchTurn(turn.id, { review });
+                    // A decided suggestion loses its underline.
+                    const shown = underlineRequests.current.get(turn.id);
+                    if (shown) void showUnderlines(api, props.composerId, shown.request, shown.source, review, t('grammar.underline'));
+                  }}
                   onSend={sendText}
                   onInsert={insertText}
                   onAnswerAction={answerAction}
