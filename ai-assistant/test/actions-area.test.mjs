@@ -152,7 +152,8 @@ describe('answering an invitation', () => {
   it('names the event and the sender, sends the answer, and has no undo', async () => {
     const api = apiWith({ 'calendar.respond': async () => ({ status: 'accepted', title: 'Team offsite', start: '2026-11-10', organizer: 'bob@example.org' }) });
     const { summary, alwaysAsk, done } = await run(api, 'answer_invitation', { status: 'accepted' }, ctxFor(api, { openEmailId: 'M1' }));
-    expect(summary).toBe('Accept the invitation “Team offsite” from Aa Bob? Bulwark sends your answer to the organiser.');
+    // The second line says where the answer goes; this message carries no .ics to read it from.
+    expect(summary).toBe('Accept the invitation “Team offsite” from Aa Bob? Bulwark sends your answer to the organiser.\nThe invitation names no organiser address.');
     expect(alwaysAsk).toBe(true);
     expect(api.calls('calendar.respond').map((c) => c.args)).toEqual([['M1', 'accepted']]);
     expect(done.undo).toBeNull();
@@ -173,7 +174,7 @@ describe('changing an event', () => {
     const { summary, alwaysAsk, done } = await run(api, 'update_event', { id: 'E1', title: 'Dentist (moved)', start: '2026-11-04T11:00', participants: [{ email: 'x@example.com' }] });
     expect(alwaysAsk).toBe(false);
     expect(summary.split('\n')).toEqual([
-      'Change the event “Dentist”?',
+      'Changes to the event “Dentist”:',
       'Title: Dentist → Dentist (moved)',
       'Time: Tuesday 3 November, 10:00–11:00 → Wednesday 4 November, 11:00–12:00',
     ]);
@@ -428,6 +429,8 @@ describe('contacts', () => {
     expect(summary.split('\n')).toEqual([
       'Change the contact Anna Berg?',
       'Email: anna@old.example → anna@old.example, anna@new.example',
+      // The user didn't type the new address in this chat.
+      'New address from a message: check anna@new.example',
       'Company: none → Shop GmbH',
     ]);
     expect(api.calls('contacts.update')[0].args).toEqual(['C1', {

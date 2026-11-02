@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 import { Section, SettingRow, Stack, Switch, Text } from '@plugin-host/ui';
 import { ACTION_GROUPS, groupOn, groupsOffered } from '../../lib/areas/actions.js';
 import { effectiveActionMode } from '../../lib/actions.js';
-import { batchLimit, settingsChangesAllowed } from '../../lib/config.js';
+import { areaAllowed, batchLimit, settingsChangesAllowed } from '../../lib/config.js';
 
 /** Shown after the standing instructions; null shows nothing. Props: { api, setup, prefs, savePrefs }. */
 export function ActionsSection({ api, setup, prefs = {}, savePrefs }) {
@@ -16,7 +16,8 @@ export function ActionsSection({ api, setup, prefs = {}, savePrefs }) {
   const config = setup?.config ?? {};
   const offered = useMemo(() => groupsOffered(api), [api]);
   const groups = Object.keys(ACTION_GROUPS).filter((group) => offered[group]);
-  if (!groups.length) return null;
+  // Nothing to switch when the webmail offers none of the calls or the admin turned the area off.
+  if (!groups.length || !areaAllowed(config, 'actions')) return null;
   const adminAllowsSettings = settingsChangesAllowed(config);
   const actionsOff = effectiveActionMode(config, prefs) === 'off';
 

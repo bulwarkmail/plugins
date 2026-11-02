@@ -111,6 +111,8 @@ const fill = (template, vars = {}) => String(template).replace(/\{(\w+)\}/g, (m,
 /** The English texts of this area, for what the model reads. */
 const english = (key, vars) => fill(EN[key] ?? key, vars);
 
+/** Longest text an action saves for the user (event description, out-of-office): the card shows it whole. */
+export const MAX_SHOWN_TEXT = 1000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
@@ -252,6 +254,20 @@ const MESSAGE_ID = { type: 'string', description: 'The message id: the open mess
 
 const INVITE_STATUS = ['accepted', 'tentative', 'declined'];
 
+/** The ORGANIZER address of the invitation a message carries (its .ics), or null. */
+export async function invitationOrganizer(api, email) {
+  const part = (email.attachments ?? []).find((a) => /calendar/i.test(a.type ?? '') || /\.ics$/i.test(a.name ?? ''));
+  if (!part?.blobId || typeof api.email?.getAttachment !== 'function') return null;
+  try {
+    const file = await api.email.getAttachment(email.id, part.blobId);
+    const ics = new TextDecoder().decode(file.data).replace(/\r?\n[ \t]/g, '');
+    const m = /^ORGANIZER[^:\r\n]*:(?:mailto:)?([^\s]+)$/im.exec(ics);
+    return m ? m[1].trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 const answerInvitation = {
   name: 'answer_invitation',
   description: 'Answer a calendar invitation in a message: accept, maybe (tentative) or decline. Bulwark sends the answer to the organiser. Only when the user asks for it.',
@@ -274,8 +290,13 @@ const answerInvitation = {
     const id = text(args.emailId, 200) || ctx?.openEmailId;
     if (!id) throw new Error('no invitation: give emailId, or open the invitation');
     const email = await messageFor(api, id);
-    const summary = api.i18n.t(`do.invite.${status}`, { title: email.subject || '…', from: senderOf(email) });
-    return { summary, plan: { emailId: email.id, status, subject: email.subject ?? '' } };
+    const t = api.i18n.t;
+    // Where the answer goes: the organiser the invitation names, which need
+    // not be the sender shown on the message.
+    const organizer = await invitationOrganizer(api, email);
+    const lines = [t(`do.invite.${status}`, { title: email.subject || '…', from: senderOf(email) })];
+    lines.push(organizer ? t('do.invite.goes_to', { address: organizer }) : t('do.invite.goes_to_unknown'));
+    return { summary: lines.join('\n'), plan: { emailId: email.id, status, subject: email.subject ?? '' } };
   },
   async perform(api, plan) {
     const answer = await api.calendar.respond(plan.emailId, plan.status);
@@ -307,6 +328,14 @@ async function userAddresses(api) {
   const safe = async (call) => { try { return (await call()) ?? []; } catch { return []; } };
   const [identities, accounts] = await Promise.all([safe(() => api.user.getIdentities()), safe(() => api.user.getAccounts())]);
   return new Set([...identities, ...accounts].map((x) => String(x?.email ?? '').toLowerCase()).filter(Boolean));
+}
+
+/** Someone besides the user takes part in the event. */
+async function hasOtherPeople(api, event) {
+  const people = Array.isArray(event.participants) ? event.participants : [];
+  if (!people.length) return false;
+  const mine = await userAddresses(api);
+  return people.some((p) => !mine.has(String(p.email ?? '').toLowerCase()));
 }
 
 /** The user organises or owns the event: nobody else is in it, or its owner is one of the user's addresses. */
@@ -352,8 +381,10 @@ const updateEvent = {
       if (location !== (event.location ?? '')) { patch.location = location; lines.push(changeLine(t, t('do.field.place'), event.location, location)); }
     }
     if (args.description !== undefined) {
-      const description = text(args.description, 5000);
-      if (description !== (event.description ?? '')) { patch.description = description; lines.push(changeLine(t, t('do.field.description'), clip(event.description ?? '', 80), clip(description, 80))); }
+      const description = text(args.description, MAX_SHOWN_TEXT + 1);
+      // The card shows the new text whole, so nothing is saved the user didn't see.
+      if (description.length > MAX_SHOWN_TEXT) throw new Error(`description is longer than ${MAX_SHOWN_TEXT} characters; keep it shorter`);
+      if (description !== (event.description ?? '')) { patch.description = description; lines.push(changeLine(t, t('do.field.description'), clip(event.description ?? '', 80), description)); }
     }
     const wasAllDay = !!event.isAllDay;
     const oldStart = wasAllDay ? String(event.start ?? '').slice(0, 10) : String(event.start ?? '').slice(0, 16);
@@ -389,7 +420,10 @@ const updateEvent = {
       if (event.duration) before.duration = event.duration;
       if (!wasAllDay && event.timeZone) before.timeZone = event.timeZone;
     }
-    return { summary, plan: { id: event.id, title: patch.title ?? event.title ?? '', patch, before } };
+    // A description other people read (the event has other participants)
+    // is the user's words to them: that always asks first.
+    const others = 'description' in patch ? await hasOtherPeople(api, event) : false;
+    return { summary, plan: { id: event.id, title: patch.title ?? event.title ?? '', patch, before }, alwaysAsk: others };
   },
   async perform(api, plan) {
     await api.calendar.updateEvent(plan.id, plan.patch);
@@ -515,10 +549,14 @@ const setVacation = {
   available: (ctx) => actionOn(ctx, 'vacation') && capOf(ctx, 'vacation') && ctx?.doVacationKnown === true,
   async describe(api, args, ctx) {
     const t = api.i18n.t;
-    const subject = text(args.subject, 500);
-    const body = text(args.text, 20000);
+    const subject = text(args.subject, 501);
+    const body = text(args.text, MAX_SHOWN_TEXT + 1);
     if (!subject) throw new Error('subject is empty');
     if (!body) throw new Error('text is empty');
+    // The card shows subject and text whole: what goes out to everyone who
+    // writes is exactly what the user saw.
+    if (subject.length > 500) throw new Error('subject is longer than 500 characters; keep it shorter');
+    if (body.length > MAX_SHOWN_TEXT) throw new Error(`text is longer than ${MAX_SHOWN_TEXT} characters; keep the out-of-office reply shorter`);
     const from = text(args.from, 30) || null;
     const to = text(args.to, 30) || null;
     for (const [key, value] of [['from', from], ['to', to]]) {
@@ -534,7 +572,7 @@ const setVacation = {
       : from ? t('do.vacation.set_from', { from: wallClock(api, from) })
         : to ? t('do.vacation.set_until', { to: wallClock(api, to) })
           : t('do.vacation.set_now');
-    const summary = [head, t('do.vacation.subject', { subject }), t('do.vacation.text', { text: clip(body, 300) })].join('\n');
+    const summary = [head, t('do.vacation.subject', { subject }), t('do.vacation.text', { text: body })].join('\n');
     return { summary, plan: { input: { isEnabled: true, subject, textBody: body, htmlBody: null, fromDate, toDate }, before } };
   },
   async perform(api, plan) {
@@ -544,6 +582,8 @@ const setVacation = {
     return { text: `Done: the out-of-office reply is on${when ? ` ${when}` : ''}.`, undo: { before: plan.before } };
   },
   async undo(api, undo) {
+    // The forward may have been set since: check again before switching the reply back on.
+    await vacationNow(api);
     await saveVacation(api, undo.before);
   },
 };
@@ -568,6 +608,8 @@ const turnOffVacation = {
     return { text: 'Done: the out-of-office reply is off.', undo: { before: plan.before } };
   },
   async undo(api, undo) {
+    // The forward may have been set since: check again before switching the reply back on.
+    await vacationNow(api);
     await saveVacation(api, undo.before);
   },
 };
@@ -982,6 +1024,21 @@ function keyedList(old, values, field, prefix) {
 const listOf = (value, max) => (value === undefined ? undefined : (Array.isArray(value) ? value : String(value).split(/[,;]/)))
   ?.map((v) => text(v, 200)).filter(Boolean).slice(0, max);
 
+const digits = (value) => String(value ?? '').replace(/\D/g, '');
+
+/**
+ * Whether the user typed this address or number in the chat themselves
+ * (ctx.userText). One the model took from a message could send the user's
+ * future mail to someone else, so the card points it out.
+ */
+export function typedByUser(ctx, value) {
+  const typed = String(ctx?.userText ?? '');
+  if (!typed) return false;
+  if (value.includes('@')) return typed.toLowerCase().includes(value.toLowerCase());
+  const d = digits(value);
+  return d.length > 0 && digits(typed).includes(d);
+}
+
 const updateContact = {
   name: 'update_contact',
   description: 'Change a contact in the user\'s address book: name, email addresses, phone numbers, company or postal address. emails and phones are the full new lists. Find the contact by id or by a name or address (query).',
@@ -1001,7 +1058,7 @@ const updateContact = {
   icon: 'user-edit',
   alwaysAsk: true,
   available: (ctx) => actionOn(ctx, 'contacts') && capOf(ctx, 'contacts'),
-  async describe(api, args) {
+  async describe(api, args, ctx) {
     const t = api.i18n.t;
     let card;
     const id = text(args.id, 200);
@@ -1035,6 +1092,8 @@ const updateContact = {
       if (emails.join('\n').toLowerCase() !== before.join('\n').toLowerCase()) {
         patch.emails = emails.length ? keyedList(card.emails, emails, 'address', 'e') : null;
         lines.push(changeLine(t, t('do.field.emails'), before.join(', '), emails.join(', ')));
+        const known = new Set(before.map((e) => e.toLowerCase()));
+        for (const e of emails) if (!known.has(e.toLowerCase()) && !typedByUser(ctx, e)) lines.push(t('do.contact.check_email', { value: e }));
       }
     }
     const phones = listOf(args.phones, 10);
@@ -1043,6 +1102,8 @@ const updateContact = {
       if (phones.join('\n') !== before.join('\n')) {
         patch.phones = phones.length ? keyedList(card.phones, phones, 'number', 'p') : null;
         lines.push(changeLine(t, t('do.field.phones'), before.join(', '), phones.join(', ')));
+        const known = new Set(before.map(digits));
+        for (const p of phones) if (!known.has(digits(p)) && !typedByUser(ctx, p)) lines.push(t('do.contact.check_phone', { value: p }));
       }
     }
     if (args.company !== undefined) {

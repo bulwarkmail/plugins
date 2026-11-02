@@ -239,7 +239,10 @@ export function useAssistantChat(props) {
         const prompt = buildPrompt(task, { language: locale, extra, ...taskInput, ...(task === 'actions' ? { now } : {}) });
         text = await streamCompletion(api, endpoint, prompt, { onText, signal: abort.signal });
       } else {
-        const ctx = { ...areasRef.current.toolsCtx, inReplyToId: mode === 'composer' ? context?.inReplyToId : undefined, lookups, actions: actionMode, mode, openEmailId: mode === 'reader' ? contextEmail?.id : undefined, settingsName: t('app.nav.settings'), zone: now.zone, config: setup?.config ?? {}, prefs };
+        // What the user typed in this chat: an action can tell an address the
+        // user gave from one the model took from a message.
+        const userText = [...previous.filter((x) => x.role === 'user').map((x) => x.label ?? ''), label ?? ''].join(' ');
+        const ctx = { ...areasRef.current.toolsCtx, userText, inReplyToId: mode === 'composer' ? context?.inReplyToId : undefined, lookups, actions: actionMode, mode, openEmailId: mode === 'reader' ? contextEmail?.id : undefined, settingsName: t('app.nav.settings'), zone: now.zone, config: setup?.config ?? {}, prefs };
         const tools = [...toolsFor(ctx), ...actionToolsFor(ctx)];
         let autoActions = 0;
         // Lookups run straight away; an action is shown first, then waits for

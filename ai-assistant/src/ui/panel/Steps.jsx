@@ -42,19 +42,27 @@ export function ActionCard({ api, step, onAnswer, onUndo }) {
   const action = step.action ?? { summary: step.result, state: 'failed' };
   const state = step.status === 'failed' && action.state !== 'skipped' ? 'failed' : action.state;
   const [busy, setBusy] = useState(false);
+  const summaryId = `action-summary-${step.id}`;
   return (
-    <div data-action={step.name} data-action-state={state} style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px' }}>
+    <div data-action={step.name} data-action-state={state} style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px', minWidth: 0 }}>
       <Stack gap={2}>
         <Row gap={2} wrap={false} align="start">
           <Icon name={TOOL_ACTION_ICONS[step.name] ?? areaAction(step.name)?.icon ?? 'bolt'} size="sm" className="text-primary" />
-          <Text size="sm" className="whitespace-pre-wrap">{action.summary}</Text>
+          {/* Long addresses and links wrap at any width; a long text scrolls (keyboard too) instead of growing the card. */}
+          <div id={summaryId} tabIndex={0} data-action-summary style={{ minWidth: 0, flex: '1 1 auto', overflowWrap: 'anywhere', wordBreak: 'break-word', maxHeight: '16rem', overflowY: 'auto' }}>
+            <Text size="sm" className="whitespace-pre-wrap">{action.summary}</Text>
+          </div>
         </Row>
+        {/* A screen reader hears that an action waits for the OK, and what it is. */}
+        <div role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+          {state === 'waiting' ? `${t('action.waiting')}: ${action.summary}` : ''}
+        </div>
         {state === 'waiting' && (
           <Row gap={1} justify="end">
             <Text size="xs" tone="muted">{t('action.waiting')}</Text>
             <span style={{ flex: 1 }} />
-            <Button variant="ghost" size="sm" onClick={() => onAnswer(false)}>{t('action.skip')}</Button>
-            <Button size="sm" onClick={() => onAnswer(true)}>{t('action.approve')}</Button>
+            <Button variant="ghost" size="sm" aria-describedby={summaryId} onClick={() => onAnswer(false)}>{t('action.skip')}</Button>
+            <Button size="sm" aria-describedby={summaryId} onClick={() => onAnswer(true)}>{t('action.approve')}</Button>
           </Row>
         )}
         {state === 'running' && <Spinner size="sm" />}
