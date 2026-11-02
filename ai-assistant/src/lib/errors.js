@@ -1,5 +1,19 @@
 // Turn whatever went wrong into one of a few cases the user can act on.
 
+/**
+ * Why a lookup or an action failed, in words the user can be shown (the
+ * error's own message is for the model): gone, folder, calendar, denied or other.
+ */
+export function failureReason(err) {
+  if (err && typeof err.reason === 'string') return err.reason;
+  const text = String(err?.message ?? err ?? '');
+  if (/no message with that id|not ?found|no longer exists|doesn't exist any more|was deleted/i.test(text)) return 'gone';
+  if (/no folder|mailbox/i.test(text)) return 'folder';
+  if (/calendar|event/i.test(text) && /refus|reject|invalid|fail/i.test(text)) return 'calendar';
+  if (/permission|not allowed|forbidden|denied|refused/i.test(text)) return 'denied';
+  return 'other';
+}
+
 export class AiError extends Error {
   /**
    * code: not_configured | declined | bad_key | forbidden | not_found |

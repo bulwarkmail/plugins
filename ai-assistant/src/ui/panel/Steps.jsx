@@ -67,7 +67,8 @@ export function ActionCard({ api, step, onAnswer, onUndo }) {
         )}
         {state === 'skipped' && <Text size="xs" tone="muted">{t('action.skipped')}</Text>}
         {state === 'undone' && <Text size="xs" tone="muted">{t('action.undone')}</Text>}
-        {state === 'failed' && <Text size="xs" tone="danger">{t('action.failed')}{step.result ? `: ${step.result.replace(/^The tool failed: /, '')}` : ''}</Text>}
+        {/* The model's error text stays for the model; the user reads why in their language. */}
+        {state === 'failed' && <Text size="xs" tone="danger">{t(`action.reason.${step.reason ?? 'other'}`)}</Text>}
       </Stack>
     </div>
   );
@@ -130,7 +131,9 @@ function StepRow({ api, mode, replying, step, onSend, onInsert }) {
         <Text size="xs" tone="muted">{stepLabel(t, step)}{step.status === 'failed' ? ` · ${t('panel.step.failed')}` : ''}</Text>
       </Row>
       {step.widget && <Widget api={api} mode={mode} replying={replying} widget={step.widget} onSend={onSend} onInsert={onInsert} />}
-      {step.result && !step.widget && <Text size="xs" tone="muted" className="whitespace-pre-wrap">{step.result.slice(0, 1200)}</Text>}
+      {step.status === 'failed'
+        ? <Text size="xs" tone="danger">{t(`action.reason.${step.reason ?? 'other'}`)}</Text>
+        : step.result && !step.widget && <Text size="xs" tone="muted" className="whitespace-pre-wrap">{step.result.slice(0, 1200)}</Text>}
     </Stack>
     </div>
   );

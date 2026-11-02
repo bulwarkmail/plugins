@@ -799,6 +799,35 @@ describe('quick action names', () => {
   });
 });
 
+describe('a failed action', () => {
+  it('says why in the user\'s words, and keeps the model\'s text for the model', async () => {
+    const ev = (event, data) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    const call = ev('message_start', { type: 'message_start' })
+      + ev('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'tu1', name: 'archive_message' } })
+      + ev('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"id":"M1"}' } })
+      + ev('content_block_stop', { type: 'content_block_stop', index: 0 })
+      + ev('message_delta', { type: 'message_delta', delta: { stop_reason: 'tool_use' } })
+      + ev('message_stop', { type: 'message_stop' });
+    let n = 0;
+    const api = makeApi({ handlers: {
+      'proxy.fetch': async () => streamResponse(n++ === 0 ? [call] : anthropicSse(['It is gone.'])),
+      'email.get': async () => EMAIL,
+      'email.archive': async () => { throw new Error('email.archive: The tool failed: notFound'); },
+    } });
+    await api.storage.set('prefs', { actions: 'auto' });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('archive it');
+    await pressEnter();
+    await settled();
+    const card = document.querySelector('[data-action="archive_message"]');
+    expect(card.dataset.actionState).toBe('failed');
+    expect(card.textContent).toContain("The message isn't there any more.");
+    expect(card.textContent).not.toContain('notFound');
+    // The model still hears what went wrong.
+    expect(JSON.stringify(sentPrompt(api).messages)).toContain('notFound');
+  });
+});
+
 describe('Escape', () => {
   const escape = async (el) => { await act(async () => { fireEvent.keyDown(el, { key: 'Escape' }); }); };
 

@@ -11,7 +11,7 @@
 // in, so the preview grows word by word.
 
 import { streamTurn } from './client.js';
-import { AiError } from './errors.js';
+import { AiError, failureReason } from './errors.js';
 import { clip } from './prompts.js';
 import { parseWidgetJson } from './widgets.js';
 
@@ -179,6 +179,7 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
       } catch (err) {
         result = `The tool failed: ${err?.message ?? 'unknown error'}`;
         step.status = 'failed';
+        step.reason = failureReason(err);
       }
       step.result = result;
       onStep({ ...step });
