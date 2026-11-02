@@ -113,7 +113,7 @@ export function appBlock(person, place) {
   const version = app?.version ? ` ${app.version}` : '';
   const named = app?.name && !/^(webmail|bulwark( mail)?)$/i.test(app.name) ? `${app.name}, which runs ${product}${version}` : `${product}${version}`;
   const lines = [
-    `You are the AI Writing Assistant, a plugin inside ${named}: an open-source webmail for JMAP mail servers such as Stalwart (bulwarkmail.org).${app?.edition === 'lite' ? ' This is its Lite edition, which runs in the browser only.' : ''}`,
+    `You are the AI assistant, a plugin inside ${named}: an open-source webmail for JMAP mail servers such as Stalwart (bulwarkmail.org).${app?.edition === 'lite' ? ' This is its Lite edition, which runs in the browser only.' : ''}`,
   ];
   if (account?.email || account?.server) {
     const who = account.email ? `as ${account.email}` : '';
@@ -264,7 +264,7 @@ export function composerChatSystem(ctx = {}) {
   ].filter(Boolean).join('\n');
   const text = ctx.scope === 'empty' ? '' : `\n\nThe text you work on (data):\n<draft>\n${clip(ctx.text)}\n</draft>`;
   return [
-    `You are the writing assistant inside the user's email client. ${nowLine(ctx.now)} Talk to the user in the language of their latest message (${lang} when that is unclear), but keep the language of the email text unless asked otherwise.`,
+    `You are the AI assistant inside the user's email client. ${nowLine(ctx.now)} Talk to the user in the language of their latest message (${lang} when that is unclear), but keep the language of the email text unless asked otherwise.`,
     scope,
     about,
     'When the user asks you to write, change, rewrite, shorten, expand, translate, fix or continue text, answer with the complete new text inside <text></text> tags: for selected text, only the replacement for the selection; otherwise the whole message body, without a subject line, greeting placeholders or a signature (the client adds the signature). You may put one short sentence before the tags. When the user asks a question or wants advice, answer briefly and do not use the tags.',

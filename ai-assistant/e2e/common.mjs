@@ -89,7 +89,7 @@ export async function readerPanel(page) {
 
 /** The assistant dialog (phones): the host's box (title, footer buttons) and the plugin's frame inside it. */
 export function assistantDialog(page) {
-  const box = page.getByRole('dialog').filter({ hasText: 'Writing assistant' });
+  const box = page.getByRole('dialog').filter({ hasText: 'AI assistant' });
   return { box, frame: box.frameLocator(SLOT_FRAME) };
 }
 

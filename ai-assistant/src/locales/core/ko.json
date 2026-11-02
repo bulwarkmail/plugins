@@ -54,7 +54,7 @@
   "settings.disconnect": "내 키 사용 중지",
   "settings.disconnected": "키가 삭제되었어요.",
   "composer.open": "어시스턴트",
-  "composer.title": "글쓰기 어시스턴트",
+  "composer.title": "AI 어시스턴트",
   "composer.prompt_label": "메일에 어떤 내용을 쓸까요?",
   "composer.prompt_placeholder": "메일에 어떤 내용을 쓸까요? 예: 안나에게 감사 인사를 하고 화요일 10시를 제안",
   "composer.write": "작성",

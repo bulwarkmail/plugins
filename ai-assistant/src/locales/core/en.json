@@ -54,7 +54,7 @@
   "settings.disconnect": "Stop using my key",
   "settings.disconnected": "Your key was removed.",
   "composer.open": "Assistant",
-  "composer.title": "Writing assistant",
+  "composer.title": "AI assistant",
   "composer.prompt_label": "What should the email say?",
   "composer.prompt_placeholder": "What should the email say? For example: thank Anna and propose Tuesday at 10",
   "composer.write": "Write",

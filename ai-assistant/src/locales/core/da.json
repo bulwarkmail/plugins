@@ -54,7 +54,7 @@
   "settings.disconnect": "Stop med at bruge min nøgle",
   "settings.disconnected": "Din nøgle blev fjernet.",
   "composer.open": "Assistent",
-  "composer.title": "Skriveassistent",
+  "composer.title": "AI-assistent",
   "composer.prompt_label": "Hvad skal mailen sige?",
   "composer.prompt_placeholder": "Hvad skal mailen sige? For eksempel: tak Anna og foreslå tirsdag kl. 10",
   "composer.write": "Skriv",

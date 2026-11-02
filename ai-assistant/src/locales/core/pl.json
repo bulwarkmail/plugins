@@ -54,7 +54,7 @@
   "settings.disconnect": "Przestań używać mojego klucza",
   "settings.disconnected": "Twój klucz został usunięty.",
   "composer.open": "Asystent",
-  "composer.title": "Asystent pisania",
+  "composer.title": "Asystent AI",
   "composer.prompt_label": "Co ma zawierać e-mail?",
   "composer.prompt_placeholder": "Co ma zawierać e-mail? Na przykład: podziękuj Annie i zaproponuj wtorek o 10",
   "composer.write": "Napisz",

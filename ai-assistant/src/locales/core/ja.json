@@ -54,7 +54,7 @@
   "settings.disconnect": "自分のキーの使用をやめる",
   "settings.disconnected": "キーを削除しました。",
   "composer.open": "アシスタント",
-  "composer.title": "文章作成アシスタント",
+  "composer.title": "AI アシスタント",
   "composer.prompt_label": "どんな内容のメールにしますか？",
   "composer.prompt_placeholder": "どんな内容のメールにしますか？ 例: アンナさんにお礼を言い、火曜日の10時を提案する",
   "composer.write": "作成",

@@ -54,7 +54,7 @@
   "settings.disconnect": "停止使用我的金鑰",
   "settings.disconnected": "你的金鑰已移除。",
   "composer.open": "助理",
-  "composer.title": "寫作助理",
+  "composer.title": "AI 助理",
   "composer.prompt_label": "郵件要說些什麼？",
   "composer.prompt_placeholder": "郵件要說些什麼？例如：感謝 Anna，並提議週二 10 點見面",
   "composer.write": "撰寫",

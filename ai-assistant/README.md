@@ -1,10 +1,10 @@
-# AI Writing Assistant
+# AI Assistant
 
-A chat next to the message you write or read. It rewrites, translates and
-proofreads your text, summarises messages and drafts replies, with an
-OpenAI-compatible service (OpenAI, Ollama, LM Studio, vLLM, ...) or the
-Anthropic Messages API. It works on the text you highlight, else on the
-whole message.
+An assistant next to your mail. Ask it about the open message, let it
+write or rewrite yours, look things up in your mail, calendar and
+contacts, or do small tasks for you, like filing a message or adding an
+event. It works with an OpenAI-compatible service (OpenAI, Ollama, LM
+Studio, vLLM, ...) or the Anthropic Messages API.
 
 Nothing is sent to the AI service until you ask the assistant something.
 Before the first request to a service you see which service it is, which
@@ -86,7 +86,7 @@ in the composer with the text it drafted. It never sends and never
 deletes mail; a reply or a message waits in the composer for you.
 
 Each action shows as a card in the chat with what it will do ("Move
-“Invoice 42” to Projects 2026"). Settings > AI Writing Assistant >
+“Invoice 42” to Projects 2026"). Settings > AI Assistant >
 Actions has two modes:
 
 - **Ask me first**: the card waits with Do it and Skip, and nothing
@@ -115,7 +115,7 @@ name, your addresses, how you sign (the plain-text signature of your
 first identity), your time zone, the local time and the language of the
 mail client. Two kinds of standing instructions go along as well:
 **the administrator's**, for everyone (the plugin's admin settings), and
-**your own** (Settings > AI Writing Assistant > Standing instructions):
+**your own** (Settings > AI Assistant > Standing instructions):
 "I am a teacher, keep my emails short and warm, sign with Anna". Yours
 come last, so they win when the two disagree.
 
@@ -160,7 +160,7 @@ menus and `api.ui.openPanel`).
 
 ## Settings (users)
 
-Settings > AI Writing Assistant shows which service and model are used. A
+Settings > AI Assistant shows which service and model are used. A
 user can pick another model, choose between the two services when both
 are set up, hide the assistant next to messages, turn the lookups
 off, and turn actions on (ask first or automatic). When the administrator allows it, a user can connect their own key:

@@ -1,4 +1,4 @@
-// AI writing assistant for Bulwark Webmail.
+// AI assistant for Bulwark Webmail.
 //
 // Nothing is sent anywhere until the user asks the assistant something.
 // Requests go through the webmail's server proxy, which adds the API key

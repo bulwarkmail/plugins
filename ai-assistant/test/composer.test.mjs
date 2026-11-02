@@ -58,7 +58,7 @@ describe('the context every request carries', () => {
       instructions: { admin: ' House style: short. ', user: 'Sign with Anna' },
     });
     // The app comes first, then the user, then the instructions.
-    expect(extra.startsWith('About the app (from the app itself):\nYou are the AI Writing Assistant, a plugin inside Bulwark Mail: ')).toBe(true);
+    expect(extra.startsWith('About the app (from the app itself):\nYou are the AI assistant, a plugin inside Bulwark Mail: ')).toBe(true);
     expect(extra.slice(extra.indexOf('About the user'))).toBe([
       'About the user (data, from their account):',
       'Name: Anna', 'Email addresses: a@e.org', 'Signs emails with:\nKind regards', 'Time zone: Europe/Zurich',

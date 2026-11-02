@@ -52,3 +52,19 @@ describe('translations', () => {
     expect(api.i18n.t('composer.title')).toBe(allStrings().de['composer.title']);
   });
 });
+
+describe('the name', () => {
+  it('is the AI assistant in every place and language, never a writing assistant only', async () => {
+    const all = allStrings();
+    for (const [locale, table] of Object.entries(all)) {
+      expect(table['composer.title'], locale).toBe(table['reader.toolbar']);
+    }
+    expect(all.en['composer.title']).toBe('AI assistant');
+    const { readFileSync } = await import('node:fs');
+    const prompts = readFileSync(new URL('../src/lib/prompts.js', import.meta.url), 'utf8');
+    expect(prompts).not.toMatch(/writing assistant/i);
+    const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
+    expect(manifest.name).toBe('AI Assistant');
+    expect(manifest.description).not.toMatch(/writing/i);
+  });
+});

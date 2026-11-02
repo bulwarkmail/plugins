@@ -54,7 +54,7 @@
   "settings.disconnect": "Не використовувати мій ключ",
   "settings.disconnected": "Ваш ключ видалено.",
   "composer.open": "Асистент",
-  "composer.title": "Помічник з написання",
+  "composer.title": "ШІ-асистент",
   "composer.prompt_label": "Про що має бути лист?",
   "composer.prompt_placeholder": "Про що має бути лист? Наприклад: подякувати Анні й запропонувати вівторок о 10:00",
   "composer.write": "Написати",

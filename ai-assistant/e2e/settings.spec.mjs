@@ -27,7 +27,7 @@ function settingsFrame(page) {
 async function openSettings(page) {
   // In-app navigation: plugins start with the mail view.
   await page.getByRole('link', { name: 'Settings' }).first().click();
-  await page.getByRole('button', { name: 'AI Writing Assistant' }).click();
+  await page.getByRole('button', { name: 'AI Assistant' }).click();
   await expect(settingsFrame(page).getByTestId('ai-status')).toBeVisible({ timeout: 30_000 });
 }
 

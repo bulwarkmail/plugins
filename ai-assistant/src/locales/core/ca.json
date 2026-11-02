@@ -54,7 +54,7 @@
   "settings.disconnect": "Deixa d'utilitzar la meva clau",
   "settings.disconnected": "S'ha eliminat la vostra clau.",
   "composer.open": "Assistent",
-  "composer.title": "Assistent de redacció",
+  "composer.title": "Assistent d'IA",
   "composer.prompt_label": "Què ha de dir el correu?",
   "composer.prompt_placeholder": "Què ha de dir el correu? Per exemple: donar les gràcies a l'Anna i proposar dimarts a les 10",
   "composer.write": "Redacta",

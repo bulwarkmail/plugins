@@ -54,7 +54,7 @@
   "settings.disconnect": "Миний түлхүүрийг ашиглахаа болих",
   "settings.disconnected": "Таны түлхүүрийг устгасан.",
   "composer.open": "Туслах",
-  "composer.title": "Бичгийн туслах",
+  "composer.title": "AI туслах",
   "composer.prompt_label": "Имэйлд юу гэж бичих вэ?",
   "composer.prompt_placeholder": "Имэйлд юу гэж бичих вэ? Жишээ нь: Аннад баярлалаа гэж хэлээд мягмар гарагийн 10 цагийг санал болго",
   "composer.write": "Бичих",

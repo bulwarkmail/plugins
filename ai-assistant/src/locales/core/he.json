@@ -54,7 +54,7 @@
   "settings.disconnect": "הפסק להשתמש במפתח שלי",
   "settings.disconnected": "המפתח שלך הוסר.",
   "composer.open": "עוזר",
-  "composer.title": "עוזר כתיבה",
+  "composer.title": "עוזר AI",
   "composer.prompt_label": "מה המייל צריך לומר?",
   "composer.prompt_placeholder": "מה המייל צריך לומר? לדוגמה: להודות לאנה ולהציע את יום שלישי ב-10",
   "composer.write": "כתוב",

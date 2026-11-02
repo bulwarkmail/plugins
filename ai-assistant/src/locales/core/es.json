@@ -54,7 +54,7 @@
   "settings.disconnect": "Dejar de usar mi clave",
   "settings.disconnected": "Se ha eliminado tu clave.",
   "composer.open": "Asistente",
-  "composer.title": "Asistente de redacción",
+  "composer.title": "Asistente de IA",
   "composer.prompt_label": "¿Qué debe decir el correo?",
   "composer.prompt_placeholder": "¿Qué debe decir el correo? Por ejemplo: dar las gracias a Anna y proponer el martes a las 10",
   "composer.write": "Redactar",

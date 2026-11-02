@@ -54,7 +54,7 @@
   "settings.disconnect": "Не использовать мой ключ",
   "settings.disconnected": "Ваш ключ удалён.",
   "composer.open": "Ассистент",
-  "composer.title": "Помощник по написанию",
+  "composer.title": "ИИ-ассистент",
   "composer.prompt_label": "О чём должно быть письмо?",
   "composer.prompt_placeholder": "О чём должно быть письмо? Например: поблагодарить Анну и предложить вторник в 10:00",
   "composer.write": "Написать",

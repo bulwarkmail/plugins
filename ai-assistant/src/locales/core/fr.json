@@ -54,7 +54,7 @@
   "settings.disconnect": "Ne plus utiliser ma clé",
   "settings.disconnected": "Votre clé a été supprimée.",
   "composer.open": "Assistant",
-  "composer.title": "Assistant de rédaction",
+  "composer.title": "Assistant IA",
   "composer.prompt_label": "Que doit dire l'e-mail ?",
   "composer.prompt_placeholder": "Que doit dire l'e-mail ? Par exemple : remercier Anna et proposer mardi à 10 h",
   "composer.write": "Rédiger",

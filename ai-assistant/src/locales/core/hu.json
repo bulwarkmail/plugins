@@ -54,7 +54,7 @@
   "settings.disconnect": "Saját kulcs használatának befejezése",
   "settings.disconnected": "A kulcsod törölve.",
   "composer.open": "Asszisztens",
-  "composer.title": "Írássegéd",
+  "composer.title": "AI-asszisztens",
   "composer.prompt_label": "Miről szóljon a levél?",
   "composer.prompt_placeholder": "Miről szóljon a levél? Például: köszönd meg Annának, és javasold a keddet 10 órára",
   "composer.write": "Megírás",
