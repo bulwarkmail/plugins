@@ -77,6 +77,42 @@ setting up in the app's own settings index and names the page and the
 setting as you see them, in your language. Nothing is looked up or sent unless you asked a
 question.
 
+## More context
+
+Next to an open message the assistant can read more than its text, when
+your question needs it. The input box shows what it may read as chips;
+take any of them out with its x.
+
+- **Attachments**: one chip per attachment (one chip for all when there
+  are more than three). Ask "what is on the agenda?" and it reads the
+  file: PDF (up to 50 pages), Word, Excel (up to 5 sheets of 2,000 rows),
+  PowerPoint, OpenDocument, text, CSV, HTML, calendar and contact files.
+  It says so when a file is too big (over 20 MB), protected with a
+  password, scanned without a text layer, or of a kind it can't read
+  (old .doc, .xls and .ppt files among them).
+- **Pictures**: attached images and pictures in the message go to the
+  model as images when it can see them (Anthropic, and OpenAI's own
+  models; for other servers the administrator decides). They are made
+  smaller in the webmail first. Tracking pixels and tiny images are left
+  out, and remote images are never loaded. A model that can't see images
+  only hears the file name and the picture's description. The date and
+  place a photo was taken go along only when you ask for them.
+- **This conversation**: when the message is part of a conversation, it
+  can read every message of it, without the quoted earlier mail.
+- **Messages selected in the list**: tick two or more messages and the
+  panel shows "3 messages". The Actions menu then offers **Summarize
+  these**, **What do I have to do?** and, with actions on, **One reply
+  to all**, a new message to everyone who wrote them (it always asks
+  first, since the recipients come from the messages). Up to 50 messages
+  are read.
+- **@ mentions**: type `@` and a few letters to add a message or a
+  contact from your mail and address book.
+
+Everything one request reads shares a limit of 60,000 characters and 8
+pictures (4 per message). Users can switch attachments, pictures and
+whole conversations off in the plugin's settings; the administrator can
+switch the whole group off with **More context**.
+
 ## Actions
 
 When you turn them on, the assistant can also do things for you: archive
@@ -178,7 +214,8 @@ menus and `api.ui.openPanel`).
 Settings > AI Assistant shows which service and model are used. A
 user can pick another model, choose between the two services when both
 are set up, hide the assistant next to messages, turn the lookups
-off, and turn actions on (ask first or automatic). When the administrator allows it, a user can connect their own key:
+off, switch reading attachments, looking at pictures and reading whole
+conversations off, and turn actions on (ask first or automatic). When the administrator allows it, a user can connect their own key:
 they pick the service and address here, and type the key into the
 webmail's own dialog, so the plugin never sees it. Their key is stored
 encrypted on the server and only sent to the address they approved there.
@@ -195,6 +232,11 @@ encrypted on the server and only sent to the address they approved there.
 | Type a request about a message | The same, and the earlier turns of the chat |
 | Summarize a conversation | Sender, date, subject and text (without quotes) of up to 20 messages |
 | Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, the message you reply to, and the settings it reads |
+| Ask about an attachment (More context on) | The attachment's text (up to 20,000 characters, more when the model asks, at most 60,000 per request with everything else it reads), or the picture itself, made smaller, when the model can see images (otherwise its name and description) |
+| Ask when or where a photo was taken | The date and place stored in the photo |
+| Ask about the conversation | Sender, recipients, date, subject and text (without quotes) of every message in it, up to 50 |
+| Ask about messages you selected in the list | The same for up to 50 of them, and how many you selected |
+| Mention a message or contact with @ | The message's sender, date and subject (its text when the model reads it), or the contact's name, addresses and company |
 | Let it do something (actions on) | What the action did, and the names of your folders when it files a message |
 
 The privacy notice before the first request lists the same, and names
