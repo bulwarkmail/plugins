@@ -723,3 +723,23 @@ describe('quick action names', () => {
     expect(screen.queryByRole('combobox', { name: 'Translate into' })).toBeNull();
   });
 });
+
+describe('the header', () => {
+  it('is as high as the side panel headers of the app, with or without a conversation', async () => {
+    const api = makeApi({ answers: ['Sure.'] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const header = document.querySelector('[data-assistant-header]');
+    expect(header.style.height).toBe('56px');
+    expect(screen.getByRole('heading', { name: 'AI assistant' })).toBeTruthy();
+    // New chat keeps its place while hidden, so the title doesn't move when it appears.
+    expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull();
+    const slot = header.lastElementChild;
+    expect(slot.style.visibility).toBe('hidden');
+    await type('hello');
+    await pressEnter();
+    await settled();
+    expect(document.querySelector('[data-assistant-header]').style.height).toBe('56px');
+    expect(slot.style.visibility).toBe('visible');
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy();
+  });
+});
