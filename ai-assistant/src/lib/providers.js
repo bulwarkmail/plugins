@@ -57,6 +57,8 @@ export function buildRequest(endpoint, prompt, { stream = true } = {}) {
   const messages = prompt.messages ?? [];
   const maxTokens = prompt.maxTokens ?? 1500;
   const tools = Array.isArray(prompt.tools) && prompt.tools.length ? prompt.tools : null;
+  // 'none': the tools are there (the history may hold their calls), but may not be called.
+  const noTools = tools && prompt.toolChoice === 'none';
   if (endpoint.provider === 'anthropic') {
     return {
       url: `${endpoint.baseUrl}/messages`,
@@ -71,6 +73,7 @@ export function buildRequest(endpoint, prompt, { stream = true } = {}) {
         ...(prompt.system ? { system: prompt.system } : {}),
         messages: anthropicMessages(messages),
         ...(tools ? { tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) } : {}),
+        ...(noTools ? { tool_choice: { type: 'none' } } : {}),
         stream,
       },
     };
@@ -84,7 +87,7 @@ export function buildRequest(endpoint, prompt, { stream = true } = {}) {
     body: {
       model: endpoint.model,
       messages: openaiMessages(prompt.system, messages),
-      ...(tools ? { tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } })), tool_choice: 'auto' } : {}),
+      ...(tools ? { tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } })), tool_choice: noTools ? 'none' : 'auto' } : {}),
       stream,
     },
   };

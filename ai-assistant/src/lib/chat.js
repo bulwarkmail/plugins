@@ -138,18 +138,22 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
   const steps = [];
   let lastSaid = '';
   for (let round = 0; ; round++) {
-    const allowTools = tools.length > 0 && typeof runTool === 'function' && round < MAX_TOOL_ROUNDS;
+    const canUseTools = tools.length > 0 && typeof runTool === 'function';
+    const allowTools = canUseTools && round < MAX_TOOL_ROUNDS;
+    // After the last round the tools stay in the request (the history holds
+    // tool calls, and Anthropic refuses those without tools), but the model
+    // may not call them any more: it has to answer.
     const turn = await streamTurn(api, endpoint, {
       system,
       messages: history,
       maxTokens,
-      ...(allowTools ? { tools } : {}),
+      ...(canUseTools ? { tools, ...(allowTools ? {} : { toolChoice: 'none' }) } : {}),
     }, {
       signal,
       ...timeouts,
       onText: (full) => onText(full),
     });
-    if (!turn.toolCalls.length) {
+    if (!turn.toolCalls.length || !allowTools) {
       // The answer. A model that only narrated before its last lookup and
       // then fell silent keeps that narration rather than nothing.
       const text = turn.text.trim() ? turn.text : lastSaid;
