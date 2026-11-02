@@ -178,7 +178,8 @@ describe('background', () => {
     expect(actions[COMPOSER_MENU_SURFACE].map((a) => a.id)).toEqual(['improve', 'grammar', 'shorter', 'translate', 'ask']);
     expect(actions[COMPOSER_MENU_SURFACE][0]).toMatchObject({ label: 'Improve writing', icon: 'sparkles', order: 10 });
     expect(actions[READER_MENU_SURFACE].map((a) => a.id)).toEqual(['explain', 'translate', 'reply', 'ask']);
-    expect(actions[READER_SURFACE]).toEqual([{ id: 'assistant', label: 'Assistant', icon: 'sparkles' }]);
+    // One button for the reader's panel: the host's toggle, not a second one of the plugin's.
+    expect(actions[READER_SURFACE]).toEqual([]);
     // The host allows 8 entries per surface and 60-character labels.
     for (const list of Object.values(actions)) {
       expect(list.length).toBeLessThanOrEqual(8);
@@ -214,11 +215,6 @@ describe('background', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(api.calls('ui.togglePanel').map((c) => c.args)).toEqual([['composer-sidebar-right', { composerId: 'c7' }]]);
     expect(api.calls('ui.openDialog')).toHaveLength(0);
-    // The reader's button toggles the panel next to the message.
-    bg.hooks.onAction({ surface: READER_SURFACE, actionId: 'assistant', context: { emailId: 'M1' } });
-    await new Promise((r) => setTimeout(r, 0));
-    expect(api.calls('ui.togglePanel')[1].args).toEqual(['email-detail-sidebar']);
-
     // A phone: no panel answers (null). The dialog opens, once at a time.
     panel = null;
     bg.hooks.onAction({ surface: COMPOSER_SURFACE, actionId: 'assistant', context: { composerId: 'c8' } });

@@ -57,9 +57,9 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
         api.ui.setActions(READER_MENU_SURFACE, state.configured && state.showInReader
           ? READER_MENU_ACTIONS.map((action, i) => ({ id: action, label: t(`menu.${action}`), icon: MENU_ICONS[action], order: 10 + i }))
           : []),
-        api.ui.setActions(READER_SURFACE, state.configured && state.showInReader
-          ? [{ id: ACTION_ID, label: t('composer.open'), icon: 'sparkles' }]
-          : []),
+        // The reader has the host's own panel button at the end of its
+        // toolbar; a second one of the plugin's would open the same panel.
+        api.ui.setActions(READER_SURFACE, []),
       ]);
     } catch (err) {
       shownActions = null;
@@ -126,7 +126,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
     return false;
   }
 
-  /** The Assistant button in the reader's toolbar: the panel next to the message (phones have the bar). */
+  /** The panel next to the message (phones have the bar instead). */
   async function toggleReaderPanel() {
     try {
       await api.ui.togglePanel(READER_PANEL);
@@ -184,8 +184,6 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       onAction({ surface, actionId, context } = {}) {
         if (surface === COMPOSER_SURFACE && actionId === ACTION_ID) {
           void toggleComposerPanel(context?.composerId);
-        } else if (surface === READER_SURFACE && actionId === ACTION_ID) {
-          void toggleReaderPanel();
         } else if (surface === COMPOSER_MENU_SURFACE) {
           void openPanel('composer', context?.composerId, { action: actionId, text: context?.selection?.text ?? '' });
         } else if (surface === READER_MENU_SURFACE) {
