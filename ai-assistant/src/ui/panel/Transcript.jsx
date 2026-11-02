@@ -18,7 +18,15 @@ export function Transcript({ chat, onExample }) {
     <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px' }} data-assistant-transcript>
       {turns.length === 0 && !consent && (
         <Stack gap={2}>
-          <Text tone="muted" size="xs">{t(mode === 'reader' ? (source.scope === 'none' ? (lookups ? 'panel.empty.none' : 'panel.empty.none_plain') : 'panel.empty.read') : source.scope === 'empty' ? 'panel.empty.write' : 'panel.empty.compose')}</Text>
+          <Text tone="muted" size="xs">{chat.areas.empty?.text ?? t(mode === 'reader' ? (source.scope === 'none' ? (lookups ? 'panel.empty.none' : 'panel.empty.none_plain') : 'panel.empty.read') : source.scope === 'empty' ? 'panel.empty.write' : 'panel.empty.compose')}</Text>
+          {/* Ways to start an area offers here (Catch me up). */}
+          {chat.areas.empty?.actions?.length > 0 && (
+            <Row gap={1}>
+              {chat.areas.empty.actions.map((a) => (
+                <Button key={a.id} size="sm" variant="secondary" icon={a.icon} disabled={chat.running} busy={a.busy} data-empty-action={a.id} onClick={a.run}>{a.label}</Button>
+              ))}
+            </Row>
+          )}
           {mode === 'composer' && source.scope === 'empty' && (
             <Stack gap={1}>
               {[1, 2, 3].map((n) => (

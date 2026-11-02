@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Прочитано ваші налаштування",
   "panel.steps.kind.find_setting": "Налаштування",
   "panel.steps.kind.read_my_settings": "Налаштування",
-  "shortcut.toggle": "Відкрити або закрити ШІ-асистента"
+  "shortcut.toggle": "Відкрити або закрити ШІ-асистента",
+  "panel.menu.count": "Підказки: {count}",
+  "panel.menu.none": "Нічого не знайдено"
 }

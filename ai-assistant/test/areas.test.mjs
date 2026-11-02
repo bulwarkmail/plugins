@@ -180,6 +180,12 @@ describe('an area\'s parts of the panel', () => {
     await type(box, '/');
     const list = await screen.findByRole('listbox', { name: 'Commands' });
     expect(list.querySelectorAll('[role="option"]')).toHaveLength(2);
+    expect(box.getAttribute('aria-haspopup')).toBe('listbox');
+    expect(document.querySelector('[data-input-menu-status]').textContent).toBe('2 suggestions');
+    await type(box, '/zz');
+    await waitFor(() => expect(document.querySelector('[data-input-menu-status]').textContent).toBe('No matches'));
+    await type(box, '/');
+    await screen.findByRole('listbox', { name: 'Commands' });
     expect(box.getAttribute('aria-activedescendant')).toBe(list.querySelector('[aria-selected="true"]').id);
     await act(async () => { fireEvent.keyDown(box, { key: 'ArrowDown' }); });
     await act(async () => { fireEvent.keyDown(box, { key: 'Enter' }); });

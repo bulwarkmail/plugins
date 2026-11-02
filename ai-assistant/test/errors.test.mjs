@@ -60,3 +60,13 @@ describe('messageFor', () => {
     }
   });
 });
+
+describe('why an action failed', () => {
+  it('names a missing folder, also one with a name', async () => {
+    const { failureReason } = await import('../src/lib/errors.js');
+    expect(failureReason(new Error('email.archive: this account has no Archive folder'))).toBe('folder');
+    expect(failureReason(new Error('no folder "Projects"; the folders are: Inbox'))).toBe('folder');
+    expect(failureReason(new Error('no message with that id'))).toBe('gone');
+    expect(failureReason(new Error('boom'))).toBe('other');
+  });
+});

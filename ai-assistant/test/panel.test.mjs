@@ -1002,7 +1002,8 @@ describe('the Actions menu with nothing to work on', () => {
   it('offers ways to start in the reader with no message open', async () => {
     const api = makeApi({ answers: ['Nothing today.'] });
     await mount(api, { email: null, selection: null, focusRequest: 0 });
-    expect(await entries()).toEqual(["What's on my calendar today?", 'Find a message']);
+    // Catch me up (the everywhere area) joins them after a line.
+    expect(await entries()).toEqual(["What's on my calendar today?", 'Find a message', 'Catch me up']);
     await click(screen.getByRole('menuitem', { name: "What's on my calendar today?" }));
     await settled();
     expect(sentPrompt(api).messages.at(-1).content).toBe("What's on my calendar today?");
@@ -1012,6 +1013,7 @@ describe('the Actions menu with nothing to work on', () => {
     const api = makeApi();
     await api.storage.set('prefs', { lookups: false });
     await mount(api, { email: null, selection: null, focusRequest: 0 });
+    // Catch me up reads mail, the calendar and tasks: not with lookups off.
     expect(await entries()).toEqual(['Find a message']);
     await click(screen.getByRole('menuitem', { name: 'Find a message' }));
     const box = screen.getByRole('textbox', { name: 'Message to the assistant' });

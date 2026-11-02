@@ -21,6 +21,7 @@ import { AiError } from '../../lib/errors.js';
 import { defaultTarget, languageOptions } from '../../lib/languages.js';
 import { diffSuggestions } from '../../lib/grammar.js';
 import { COMPOSER_CONTEXT_KEY, DRAFT_KEY, READER_CHAT_KEY, chatKey, pendingKey } from '../../lib/background.js';
+import { viewOf } from '../../lib/areas/everywhere.js';
 import {
   MAX_TURNS, PENDING_TTL_MS, appLabels, storedTurns, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, topicSubject, uid,
 } from './model.js';
@@ -33,6 +34,9 @@ export function useAssistantChat(props) {
   const t = api.i18n.t;
   const locale = api.i18n.getLocale?.() ?? 'en';
   const mode = props.composerId ? 'composer' : 'reader';
+  // Next to Calendar, Contacts, Files or Settings (app-side-panel): the
+  // reader's chat with no message open, which it shares.
+  const view = mode === 'reader' ? viewOf(props) : null;
   const id = mode === 'composer' ? props.composerId : props.email?.id;
   const email = props.email ?? null;
   const selection = props.selection ?? null;
@@ -197,7 +201,7 @@ export function useAssistantChat(props) {
    * (the chat). `label` is what the user turn shows; `sent` what the chat
    * sends when it differs.
    */
-  const send = useCallback(async ({ label, sent, task, input: taskInput, show, scope, src }) => {
+  const send = useCallback(async ({ label, sent, task, input: taskInput, show, scope, src, finish, data }) => {
     const endpoint = setup?.endpoint;
     if (!endpoint) return;
     controller.current?.abort();
@@ -233,7 +237,9 @@ export function useAssistantChat(props) {
       if (abort.signal.aborted) throw new AiError('cancelled');
       const onText = (full) => patchTurn(turn.id, { content: full });
       let text;
-      const extra = extraContext();
+      // `data`: what this one request carries as data in its system prompt
+      // (Catch me up's mail and events), kept out of the transcript.
+      const extra = data ? `${extraContext()}\n\n${data}` : extraContext();
       const now = clock(userZone(api, person?.timeZone));
       if (task) {
         const prompt = buildPrompt(task, { language: locale, extra, ...taskInput, ...(task === 'actions' ? { now } : {}) });
@@ -285,7 +291,8 @@ export function useAssistantChat(props) {
         const corrected = keepEdges(src, text) || src;
         patchTurn(turn.id, { content: text, status: 'done', review: { segments: diffSuggestions(src, corrected), states: {} } });
       } else {
-        patchTurn(turn.id, { content: text, status: 'done' });
+        // `finish`: what a request adds under the answer (Catch me up's cards).
+        patchTurn(turn.id, { content: finish ? finish(text) : text, status: 'done' });
       }
     } catch (err) {
       const error = err instanceof AiError ? err : new AiError('unreachable', { detail: err?.message });
@@ -335,12 +342,15 @@ export function useAssistantChat(props) {
   // The input takes the focus when the panel is asked for (a new
   // focusRequest) or a request waits; opening another message leaves the
   // focus where the user is (the list, the message).
-  const lastFocusRequest = useRef(props.focusRequest);
+  // A panel that opens on request starts with a focusRequest above 0: it
+  // takes the focus once its input is there (not while the chat loads).
+  const lastFocusRequest = useRef(props.focusRequest > 0 ? -1 : props.focusRequest);
   useEffect(() => {
+    if (!loaded) return;
     const asked = props.focusRequest !== lastFocusRequest.current;
     lastFocusRequest.current = props.focusRequest;
     if (asked) inputRef.current?.focus();
-  }, [props.focusRequest]);
+  }, [props.focusRequest, loaded]);
   useEffect(() => {
     if (!loaded || !id) return;
     let live = true;
@@ -462,7 +472,7 @@ export function useAssistantChat(props) {
 
   return {
     areas,
-    api, t, locale, mode, email, setup, loaded, turns, consent, source, input, setInput, inputRef,
+    api, t, locale, mode, view, email, setup, loaded, turns, consent, source, input, setInput, inputRef,
     target, setTarget, languages, running, translating, setTranslating, lookups,
     removeContext, restoreContext, quick, submit, stop, apply, replyFor, sendText, insertText, clear, retry,
     patchTurn, answerAction, undoStep,

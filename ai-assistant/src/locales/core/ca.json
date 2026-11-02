@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "S'ha llegit la teva configuració",
   "panel.steps.kind.find_setting": "Configuració",
   "panel.steps.kind.read_my_settings": "Configuració",
-  "shortcut.toggle": "Obre o tanca l'assistent d'IA"
+  "shortcut.toggle": "Obre o tanca l'assistent d'IA",
+  "panel.menu.count": "{count} suggeriments",
+  "panel.menu.none": "Cap coincidència"
 }
