@@ -251,6 +251,8 @@ export function useAssistantChat(props) {
         // Lookups run straight away; an action is shown first, then waits for
         // the user's OK (ask-first mode, or past the automatic limit) or runs.
         const callTool = async (name, args, call) => {
+          // Once the service refused images, lookups hand over names only.
+          if (call?.imagesRefused) ctx.imagesRefused = true;
           if (!isActionTool(name)) return runTool(api, name, args, ctx);
           const { summary, plan, alwaysAsk } = await describeAction(api, name, args, ctx);
           // Some actions always ask first, whatever the user's mode.
@@ -279,7 +281,8 @@ export function useAssistantChat(props) {
           : readerChatSystem({ language: locale, now, email: contextEmail ? emailForPrompt(contextEmail, now.zone) : null, emailId: contextEmail?.id, selection: scope === 'passage' ? src : '', hasTools: tools.length > 0, actions: actionMode, extra });
         const messages = [...historyMessages(previous), { role: 'user', content: userTurn.content }];
         const out = await runChat(api, endpoint, {
-          system, messages, tools, runTool: callTool,
+          // Images only for a model that can see them (the context area says so).
+          system, messages, tools, runTool: callTool, images: ctx.images === true,
         }, {
           onText,
           onStep: (step) => patchTurn(turn.id, (cur) => ({ steps: cur.steps.some((s) => s.id === step.id) ? cur.steps.map((s) => (s.id === step.id ? { ...s, ...step } : s)) : [...cur.steps, step] })),

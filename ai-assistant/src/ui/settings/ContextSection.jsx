@@ -38,6 +38,11 @@ export function ContextSection({ api, setup, prefs = {}, savePrefs }) {
             <Switch id="ai-ctx-images" label={t('ctx.settings.images')} checked={attachmentsOn && prefs.ctxImages !== false} disabled={!attachmentsOn} onChange={(on) => save({ ctxImages: on })} />
           </SettingRow>
         )}
+        {looks && sees && (
+          <SettingRow label={t('ctx.settings.photo_details')} description={t('ctx.settings.photo_details_hint')} htmlFor="ai-ctx-photo-details">
+            <Switch id="ai-ctx-photo-details" label={t('ctx.settings.photo_details')} checked={attachmentsOn && prefs.ctxImages !== false && prefs.ctxPhotoDetails === true} disabled={!attachmentsOn || prefs.ctxImages === false} onChange={(on) => save({ ctxPhotoDetails: on })} />
+          </SettingRow>
+        )}
         {looks && !sees && endpoint && !own && <Text tone="muted" size="xs">{t('ctx.settings.no_images')}</Text>}
         {thread && (
           <SettingRow label={t('ctx.settings.thread')} description={t('ctx.settings.thread_hint')} htmlFor="ai-ctx-thread">

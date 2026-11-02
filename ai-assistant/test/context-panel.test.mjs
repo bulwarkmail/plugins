@@ -31,7 +31,7 @@ function makeApi({ handlers = {}, hostFeatures = FEATURES, consent = true, confi
     ...(hostFeatures ? { hostFeatures } : {}),
     handlers: {
       'admin.getAllConfig': async () => config,
-      'email.getThread': async () => [{ id: 'T0' }, { id: 'T2' }, { id: 'M1' }],
+      'email.getThreadCount': async () => 3,
       'proxy.fetch': async () => streamResponse(anthropicSse(['Done.'])),
       ...handlers,
     },
@@ -110,11 +110,24 @@ describe('attachments in the chat', () => {
   });
 });
 
+describe('a message of a login this webmail can\'t read', () => {
+  it('shows no attachment chips and offers no read_attachment', async () => {
+    const api = makeApi();
+    await mount(api, { email: { ...EMAIL, blobsReadable: false } });
+    expect(screen.queryByRole('group', { name: /agenda\.pdf/ })).toBeNull();
+    const body = await ask(api, 'what is attached?');
+    expect(body.tools.map((t) => t.name)).not.toContain('read_attachment');
+    expect(body.system).not.toContain('agenda.pdf');
+  });
+});
+
 describe('the conversation', () => {
   it('shows "This conversation" with its size and offers read_thread', async () => {
     const api = makeApi();
     await mount(api, { email: EMAIL });
     await waitFor(() => expect(chip('This conversation, 3 messages')).toBeTruthy());
+    // Only counted: no message of it is read until the model asks.
+    expect(api.calls('email.getThread')).toHaveLength(0);
     const body = await ask(api, 'what was decided?');
     expect(body.system).toContain('part of a conversation of 3 messages');
     expect(body.tools.map((t) => t.name)).toContain('read_thread');
@@ -124,9 +137,9 @@ describe('the conversation', () => {
   });
 
   it('shows no chip for a message on its own', async () => {
-    const api = makeApi({ handlers: { 'email.getThread': async () => [{ id: 'M1' }] } });
+    const api = makeApi({ handlers: { 'email.getThreadCount': async () => 1 } });
     await mount(api, { email: EMAIL });
-    await waitFor(() => expect(api.calls('email.getThread')).toHaveLength(1));
+    await waitFor(() => expect(api.calls('email.getThreadCount')).toHaveLength(1));
     expect(screen.queryByRole('group', { name: /This conversation/ })).toBeNull();
   });
 });
@@ -166,7 +179,7 @@ describe('messages selected in the list', () => {
     const api = makeApi();
     const emails = Array.from({ length: 50 }, (_, i) => ({ id: `E${i}` }));
     await mount(api, { email: null, listSelection: { emails, total: 120 } });
-    expect(chip('120 selected messages the first 50 are read')).toBeTruthy();
+    expect(chip('120 selected messages, the first 50 are read')).toBeTruthy();
     await click(screen.getByRole('button', { name: 'Leave 120 messages out' }));
     expect(screen.queryByRole('group', { name: /selected messages/ })).toBeNull();
   });
@@ -234,10 +247,12 @@ describe('what the notice says about it', () => {
     await type('hi');
     await key('Enter');
     const notice = (await screen.findByText(/sends your request to Anthropic/)).textContent;
-    expect(notice).toContain('it sends the attachment\'s text');
-    expect(notice).toContain('The date and place a photo was taken go only when you ask for them.');
-    expect(notice).toContain('it sends every message in it');
-    expect(notice).toContain('the messages you selected in the list');
+    expect(notice).toContain('the names of its attachments and the descriptions of its pictures');
+    expect(notice).toContain('Pictures it looks at go along as images.');
+    // The photo's date and place only with its switch on.
+    expect(notice).not.toContain('date and place');
+    expect(notice).toContain('how many messages its conversation has');
+    expect(notice).toContain('When you select messages in the list, it says how many');
     expect(notice).toContain('mention with @');
   });
 
@@ -248,7 +263,7 @@ describe('what the notice says about it', () => {
     await key('Enter');
     const notice = (await screen.findByText(/sends your request to Anthropic/)).textContent;
     expect(notice).not.toContain('photo');
-    expect(notice).toContain('attachment\'s text');
+    expect(notice).toContain('the names of its attachments');
   });
 });
 
@@ -267,6 +282,14 @@ describe('the settings', () => {
     }
     await click(screen.getByRole('switch', { name: 'Look at images' }));
     await waitFor(async () => expect((await api.storage.get('prefs'))?.ctxImages).toBe(false));
+  });
+
+  it('sends a photo\'s date and place only after the user switches it on', async () => {
+    const api = await show(CONFIG);
+    const photo = screen.getByRole('switch', { name: 'Send a photo\'s date and place' });
+    expect(photo.getAttribute('aria-checked')).toBe('false');
+    await click(photo);
+    await waitFor(async () => expect((await api.storage.get('prefs'))?.ctxPhotoDetails).toBe(true));
   });
 
   it('says when the model can\'t see images', async () => {

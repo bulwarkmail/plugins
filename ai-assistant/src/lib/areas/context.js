@@ -62,7 +62,11 @@ export function contextFlags(api, { config = {}, prefs = {}, endpoint = null } =
     attachments: text || imageCall,
     text,
     images: imageCall && prefs.ctxImages !== false && canSeeImages(config, endpoint, prefs),
+    // Off unless the user switched it on (ctxPhotoDetails); nothing in a message can turn it on.
+    photoDetails: imageCall && prefs.ctxImages !== false && prefs.ctxPhotoDetails === true && canSeeImages(config, endpoint, prefs),
     thread: on && prefs.ctxThread !== false && has(api, 'threads', 'email.getThread'),
+    // How many messages the open conversation has, without reading them (newer webmails).
+    threadCount: on && prefs.ctxThread !== false && has(api, 'threads', 'email.getThreadCount'),
     selection: on && has(api, 'listSelection'),
     mentions: on,
   };
@@ -102,13 +106,31 @@ function cut(text, max) {
 const size = (bytes) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round((bytes ?? 0) / 1024))} KB`);
 const attr = (value) => String(value ?? '').replace(/["<>]/g, '');
 
+/** Most characters of a name, subject or description the sender wrote, in the prompt. */
+export const MAX_LABEL_CHARS = 120;
+
+/**
+ * Text the sender chose (a file name, a subject, a picture's description)
+ * as one plain line: no control characters or line breaks, at most `max`
+ * characters, so it can't start a line of its own in the prompt.
+ */
+export function oneLine(value, max = MAX_LABEL_CHARS) {
+  const flat = String(value ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
+/** Content the sender wrote, with our block tags in it defused so it can't close or open a block. */
+export function defuse(text) {
+  return String(text ?? '').replace(/<(\/?)(message|attachment)\b/gi, '&lt;$1$2');
+}
+
 /** The attachment list for the model, numbered as read_attachment takes them. */
 export function attachmentLines(attachments) {
   return attachments.map((a) => {
     const notes = [a.type || 'unknown type', size(a.size)];
     if (a.inline) notes.push('a picture in the message');
-    if (a.alt) notes.push(`described as "${attr(a.alt).slice(0, 120)}"`);
-    return `${a.index}. ${a.name || '(no name)'} (${notes.join(', ')})`;
+    if (a.alt) notes.push(`described as "${attr(oneLine(a.alt))}"`);
+    return `${a.index}. ${oneLine(a.name) || '(no name)'} (${notes.join(', ')})`;
   }).join('\n');
 }
 
@@ -139,9 +161,10 @@ async function readAttachmentText(api, email, att, args, budget) {
   if (budget.chars <= 0) return SPENT;
   const maxChars = allowance(budget, args.maxChars);
   const read = await api.email.getAttachmentText(email.id, att.blobId, { maxChars, ...accountArg(email.accountId) });
-  const name = read?.name || att.name || 'The attachment';
+  const name = oneLine(read?.name || att.name) || 'The attachment';
   if (!read || read.status !== 'ok') return statusSentence(read?.status, name);
-  const { text, cut: clipped } = cut(read.text ?? '', maxChars);
+  const { text: raw, cut: clipped } = cut(read.text ?? '', maxChars);
+  const text = defuse(raw);
   budget.chars -= text.length;
   const more = [
     read.pages ? `pages="${read.pages}"` : '',
@@ -155,32 +178,36 @@ async function readAttachmentText(api, email, att, args, budget) {
 
 /** The placeholder the model hears for a picture it doesn't get. */
 export function imageStandIn(att, why = 'This model can\'t see images.') {
-  return `[Image: ${att.name || 'image'}. ${why}]${att.alt ? ` Its description: ${att.alt}` : ''}`;
+  return `[Image: ${oneLine(att.name) || 'image'}. ${why}]${att.alt ? ` Its description: ${oneLine(att.alt)}` : ''}`;
 }
 
 async function readAttachmentImage(api, email, att, args, ctx, budget) {
   if (!ctx.context?.flags?.images) return imageStandIn(att);
+  if (ctx.imagesRefused) return imageStandIn(att, 'The AI service refused images in this chat.');
   const used = budget.perMessage.get(email.id) ?? 0;
   if (budget.images <= 0 || used >= MAX_IMAGES_PER_MESSAGE) return imageStandIn(att, 'No more images fit in this request.');
   // Local models get smaller pictures (their encoders shrink them anyway).
   const local = ctx.endpoint?.provider === 'openai' && !/^https:\/\/api\.openai\.com(\/|$)/i.test(ctx.endpoint?.baseUrl ?? '');
-  const exif = args.photoDetails === true;
+  // A photo's date and place only with the user's own switch: text in a message can't turn it on.
+  const exif = args.photoDetails === true && ctx.context?.flags?.photoDetails === true;
   const read = await api.email.getAttachmentImage(email.id, att.blobId, {
     ...(local ? { maxSide: LOCAL_IMAGE_SIDE } : {}),
     ...(exif ? { exif: true } : {}),
     ...accountArg(email.accountId),
   });
-  const name = att.name || 'image';
+  const name = oneLine(att.name) || 'image';
   if (!read || read.status !== 'ok' || !read.data) return statusSentence(read?.status, name);
   budget.images -= 1;
   budget.perMessage.set(email.id, used + 1);
-  const alt = read.alt || att.alt;
+  const alt = oneLine(read.alt || att.alt);
   const lines = [`The picture ${name} (${read.width}×${read.height}) is attached.${alt ? ` Its description in the message: ${alt}` : ''}`];
   if (exif) {
     const where = Number.isFinite(read.exif?.lat) && Number.isFinite(read.exif?.lon) ? `${read.exif.lat.toFixed(5)}, ${read.exif.lon.toFixed(5)}` : '';
     lines.push(read.exif?.taken || where
       ? `The photo says it was taken${read.exif?.taken ? ` on ${read.exif.taken}` : ''}${where ? ` at ${where} (latitude, longitude)` : ''}.`
       : 'The photo has no date or place stored.');
+  } else if (args.photoDetails === true) {
+    lines.push("The user has not allowed sending a photo's date and place. Tell them they can turn it on in the assistant's settings.");
   }
   return { text: lines.join('\n'), images: [{ mediaType: read.type, data: read.data, name, width: read.width, height: read.height, ...(alt ? { alt } : {}) }] };
 }
@@ -189,7 +216,9 @@ async function readAttachmentImage(api, email, att, args, ctx, budget) {
 
 function person(p) {
   if (!p) return '';
-  return p.name && p.email ? `${p.name} <${p.email}>` : (p.email || p.name || '');
+  const name = oneLine(p.name);
+  const email = oneLine(p.email);
+  return name && email ? `${name} <${email}>` : (email || name || '');
 }
 
 const accountArg = (accountId) => (accountId ? { accountId } : {});
@@ -197,14 +226,15 @@ const accountArg = (accountId) => (accountId ? { accountId } : {});
 /** One message for the model: headers and its own text (quotes of earlier mail cut). */
 export function messageBlock(email, max, zone) {
   const own = ownText(email.text ?? '') || String(email.preview ?? '');
-  const { text, cut: clipped } = cut(own, Math.max(0, max));
+  const { text: raw, cut: clipped } = cut(own, Math.max(0, max));
+  const text = defuse(raw);
   const when = zone && email.receivedAt ? whenIn(zone, email.receivedAt) : (email.receivedAt ?? '');
-  const files = (email.attachments ?? []).filter((a) => !a.inline).map((a) => a.name).filter(Boolean);
+  const files = (email.attachments ?? []).filter((a) => !a.inline).map((a) => oneLine(a.name)).filter(Boolean);
   const head = [`From: ${(email.from ?? []).map(person).join(', ')}`];
   if (email.to?.length) head.push(`To: ${email.to.map(person).join(', ')}`);
-  head.push(`Date: ${when}`, `Subject: ${email.subject ?? ''}`);
+  head.push(`Date: ${when}`, `Subject: ${oneLine(email.subject, 300)}`);
   if (files.length) head.push(`Attachments: ${files.join(', ')}`);
-  return `<message id="${attr(email.id)}">\n${head.join('\n')}\n\n${text}${clipped ? '\n[…]' : ''}\n</message>`;
+  return `<message id="${attr(email.id)}">\n${defuse(head.join('\n'))}\n\n${text}${clipped ? '\n[…]' : ''}\n</message>`;
 }
 
 /** Messages as one block within the budget; each gets an equal share, at least MIN_PER_MESSAGE. */
@@ -261,7 +291,7 @@ const tools = [
         name: { type: 'string', description: 'The file name, as in the attachment list' },
         index: { type: 'integer', description: 'Its number in the attachment list (instead of the name)' },
         maxChars: { type: 'integer', description: `How many characters to read, up to ${MAX_READ_CHARS}` },
-        photoDetails: { type: 'boolean', description: 'Only when the user asks when or where a photo was taken: also read the date and place stored in it' },
+        photoDetails: { type: 'boolean', description: 'Only when the user asks when or where a photo was taken: also read the date and place stored in it (works only when the user allowed it in the settings)' },
       },
       additionalProperties: false,
     },
@@ -349,8 +379,9 @@ const actions = [
       const subject = String(args.subject ?? '').trim().slice(0, 200);
       const body = String(args.body ?? '').trim();
       if (!body) throw new Error('body is empty');
-      const summary = api.i18n.t('ctx.action.reply_senders', { count: to.length, to: to.join(', '), subject: subject || '…' });
-      return { summary, plan: { to: to.slice(0, 50), subject, body } };
+      const recipients = to.slice(0, 50);
+      const summary = api.i18n.t('action.draft_email', { to: recipients.join(', '), subject: subject || '…' });
+      return { summary, plan: { to: recipients, subject, body } };
     },
     perform: async (api, plan) => {
       const opened = await api.compose.open({ to: plan.to, subject: plan.subject, body: plan.body });

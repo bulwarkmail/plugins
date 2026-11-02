@@ -97,7 +97,8 @@ what it may read; the x takes one out.
   as images when it can see them; they are made smaller first. Tracking
   pixels and tiny images are left out; remote images are never loaded.
   Without image support the model only hears the file name and the
-  picture's description. The date and place of a photo only when you ask.
+  picture's description. The date and place of a photo only when you ask
+  and have switched on "Send a photo's date and place" (off by default).
 - This conversation: every message of the open conversation, quotes cut.
 - Messages selected in the list: "3 messages" chip; Actions offers
   Summarize these, What do I have to do?, and One reply to all (always
@@ -106,25 +107,31 @@ what it may read; the x takes one out.
 - One request reads at most 60,000 characters and 8 pictures (4 per
   message).
 - User settings (Settings > AI Assistant > More context): Read
-  attachments, Look at images, Read the whole conversation; with their own
-  key also "My model can see images".
+  attachments, Look at images, Send a photo's date and place (off by
+  default), Read the whole conversation; with their own key also "My model
+  can see images", which their own model follows instead of the
+  administrator's image setting.
 
 What is sent to the AI service:
 
 | When you | What is sent |
 | --- | --- |
+| Anything, with a message open | The names, types and sizes of its attachments, the descriptions of its pictures, and how many messages its conversation has; with messages ticked in the list, how many |
 | Ask about an attachment | Its text (20,000 characters, more when the model asks, at most 60,000 per request in all), or the picture, made smaller, when the model can see images; otherwise its name and description |
-| Ask when or where a photo was taken | The date and place stored in the photo |
+| Ask when or where a photo was taken (switch on) | The date and place stored in the photo |
 | Ask about the conversation | Sender, recipients, date, subject and text (without quotes) of every message, up to 50 |
 | Ask about selected messages | The same for up to 50 of them, and how many you selected |
 | Mention a message or contact with @ | The message's sender, date and subject (its text when read), or the contact's name, addresses and company |
 
-The privacy notice adds, for what is on: "When it reads an attachment for
-you, it sends the attachment's text." "Pictures it looks at go along as
-images. The date and place a photo was taken go only when you ask for
-them." "When it reads the whole conversation, it sends every message in
-it." "When you ask about the messages you selected in the list, it sends
-them." "Messages and contacts you mention with @ go along too."
+The privacy notice adds, for what is on: "With an open message it also
+sends the names of its attachments and the descriptions of its pictures;
+when it reads one, the attachment's text." "Pictures it looks at go along
+as images." (with the photo switch on: "You allowed the date and place a
+photo was taken: they go along when you ask for them.") "With an open
+message it also says how many messages its conversation has; when it
+reads the whole conversation, it sends every message in it." "When you
+select messages in the list, it says how many; when you ask about them,
+it sends them." "Messages and contacts you mention with @ go along too."
 
 ## For administrators
 

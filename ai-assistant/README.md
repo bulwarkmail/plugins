@@ -121,7 +121,8 @@ take any of them out with its x.
   smaller in the webmail first. Tracking pixels and tiny images are left
   out, and remote images are never loaded. A model that can't see images
   only hears the file name and the picture's description. The date and
-  place a photo was taken go along only when you ask for them.
+  place a photo was taken go along only when you ask for them and have
+  switched on **Send a photo's date and place** (off by default).
 - **This conversation**: when the message is part of a conversation, it
   can read every message of it, without the quoted earlier mail.
 - **Messages selected in the list**: tick two or more messages and the
@@ -136,7 +137,9 @@ take any of them out with its x.
 Everything one request reads shares a limit of 60,000 characters and 8
 pictures (4 per message). Users can switch attachments, pictures and
 whole conversations off in the plugin's settings; the administrator can
-switch the whole group off with **More context**.
+switch the whole group off with **More context**. A user who connected their own
+key sets "My model can see images" themselves; the administrator's image
+setting is about the administrator's service.
 
 ## Actions
 
@@ -260,8 +263,9 @@ encrypted on the server and only sent to the address they approved there.
 | Type a request about a message | The same, and the earlier turns of the chat |
 | Summarize a conversation | Sender, date, subject and text (without quotes) of up to 20 messages |
 | Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, the message you reply to, and the settings it reads |
+| Anything, with a message open (More context on) | The names, types and sizes of its attachments, the descriptions of its pictures, and how many messages its conversation has; with messages ticked in the list, how many |
 | Ask about an attachment (More context on) | The attachment's text (up to 20,000 characters, more when the model asks, at most 60,000 per request with everything else it reads), or the picture itself, made smaller, when the model can see images (otherwise its name and description) |
-| Ask when or where a photo was taken | The date and place stored in the photo |
+| Ask when or where a photo was taken (only with **Send a photo's date and place** on) | The date and place stored in the photo |
 | Ask about the conversation | Sender, recipients, date, subject and text (without quotes) of every message in it, up to 50 |
 | Ask about messages you selected in the list | The same for up to 50 of them, and how many you selected |
 | Mention a message or contact with @ | The message's sender, date and subject (its text when the model reads it), or the contact's name, addresses and company |
