@@ -34,6 +34,11 @@ Any other value gives 401 in the error shape of the real API. 429 answers carry
 | `GET /health` | `{"status":"ok"}` |
 | `POST /__reset` | Restores the initial Todoist tasks, clears registrations and poll counters |
 | `GET /__state` | Number of Todoist tasks, registered tracking numbers, poll counters per API and number |
+| `POST /__ai/scripts` | Stores a scripted AI answer: `{"name", "steps"}` (see "Scripted lookups and actions") |
+| `GET /__ai/requests` | The last 60 AI requests, whole: `[{at, path, provider, marker, step, tools, body}]`; `?marker=<name>` keeps those of one script |
+| `GET /__ai/last` | The last AI request (404 before the first) |
+
+`POST /__reset` also clears the scripts and the request log.
 
 ## Anthropic Messages API
 
@@ -53,6 +58,42 @@ Any other value gives 401 in the error shape of the real API. 429 answers carry
   `content_block_delta` events (`text_delta`), `content_block_stop`,
   `message_delta` (stop reason and output tokens), `message_stop`. Each event
   has an `event:` line and a `data:` line.
+
+## Scripted lookups and actions
+
+A test can make either AI API call tools (lookups and actions) in a fixed
+order. Register a script, then put `[[mock:<name>]]` in the message the test
+types (or in the admin's standing instructions, which reach the system
+prompt, for quick actions with a fixed text):
+
+```json
+{ "name": "find-invoice", "steps": [
+  { "text": "Looking.", "tools": [{ "name": "search_mail", "input": { "text": "invoice" } }] },
+  { "text": "Found: {{tool_results}}" }
+] }
+```
+
+- The step is the number of tool-calling assistant turns after the typed
+  message, so the same history always gets the same step. Past the last step
+  the last one repeats; a repeated tool step ends with
+  `Mock: script "<name>" has no more steps.`
+- A tool step answers with `tool_use` blocks (Anthropic, `stop_reason:
+  tool_use`, the input streamed as `input_json_delta` pieces) or
+  `tool_calls` (OpenAI, `finish_reason: tool_calls`), streamed or not, with
+  ids `toolu_mock_<step>_<i>` / `call_mock_<step>_<i>`.
+- A text step may use `{{tool_results}}` (the results sent back in this
+  request, one per line) and `{{last_user}}` (the typed message).
+- `{"error": {"status", "type", "message"}}` answers with that error;
+  `delay_ms` waits before any step, `hang` waits 60 s (Stop tests).
+- A tool the request did not offer in `tools` is not called; the answer is
+  `Mock: tool "<name>" was not offered.`
+- Like the real Anthropic API, a request with `tool_use` or `tool_result`
+  blocks but no `tools` gets 400, and so does a `tool_use` without its
+  `tool_result` in the next message.
+- A message without a marker gets the usual echo (of the last message the
+  user typed, not of a tool result).
+
+Tests: `python test-env/mocks/test_server.py`.
 
 ## OpenAI-compatible API
 

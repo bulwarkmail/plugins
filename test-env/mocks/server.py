@@ -291,6 +291,178 @@ def count_tokens(text):
     return max(1, len(text.split()))
 
 
+
+# --------------------------------------------------------------------------
+# Scripted AI answers (lookups and actions for the e2e tests)
+# --------------------------------------------------------------------------
+#
+# A test registers a script (POST /__ai/scripts {"name", "steps"}) and puts
+# [[mock:<name>]] in the message it types (or in the admin's standing
+# instructions, which go into the system prompt). Each request is answered
+# with the step whose index is the number of tool-calling assistant turns
+# after the typed message, so retries and parallel runs stay deterministic.
+# A step is one of:
+#   {"tools": [{"name", "input"}], "text"?}   call tools (text before them is optional)
+#   {"text": "..."}                            the answer; {{tool_results}} and
+#                                              {{last_user}} are filled in
+#   {"error": {"status", "type", "message"}}   an error answer
+#   {"delay_ms": n} or {"hang": true}          added to any step: wait first
+# Past the last step the last one repeats. Every AI request is logged.
+
+MARKER = re.compile(r'\[\[mock:([A-Za-z0-9_.-]+)\]\]')
+AI_LOG_SIZE = 60
+
+
+def _anthropic_text(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return ' '.join(p.get('text', '') for p in content if isinstance(p, dict) and p.get('type') == 'text')
+    return ''
+
+
+def _is_tool_results_only(content):
+    return isinstance(content, list) and content and all(
+        isinstance(p, dict) and p.get('type') == 'tool_result' for p in content)
+
+
+def typed_index(messages, provider):
+    """Index of the last message the user typed (not a tool result)."""
+    for i in range(len(messages) - 1, -1, -1):
+        m = messages[i]
+        if m.get('role') != 'user':
+            continue
+        if provider == 'anthropic' and _is_tool_results_only(m.get('content')):
+            continue
+        return i
+    return -1
+
+
+def typed_text(messages, provider):
+    i = typed_index(messages, provider)
+    if i < 0:
+        return ''
+    c = messages[i].get('content')
+    return _anthropic_text(c) if provider == 'anthropic' else (c if isinstance(c, str) else _anthropic_text(c))
+
+
+def system_text(body, provider):
+    if provider == 'anthropic':
+        s = body.get('system')
+        return s if isinstance(s, str) else _anthropic_text(s or [])
+    return '\n'.join(_anthropic_text(m.get('content')) if not isinstance(m.get('content'), str) else m['content']
+                     for m in body.get('messages', []) if m.get('role') == 'system')
+
+
+def step_of(messages, provider):
+    start = typed_index(messages, provider)
+    n = 0
+    for m in messages[start + 1:]:
+        if m.get('role') != 'assistant':
+            continue
+        if provider == 'anthropic':
+            c = m.get('content')
+            if isinstance(c, list) and any(isinstance(p, dict) and p.get('type') == 'tool_use' for p in c):
+                n += 1
+        elif m.get('tool_calls'):
+            n += 1
+    return n
+
+
+def tool_results(messages, provider):
+    """The tool results the client sent back after the typed message, in order."""
+    out = []
+    for m in messages[typed_index(messages, provider) + 1:]:
+        if provider == 'anthropic' and m.get('role') == 'user' and isinstance(m.get('content'), list):
+            for p in m['content']:
+                if isinstance(p, dict) and p.get('type') == 'tool_result':
+                    c = p.get('content')
+                    out.append(c if isinstance(c, str) else _anthropic_text(c))
+        elif provider == 'openai' and m.get('role') == 'tool':
+            c = m.get('content')
+            out.append(c if isinstance(c, str) else _anthropic_text(c))
+    return out
+
+
+def offered_tools(body, provider):
+    tools = body.get('tools') or []
+    if provider == 'anthropic':
+        return [t.get('name') for t in tools if isinstance(t, dict)]
+    return [(t.get('function') or {}).get('name') for t in tools if isinstance(t, dict)]
+
+
+def anthropic_tool_problem(body):
+    """What the real API refuses: tool blocks without tools, a tool_use without its result."""
+    msgs = body.get('messages') or []
+    uses_tools = any(isinstance(m.get('content'), list) and any(
+        isinstance(p, dict) and p.get('type') in ('tool_use', 'tool_result') for p in m['content']) for m in msgs)
+    if uses_tools and not body.get('tools'):
+        return 'Requests which include `tool_use` or `tool_result` blocks must define tools.'
+    for i, m in enumerate(msgs):
+        if m.get('role') != 'assistant' or not isinstance(m.get('content'), list):
+            continue
+        ids = [p.get('id') for p in m['content'] if isinstance(p, dict) and p.get('type') == 'tool_use']
+        if not ids:
+            continue
+        nxt = msgs[i + 1] if i + 1 < len(msgs) else None
+        got = [p.get('tool_use_id') for p in (nxt or {}).get('content', []) if isinstance(p, dict) and p.get('type') == 'tool_result'] \
+            if nxt and isinstance(nxt.get('content'), list) else []
+        missing = [x for x in ids if x not in got]
+        if missing:
+            return f'messages.{i + 1}: `tool_use` ids were found without `tool_result` blocks immediately after: {", ".join(missing)}.'
+    return None
+
+
+def log_ai(path, provider, body, marker, step):
+    with LOCK:
+        log = STATE.setdefault('ai_log', [])
+        log.append({'at': time.time(), 'path': path, 'provider': provider, 'marker': marker,
+                    'step': step, 'tools': offered_tools(body, provider), 'body': body})
+        del log[:-AI_LOG_SIZE]
+
+
+def scripted(body, provider):
+    """None for the plain echo; else a dict: kind text|tools|error, with what to send."""
+    messages = body.get('messages') or []
+    found = MARKER.search(typed_text(messages, provider)) or MARKER.search(system_text(body, provider))
+    if not found:
+        return None
+    name = found.group(1)
+    step_no = step_of(messages, provider)
+    with LOCK:
+        script = (STATE.get('ai_scripts') or {}).get(name)
+    if not script:
+        return {'kind': 'text', 'text': f'Mock: no script "{name}".', 'marker': name, 'step': step_no}
+    steps = script.get('steps') or [{'text': ''}]
+    step = steps[min(step_no, len(steps) - 1)]
+    if step_no >= len(steps) and step.get('tools'):
+        # The client came back for more after the last tool step: end the answer.
+        return {'kind': 'text', 'text': f'Mock: script "{name}" has no more steps.', 'marker': name, 'step': step_no}
+    if step.get('hang'):
+        time.sleep(60)
+    if step.get('delay_ms'):
+        time.sleep(step['delay_ms'] / 1000)
+    base = {'marker': name, 'step': step_no}
+    if step.get('error'):
+        return {**base, 'kind': 'error', 'error': step['error']}
+    offered = offered_tools(body, provider)
+    if step.get('tools'):
+        for t in step['tools']:
+            if t.get('name') not in offered:
+                return {**base, 'kind': 'text', 'text': f'Mock: tool "{t.get("name")}" was not offered.'}
+        return {**base, 'kind': 'tools', 'text': step.get('text', ''), 'tools': step['tools']}
+    results = tool_results(messages, provider)
+    text = str(step.get('text', ''))
+    text = text.replace('{{tool_results}}', '\n'.join(results)).replace('{{last_user}}', typed_text(messages, provider))
+    return {**base, 'kind': 'text', 'text': text}
+
+
+def split_json(value, n=3):
+    s = json.dumps(value)
+    size = max(1, -(-len(s) // n))
+    return [s[i:i + size] for i in range(0, len(s), size)] or ['{}']
+
+
 # --------------------------------------------------------------------------
 # HTTP handler
 # --------------------------------------------------------------------------
@@ -410,6 +582,29 @@ class Handler(BaseHTTPRequestHandler):
         reset_state()
         self.send_json(200, {'status': 'reset'})
 
+    # -- scripted AI ------------------------------------------------------
+    def ai_scripts(self, q):
+        body = self.body_json()
+        name = body.get('name')
+        if not isinstance(name, str) or not MARKER.fullmatch(f'[[mock:{name}]]') or not isinstance(body.get('steps'), list):
+            return self.send_json(400, {'error': 'name and steps are required'})
+        with LOCK:
+            STATE.setdefault('ai_scripts', {})[name] = {'steps': body['steps']}
+        self.send_json(200, {'status': 'ok', 'name': name})
+
+    def ai_requests(self, q):
+        with LOCK:
+            log = list(STATE.get('ai_log') or [])
+        if q.get('marker'):
+            log = [r for r in log if r['marker'] == q['marker']]
+        self.send_json(200, log)
+
+    def ai_last(self, q):
+        with LOCK:
+            log = STATE.get('ai_log') or []
+            last = log[-1] if log else None
+        self.send_json(200 if last else 404, last or {'error': 'no AI request yet'})
+
     def state(self, q):
         with LOCK:
             self.send_json(200, {
@@ -435,7 +630,18 @@ class Handler(BaseHTTPRequestHandler):
         if not body.get('model') or not body.get('max_tokens') or not body.get('messages'):
             return self.send_json(400, {'type': 'error', 'error': {
                 'type': 'invalid_request_error', 'message': 'model, max_tokens and messages are required'}})
-        text = reply_text(last_user_text(body['messages']))
+        problem = anthropic_tool_problem(body)
+        script = None if problem else scripted(body, 'anthropic')
+        log_ai(self.path, 'anthropic', body, script and script['marker'], script and script['step'])
+        if problem:
+            return self.send_json(400, {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': problem}})
+        if script and script['kind'] == 'error':
+            err = script['error']
+            return self.send_json(int(err.get('status', 500)), {'type': 'error', 'error': {
+                'type': err.get('type', 'api_error'), 'message': err.get('message', 'Mock error')}})
+        if script and script['kind'] == 'tools':
+            return self.anthropic_tools(body, script)
+        text = script['text'] if script else reply_text(typed_text(body['messages'], 'anthropic'))
         in_tok = count_tokens(json.dumps(body['messages']) + str(body.get('system', '')))
         out_tok = count_tokens(text)
         msg_id = 'msg_mock0000000000000000001'
@@ -460,6 +666,40 @@ class Handler(BaseHTTPRequestHandler):
         self.sse({'type': 'content_block_stop', 'index': 0}, 'content_block_stop')
         self.sse({'type': 'message_delta', 'delta': {'stop_reason': 'end_turn', 'stop_sequence': None},
                   'usage': {'output_tokens': out_tok}}, 'message_delta')
+        self.sse({'type': 'message_stop'}, 'message_stop')
+
+    def anthropic_tools(self, body, script):
+        """A scripted turn that calls tools: optional text, then tool_use blocks."""
+        msg_id = f'msg_mock_tools_{script["step"]}'
+        calls = [{'id': f'toolu_mock_{script["step"]}_{i}', 'name': t['name'], 'input': t.get('input') or {}}
+                 for i, t in enumerate(script['tools'])]
+        text = script.get('text') or ''
+        if not body.get('stream'):
+            content = ([{'type': 'text', 'text': text}] if text else []) + [{'type': 'tool_use', **c} for c in calls]
+            return self.send_json(200, {
+                'id': msg_id, 'type': 'message', 'role': 'assistant', 'model': body['model'], 'content': content,
+                'stop_reason': 'tool_use', 'stop_sequence': None, 'usage': {'input_tokens': 10, 'output_tokens': 10},
+            })
+        self.start_sse()
+        self.sse({'type': 'message_start', 'message': {
+            'id': msg_id, 'type': 'message', 'role': 'assistant', 'model': body['model'], 'content': [],
+            'stop_reason': None, 'stop_sequence': None, 'usage': {'input_tokens': 10, 'output_tokens': 1}}}, 'message_start')
+        index = 0
+        if text:
+            self.sse({'type': 'content_block_start', 'index': 0, 'content_block': {'type': 'text', 'text': ''}}, 'content_block_start')
+            self.sse({'type': 'content_block_delta', 'index': 0, 'delta': {'type': 'text_delta', 'text': text}}, 'content_block_delta')
+            self.sse({'type': 'content_block_stop', 'index': 0}, 'content_block_stop')
+            index = 1
+        for c in calls:
+            self.sse({'type': 'content_block_start', 'index': index, 'content_block': {
+                'type': 'tool_use', 'id': c['id'], 'name': c['name'], 'input': {}}}, 'content_block_start')
+            for piece in split_json(c['input']):
+                self.sse({'type': 'content_block_delta', 'index': index,
+                          'delta': {'type': 'input_json_delta', 'partial_json': piece}}, 'content_block_delta')
+            self.sse({'type': 'content_block_stop', 'index': index}, 'content_block_stop')
+            index += 1
+        self.sse({'type': 'message_delta', 'delta': {'stop_reason': 'tool_use', 'stop_sequence': None},
+                  'usage': {'output_tokens': 10}}, 'message_delta')
         self.sse({'type': 'message_stop'}, 'message_stop')
 
     # -- OpenAI-compatible -------------------------------------------------
@@ -492,7 +732,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(400, {'error': {
                 'message': 'model and messages are required', 'type': 'invalid_request_error',
                 'param': None, 'code': None}})
-        text = reply_text(last_user_text(body['messages']))
+        script = scripted(body, 'openai')
+        log_ai(self.path, 'openai', body, script and script['marker'], script and script['step'])
+        if script and script['kind'] == 'error':
+            err = script['error']
+            return self.send_json(int(err.get('status', 500)), {'error': {
+                'message': err.get('message', 'Mock error'), 'type': err.get('type', 'server_error'), 'param': None, 'code': None}})
+        if script and script['kind'] == 'tools':
+            return self.openai_tools(body, script)
+        text = script['text'] if script else reply_text(typed_text(body['messages'], 'openai'))
         cid = 'chatcmpl-mock0000000000001'
         usage = {'prompt_tokens': count_tokens(json.dumps(body['messages'])),
                  'completion_tokens': count_tokens(text)}
@@ -518,6 +766,34 @@ class Handler(BaseHTTPRequestHandler):
         if (body.get('stream_options') or {}).get('include_usage'):
             self.sse({'id': cid, 'object': 'chat.completion.chunk', 'created': FIXED_TIME,
                       'model': body['model'], 'choices': [], 'usage': usage})
+        self.sse('[DONE]')
+
+    def openai_tools(self, body, script):
+        """A scripted turn that calls tools, as tool_calls."""
+        cid = f'chatcmpl-mock-tools-{script["step"]}'
+        calls = [{'id': f'call_mock_{script["step"]}_{i}', 'type': 'function',
+                  'function': {'name': t['name'], 'arguments': json.dumps(t.get('input') or {})}}
+                 for i, t in enumerate(script['tools'])]
+        text = script.get('text') or None
+        if not body.get('stream'):
+            return self.send_json(200, {
+                'id': cid, 'object': 'chat.completion', 'created': FIXED_TIME, 'model': body['model'],
+                'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': text, 'tool_calls': calls},
+                             'logprobs': None, 'finish_reason': 'tool_calls'}],
+                'usage': {'prompt_tokens': 10, 'completion_tokens': 10, 'total_tokens': 20},
+            })
+        self.start_sse()
+
+        def chunk(delta, finish=None):
+            return {'id': cid, 'object': 'chat.completion.chunk', 'created': FIXED_TIME, 'model': body['model'],
+                    'choices': [{'index': 0, 'delta': delta, 'logprobs': None, 'finish_reason': finish}]}
+        self.sse(chunk({'role': 'assistant', 'content': text}))
+        for i, c in enumerate(calls):
+            self.sse(chunk({'tool_calls': [{'index': i, 'id': c['id'], 'type': 'function',
+                                            'function': {'name': c['function']['name'], 'arguments': ''}}]}))
+            for piece in split_json(json.loads(c['function']['arguments'])):
+                self.sse(chunk({'tool_calls': [{'index': i, 'function': {'arguments': piece}}]}))
+        self.sse(chunk({}, 'tool_calls'))
         self.sse('[DONE]')
 
     # -- Todoist API v1 ----------------------------------------------------
@@ -677,6 +953,9 @@ ROUTES = [
     ('GET', r'/health', Handler.health),
     ('POST', r'/__reset', Handler.reset),
     ('GET', r'/__state', Handler.state),
+    ('POST', r'/__ai/scripts', Handler.ai_scripts),
+    ('GET', r'/__ai/requests', Handler.ai_requests),
+    ('GET', r'/__ai/last', Handler.ai_last),
     ('POST', r'/anthropic/v1/messages', Handler.anthropic_messages),
     ('GET', r'/openai/v1/models', Handler.openai_models),
     ('POST', r'/openai/v1/chat/completions', Handler.openai_chat),
