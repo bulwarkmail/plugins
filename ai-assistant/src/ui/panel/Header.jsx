@@ -1,6 +1,7 @@
 // The panel's title row: its name and, once there is a conversation, New chat.
-// 56 px high like the app's other side panels (the contact panel's h-14), and
-// the same height with or without the button, so nothing below it jumps.
+// 56 px high plus its border, like the app's toolbars and its other side
+// panels (h-14 with a border under it), and the same height with or without
+// the button, so nothing below it jumps.
 
 import { Button, Icon } from '@plugin-host/ui';
 
@@ -12,7 +13,7 @@ export function Header({ api, hasTurns, onClear }) {
     <div
       data-assistant-header
       style={{
-        height: HEADER_HEIGHT, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        height: HEADER_HEIGHT, boxSizing: 'content-box', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
         padding: '0 8px 0 16px', borderBottom: '1px solid var(--color-border)', flexShrink: 0,
       }}
     >

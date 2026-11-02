@@ -976,6 +976,8 @@ describe('the header', () => {
     await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
     const header = document.querySelector('[data-assistant-header]');
     expect(header.style.height).toBe('56px');
+    // The border comes on top, as under the app's h-14 rows.
+    expect(header.style.boxSizing).toBe('content-box');
     expect(screen.getByRole('heading', { name: 'AI assistant' })).toBeTruthy();
     // New chat keeps its place while hidden, so the title doesn't move when it appears.
     expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull();
