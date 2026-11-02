@@ -26,7 +26,7 @@ export function contextChip(t, source, email) {
 export function ContextChips({ api, source, email, onRemove, onRestore, fit = 'full', extra = [] }) {
   // The 2.2 areas' chips follow the message's (attachments, a thread, files, ...).
   const more = extra.map((c) => (
-    <ContextChip key={c.key} icon={c.icon} label={c.label} detail={c.detail} title={c.title} onRemove={c.onRemove} removeLabel={c.removeLabel ?? api.i18n.t('panel.context.remove')} onClick={c.onClick} dashed={c.dashed} fit={fit} />
+    <ContextChip key={c.key} icon={c.icon} label={c.label} detail={c.detail} title={c.title} name={c.name} onRemove={c.onRemove} removeLabel={c.removeLabel ?? api.i18n.t('panel.context.remove')} onClick={c.onClick} dashed={c.dashed} fit={fit} />
   ));
   const own = <OwnChip api={api} source={source} email={email} onRemove={onRemove} onRestore={onRestore} fit={fit} />;
   return more.length ? <>{own}{more}</> : own;
@@ -89,12 +89,13 @@ const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'no
  * screens, else on hover and keyboard focus, and its place is kept so
  * nothing moves. `dashed` with onClick is the chip that brings a context back.
  */
-export function ContextChip({ icon, label, detail, title, onRemove, removeLabel, onClick, dashed = false, fit = 'full' }) {
+export function ContextChip({ icon, label, detail, title, name: fullName, onRemove, removeLabel, onClick, dashed = false, fit = 'full' }) {
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
   const iconOnly = fit === 'icon';
   const more = detail ? (title || detail) : title;
-  const name = more && more !== label ? `${label}: ${more}` : label;
+  // `name`: what a screen reader says, when the label and title don't say it well together.
+  const name = fullName || (more && more !== label ? `${label}: ${more}` : label);
   const box = {
     display: 'inline-flex', alignItems: 'center', gap: CHIP.gap, flex: '0 1 auto', minWidth: iconOnly ? CHIP.iconOnly : 0, maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box',
     // Sits on the input box (muted): outlined, with the box's colour inside.

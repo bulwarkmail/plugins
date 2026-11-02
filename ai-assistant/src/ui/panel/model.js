@@ -30,8 +30,14 @@ export const STORED_SOURCE_CHARS = 2000;
  */
 export function storedTurns(turns, mode) {
   const clip = (text) => (typeof text === 'string' && text.length > STORED_SOURCE_CHARS ? text.slice(0, STORED_SOURCE_CHARS) : text);
-  return turns.slice(-MAX_TURNS).map((turn) => {
-    if (mode !== 'reader' || turn.role !== 'assistant') return turn;
+  // What a lookup read (an attachment, a conversation) is kept short in every panel.
+  const clipSteps = (turn) => (Array.isArray(turn.steps) && turn.steps.some((s) => typeof s?.result === 'string' && s.result.length > STORED_SOURCE_CHARS)
+    ? { ...turn, steps: turn.steps.map((s) => (typeof s?.result === 'string' ? { ...s, result: clip(s.result) } : s)) }
+    : turn);
+  return turns.slice(-MAX_TURNS).map((whole) => {
+    if (whole.role !== 'assistant') return whole;
+    const turn = clipSteps(whole);
+    if (mode !== 'reader') return turn;
     const out = { ...turn, source: clip(turn.source) };
     if (turn.status !== 'error' && turn.input && typeof turn.input === 'object') {
       out.input = { ...turn.input };

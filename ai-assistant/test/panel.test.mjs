@@ -813,11 +813,11 @@ describe('words for every platform and lookup', () => {
     // A saved answer with a lookup this version has no words for.
     await api.storage.set('chat:reader', { turns: [
       { id: 'u1', role: 'user', content: 'what is in the file?', label: 'what is in the file?', emailId: 'M1' },
-      { id: 'a1', role: 'assistant', content: 'A list.', status: 'done', task: 'chat', show: 'chat', steps: [{ id: 's1', name: 'read_attachment', args: { name: 'list.txt' }, status: 'done', result: 'milk, eggs' }] },
+      { id: 'a1', role: 'assistant', content: 'A list.', status: 'done', task: 'chat', show: 'chat', steps: [{ id: 's1', name: 'read_punch_card', args: { name: 'list.txt' }, status: 'done', result: 'milk, eggs' }] },
     ] });
     await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
     const box = await waitFor(() => { const el = document.querySelector('[data-steps]'); if (!el) throw new Error('no steps'); return el; });
-    expect(box.textContent).not.toContain('read_attachment');
+    expect(box.textContent).not.toContain('read_punch_card');
     expect(box.textContent).toContain('Other');
     await click(within(box).getByRole('button'));
     expect(box.textContent).toContain('Looked something up');
