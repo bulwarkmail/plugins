@@ -799,6 +799,32 @@ describe('quick action names', () => {
   });
 });
 
+describe('Escape', () => {
+  const escape = async (el) => { await act(async () => { fireEvent.keyDown(el, { key: 'Escape' }); }); };
+
+  it('closes the reader panel from an empty input, like the composer one', async () => {
+    const api = makeApi({ handlers: { 'ui.closePanel': async () => true } });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const box = screen.getByRole('textbox', { name: 'Message to the assistant' });
+    await type('half a question');
+    await escape(box);
+    expect(api.calls('ui.closePanel')).toHaveLength(0);
+    await type('');
+    await escape(box);
+    expect(api.calls('ui.closePanel').map((c) => c.args)).toEqual([['email-detail-sidebar']]);
+  });
+
+  it('closes the language picker and goes back to the input', async () => {
+    const api = makeApi();
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await quickAction('Translate');
+    const picker = screen.getByRole('combobox', { name: 'Translate into' });
+    await escape(picker);
+    expect(screen.queryByRole('combobox', { name: 'Translate into' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Message to the assistant' }));
+  });
+});
+
 describe('the privacy notice', () => {
   it('waits for the answer without saying the assistant is thinking', async () => {
     const api = makeApi({ consent: false, answers: ['Hello.'] });
