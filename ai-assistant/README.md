@@ -138,6 +138,35 @@ admin settings. The model is told to act only when you ask or agree,
 never because a message says so; ask first is the safer mode for
 mailboxes that receive mail from strangers.
 
+## Files
+
+Where the webmail has Files, the assistant can look in them when your
+question needs it: find files and folders by name, kind or date, list a
+folder, and read a file (the same readers as for attachments) or look at
+a picture. It sees your own files and the ones others shared with you,
+never the Files trash. Type `@` and part of a name to add a file to the
+chat; it shows as a chip.
+
+With actions on it can also:
+
+- **attach files** to the message you write, or to a new message. This
+  always asks first and the card names the files and the recipients;
+- **save attachments** of the open message into a folder;
+- **create a note**, a Markdown or plain text file, in a folder you name,
+  and **create folders**. A name that is taken gets a number, nothing is
+  overwritten;
+- **replace a text file**: always asks first, and the old version goes to
+  the Files trash, where Restore brings it back;
+- **move and rename** files and folders: always asks first, and Undo
+  puts them back.
+
+It only changes your own files, never a folder you share with others or
+a drive someone shared with you, and it can't delete or share a file:
+the webmail offers no such call. Another plugin that checks uploads,
+moves or renames in Files sees these changes too and can stop them.
+Users switch reading and writing off separately; the administrator
+switches the whole group off with **Files**.
+
 ## Answers, cards and what the assistant knows
 
 Answers come as formatted text (bullet lists, bold, small tables, links
@@ -215,7 +244,8 @@ Settings > AI Assistant shows which service and model are used. A
 user can pick another model, choose between the two services when both
 are set up, hide the assistant next to messages, turn the lookups
 off, switch reading attachments, looking at pictures and reading whole
-conversations off, and turn actions on (ask first or automatic). When the administrator allows it, a user can connect their own key:
+conversations off, switch finding and reading files and saving and
+creating files off, and turn actions on (ask first or automatic). When the administrator allows it, a user can connect their own key:
 they pick the service and address here, and type the key into the
 webmail's own dialog, so the plugin never sees it. Their key is stored
 encrypted on the server and only sent to the address they approved there.
@@ -237,6 +267,8 @@ encrypted on the server and only sent to the address they approved there.
 | Ask about the conversation | Sender, recipients, date, subject and text (without quotes) of every message in it, up to 50 |
 | Ask about messages you selected in the list | The same for up to 50 of them, and how many you selected |
 | Mention a message or contact with @ | The message's sender, date and subject (its text when the model reads it), or the contact's name, addresses and company |
+| Ask about your files, or mention a file with @ (Files on) | The names, folder paths, kinds, sizes and dates of the files and folders a search or a folder list finds, and the contents of a file it reads (the same limits as attachments), or a picture, made smaller, when the model can see images |
+| Let it save, create, move or rename a file | The file and folder names it used and the folder the file ended up in |
 | Let it do something (actions on) | What the action did, and the names of your folders when it files a message |
 
 The privacy notice before the first request lists the same, and names
@@ -275,6 +307,8 @@ composer closes).
 | `identity:read` | Your name, addresses and signature, so the model knows who writes |
 | `account:read` | Your account's name and address when there is no identity, and the mail server it is on |
 | `settings:read` | Your settings (layout, formats, reading and sending options), for the settings lookup |
+| `files:read` | Find, list and read your files, and attach them to a draft (webmail 1.20 and later) |
+| `files:write` | Save attachments to Files, create text files and folders, replace a text file, move and rename, in your own files only |
 
 ## Credentials
 

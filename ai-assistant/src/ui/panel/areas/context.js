@@ -11,6 +11,8 @@ import { attachmentLines, contextFlags, isImage } from '../../../lib/areas/conte
 import { contactParts } from '../../../lib/widgets.js';
 import { effectiveActionMode } from '../../../lib/actions.js';
 import { excerpt } from '../model.js';
+// Files (area files) are a source of the same @ menu: the input opens the first one.
+import { fileMentionItems, fileMentionLabel, pickFileMention } from './files.js';
 
 /** More attachments than this share one chip. */
 export const MAX_ATTACHMENT_CHIPS = 3;
@@ -85,16 +87,17 @@ export function useArea(chat, props = {}) {
 
   const removeAttachments = useCallback((ids) => setRemovedAtt((prev) => new Set([...prev, ...ids])), []);
 
-  // ─── The @ menu: messages and contacts ───
+  // ─── The @ menu: messages, contacts and files ───
   const menus = useMemo(() => (flags.mentions ? [{
     trigger: '@',
-    label: t('ctx.mention.label'),
+    label: fileMentionLabel(api, t, { config: setup?.config ?? {}, prefs }) ?? t('ctx.mention.label'),
     items: async (query) => {
       const q = String(query ?? '').trim();
       if (q.length < 2) return [];
-      const [contacts, mails] = await Promise.all([
+      const [contacts, mails, files] = await Promise.all([
         Promise.resolve(api.contacts.search(q)).catch(() => []),
         Promise.resolve(api.email.search({ text: q, limit: 5 })).catch(() => []),
+        fileMentionItems(api, q, { config: setup?.config ?? {}, prefs }).catch(() => []),
       ]);
       const people = (contacts ?? []).slice(0, 4).map((c) => {
         const { name, emails, company } = contactParts(c);
@@ -112,14 +115,16 @@ export function useArea(chat, props = {}) {
           mention: { kind: 'message', id: m.id, ...(m.accountId ? { accountId: m.accountId } : {}), label, detail: from, line: `- id ${m.id} | from ${from || '?'} | ${m.receivedAt ?? ''} | ${m.subject ?? ''}` },
         };
       });
-      return [...people, ...messages];
+      // The menu shows 8: files go before the messages so a full list of messages can't hide them.
+      return [...people, ...files, ...messages];
     },
     onPick: (item) => {
+      if (item.file) { pickFileMention(item.file); return; }
       const picked = mentionOf(item);
       if (!picked) return;
       setMentions((prev) => (prev.some((m) => m.kind === picked.kind && m.id === picked.id && m.accountId === picked.accountId) ? prev : [...prev, picked]));
     },
-  }] : []), [api, t, flags.mentions]);
+  }] : []), [api, t, flags.mentions, setup, prefs]);
 
   // ─── Chips ───
   const chips = [];
