@@ -333,8 +333,9 @@ High-risk permissions are listed first in the consent dialog and marked.
 | `email:blob-write` | **Replace attachments before sending.** Upload files to your mail server and replace a file you attached with another one before the message is sent. | yes |
 | `email:render-takeover` | **Change how messages are shown.** Replace the text of messages you open and of the message list, for example to show decrypted content. | yes |
 | `compose:open` | **Open the composer for you.** Open a new message with recipients, text or attachments filled in. You still decide whether to send it. |  |
-| `compose:read` | **Read the message you are writing.** Read the text of a message while you write it, when you use the plugin in the composer. Not the signature or the quoted message. |  |
+| `compose:read` | **Read the message you are writing.** Read a message while you write it, when you use the plugin in the composer: its text, subject, recipients including Bcc, and the names and sizes of attachments. Not the signature or the quoted message. |  |
 | `compose:write` | **Change the message you are writing.** Replace or add text in a message while you write it, when you use the plugin in the composer. You can undo each change, and you still decide whether to send. |  |
+| `compose:check` | **Check what you write.** Reads what you write in the composer while you type and may send it to the service it uses. Only where proofreading is on, and never for a message you sign or encrypt. | yes |
 | `email:forward` | **Forward your mail.** Forward messages from your account with their attachments, without opening the composer. You are asked before the first forward to each address. | yes |
 | `calendar:read` | **Read your calendar.** See your calendars and their events. |  |
 | `calendar:write` | **Change your calendar.** Create, change and delete events. |  |
@@ -1596,6 +1597,55 @@ await api.composer.attach(composerId, { blobId, name, type, size })             
 - `attach` adds a blob from `api.jmap.uploadBlob` through the composer's usual
   checks (size limit, onBeforeAttachmentUpload).
 
+### Text checkers (Bulwark 1.20 and later)
+
+A plugin with `compose:check` can check what the user writes while they
+type. The host sends it the user's own text in paragraphs and draws its
+answers as underlines with a popup of suggestions; the issue list, keyboard
+access, plain-text mode and the admin's policy are the host's. See
+`languagetool/` for a complete checker.
+
+```js
+const checker = await api.composer.registerChecker({
+  id: 'spell', label: 'My checker', kinds: ['spelling', 'grammar'],
+  debounceMs: 800, languages: ['de-DE'], warnBeforeSend: false,
+  async check({ composerId, revision, language, full, order, segments, objectReplacement }) {
+    return [{ segmentId: segments[0].id, offset: 0, length: 3, kind: 'spelling',
+      message: 'Possible spelling mistake.', replacements: ['the'], ruleId: 'TYPO' }];
+    // or { annotations, status: 'ok' | 'unavailable' | 'paused', message, retryAfterMs }
+  },
+  onAction({ composerId, annotation, action }) {},   // ignore | dictionary | disable-rule
+});
+await checker.update({ warnBeforeSend: true });
+await checker.recheck();     // every composer sends all its paragraphs again (full: true)
+await checker.dispose();
+```
+
+- Register from `activate()`: the host calls `check` in the background frame.
+- `segments` holds only paragraphs the checker hasn't seen; `order` lists all
+  ids. An id names one exact text, so cache by id. A hard break is `\n`, a
+  mention or inline image one `objectReplacement` (U+FFFC) to skip.
+- Offsets are UTF-16 units into the segment text (as JavaScript and
+  LanguageTool count). Ranges over a line break or an object, through half a
+  character, or out of the segment are dropped; at most 300 annotations and 5
+  replacements each.
+- One request per composer at a time, newest text wins, 15 s timeout, at most
+  20,000 characters of new text per request. Errors and timeouts don't count
+  as plugin errors: answer `status: 'unavailable'` or `'paused'` with
+  `retryAfterMs` instead of throwing.
+- Nothing is sent while proofreading is off (user, message or admin, also per
+  plugin id), while the policy isn't loaded, for a message that will be
+  signed or encrypted, or in the first second after the composer opens.
+- A checker that checks only when the user asks registers with
+  `mode: 'on-demand'`, needs only `compose:read`, and uses
+  `api.composer.getCheckText(composerId, id)` and
+  `api.composer.setAnnotations(composerId, id, revision, annotations)` with a
+  composer id from a user action (the AI assistant does this).
+- Crypto plugins: give the Options entries that sign or encrypt
+  `protects: 'sign'` or `'encrypt'` (needs `crypto:full` or
+  `email:raw-send`). While one is ticked, nothing is checked. A `crypto:full`
+  plugin that publishes no such entries pauses checking everywhere.
+
 ### api.email, api.mailboxes, api.drafts, api.compose
 
 ```js
@@ -1923,6 +1973,8 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.toast.error` | none |
 | `api.toast.info` | none |
 | `api.toast.warning` | none |
+| `api.toast.progress` | none |
+| `api.toast.dismiss` | none |
 | `api.http.post` | `http:post` |
 | `api.http.fetch` | `http:fetch` |
 | `api.jmap.fetchBlob` | `email:blob-read` |
@@ -2025,6 +2077,7 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.tasks.create` | `tasks:write` |
 | `api.tasks.update` | `tasks:write` |
 | `api.tasks.setComplete` | `tasks:write` |
+| `api.tasks.acknowledgeAlert` | `tasks:write` |
 | `api.tasks.delete` | `tasks:write` |
 | `api.templates.list` | `templates:read` |
 | `api.templates.get` | `templates:read` |
@@ -2048,10 +2101,18 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.drafts.create` | `email:write` |
 | `api.notifications.show` | `ui:notifications` |
 | `api.composer.getBody` | `compose:read` |
+| `api.composer.getSnapshot` | `compose:read` |
+| `api.composer.readAttachment` | `email:blob-read` |
 | `api.composer.getSelection` | `compose:read` |
 | `api.composer.replaceSelection` | `compose:write` |
 | `api.composer.replaceBody` | `compose:write` |
 | `api.composer.attach` | `email:blob-write` |
+| `api.composer.registerChecker` | `compose:check`, or `compose:read` for an on-demand checker |
+| `api.composer.updateChecker` | `compose:check`, or `compose:read` for an on-demand checker |
+| `api.composer.recheck` | `compose:check`, or `compose:read` for an on-demand checker |
+| `api.composer.unregisterChecker` | `compose:check`, or `compose:read` for an on-demand checker |
+| `api.composer.getCheckText` | `compose:check`, or `compose:read` for an on-demand checker |
+| `api.composer.setAnnotations` | `compose:check`, or `compose:read` for an on-demand checker |
 
 <!-- /generated:api-permissions -->
 

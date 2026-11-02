@@ -26,6 +26,14 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Methods whose permission the webmail checks in code (null in
+// PERM_PER_METHOD), and what they need.
+const CHECKER_PERMISSION = '`compose:check`, or `compose:read` for an on-demand checker';
+const CHECKED_IN_CODE = Object.fromEntries(
+  ['registerChecker', 'updateChecker', 'recheck', 'unregisterChecker', 'getCheckText', 'setAnnotations']
+    .map((m) => [`composer.${m}`, CHECKER_PERMISSION]),
+);
+
 const WEBMAIL = path.resolve(process.env.BULWARK_WEBMAIL || path.join(path.dirname(ROOT), 'jmap-webmail-plugins'));
 const DOC = path.join(ROOT, 'WRITING_PLUGINS.md');
 const SHOTS = 'docs/screenshots';
@@ -285,7 +293,7 @@ function apiPermissionsTable(methods) {
   return [
     '| Method | Permission |',
     '|---|---|',
-    ...methods.map(([method, perm]) => `| ${code(`api.${method}`)} | ${perm ? code(perm) : 'none'} |`),
+    ...methods.map(([method, perm]) => `| ${code(`api.${method}`)} | ${perm ? code(perm) : CHECKED_IN_CODE[method] ?? 'none'} |`),
   ].join('\n');
 }
 
