@@ -78,9 +78,10 @@ const toolResults = (request) => (request.body.messages.at(-1).content ?? []).fi
 
 /** Open a message by its subject and wait until the reader shows it. */
 async function open(page, subject) {
-  await openMessage(page, subject, page.getByText(subject, { exact: true }).first());
+  const row = () => page.getByText(subject, { exact: true }).locator('visible=true').first();
+  await openMessage(page, subject, row());
   const shown = page.getByRole('heading', { name: subject });
-  if (!(await shown.isVisible({ timeout: 10_000 }).catch(() => false))) await page.getByText(subject, { exact: true }).first().click({ force: true });
+  if (!(await shown.isVisible({ timeout: 10_000 }).catch(() => false))) await row().click();
   await expect(shown).toBeVisible({ timeout: 30_000 });
 }
 
