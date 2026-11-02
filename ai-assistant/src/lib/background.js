@@ -7,6 +7,9 @@
 
 import { loadSetup } from './assistant.js';
 import { withStrings } from './i18n.js';
+import { areaAllowed } from './config.js';
+import { has } from './caps.js';
+import { APP_PANEL, LAST_ACTIVE_EVERY_MS, LAST_ACTIVE_KEY, LAST_VISIT_KEY, viewOf } from './areas/everywhere.js';
 
 export const DRAFT_KEY = 'draft';
 /** What the open composer is: { mode, inReplyToId, originalSubject, at } (onComposerOpen). */
@@ -20,6 +23,8 @@ export const READER_PANEL = 'email-detail-sidebar';
 export const ACTION_ID = 'assistant';
 export const SHORTCUT = 'Alt+A';
 const REFRESH_EVERY_MS = 30_000;
+/** Closed for longer than this, the webmail's next start is a new visit (Catch me up's "since"). */
+const VISIT_GAP_MS = 2 * LAST_ACTIVE_EVERY_MS;
 
 /** The saved transcript of a chat. */
 export const chatKey = (mode, id) => `chat:${mode === 'composer' ? 'composer' : 'email'}:${id}`;
@@ -34,9 +39,9 @@ export const COMPOSER_MENU_ACTIONS = ['improve', 'grammar', 'shorter', 'translat
 export const READER_MENU_ACTIONS = ['explain', 'translate', 'reply', 'ask'];
 const MENU_ICONS = { improve: 'sparkles', grammar: 'text-spellcheck', shorter: 'text-decrease', translate: 'language', ask: 'message-circle', explain: 'help-circle', reply: 'arrow-back-up' };
 
-export function createBackground(api, { now = () => Date.now() } = {}) {
+export function createBackground(api, { now = () => Date.now(), every = (fn, ms) => setInterval(fn, ms) } = {}) {
   withStrings(api);
-  const state = { configured: false, showInReader: true, checkedAt: 0, composerOpen: false };
+  const state = { configured: false, showInReader: true, everywhere: false, checkedAt: 0, composerOpen: false };
   let shownActions = null;
   let dialogOpen = false;
   const t = (key, vars) => api.i18n.t(key, vars);
@@ -76,6 +81,8 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       const setup = await loadSetup(api);
       state.configured = !!setup.endpoint;
       state.showInReader = setup.prefs.showInReader !== false;
+      // The panel next to Calendar, Contacts, Files and Settings: the admin's switch, then the user's.
+      state.everywhere = areaAllowed(setup.config ?? {}, 'everywhere') && setup.prefs.everywhere !== false;
     } catch {
       state.configured = false;
     }
@@ -93,6 +100,32 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
         slot: 'plugin-dialog',
         width: 680,
         extraProps: { composerId },
+      });
+    } catch (err) {
+      api.log?.warn?.('assistant dialog failed', err?.message ?? err);
+      return null;
+    } finally {
+      dialogOpen = false;
+    }
+  }
+
+  /**
+   * The assistant as a dialog for a view where its panel has no room (a
+   * phone, Settings below 1024 px): the webmail's app-side-panel button
+   * asks for it with what the view shows.
+   */
+  async function openViewDialog(view, context) {
+    if (!viewOf({ view }) || dialogOpen || !state.configured || !state.everywhere) return null;
+    dialogOpen = true;
+    try {
+      return await api.ui.openDialog({
+        title: t('composer.title'),
+        slot: 'plugin-dialog',
+        width: 560,
+        // Webmail 1.20 and later: the dialog is as tall as the visible window
+        // (a phone's keyboard included) and the chat fills it; older ones ignore it.
+        fill: true,
+        extraProps: { view, context: context && typeof context === 'object' ? context : {} },
       });
     } catch (err) {
       api.log?.warn?.('assistant dialog failed', err?.message ?? err);
@@ -136,11 +169,26 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
   }
 
   /**
-   * Alt+A outside the composer: the panel next to the message. With a
-   * composer open the composer's own Alt+A has it, so this one stays out.
+   * Alt+A outside the composer: the panel of the view the user is in (the
+   * app-side-panel of Calendar, Contacts, Files and Settings), else the one
+   * next to the message. With a composer open the composer's own Alt+A has
+   * it, so this one stays out.
    */
   async function shortcutToggle() {
-    if (state.composerOpen || !state.configured || !state.showInReader) return;
+    // Right after the page loads the first look may still be under way.
+    if (!state.configured) await refresh();
+    if (state.composerOpen || !state.configured) return;
+    if (state.everywhere && has(api, 'sidePanel')) {
+      let open = null;
+      try {
+        open = await api.ui.togglePanel(APP_PANEL);
+      } catch (err) {
+        api.log?.warn?.('togglePanel failed', err?.message ?? err);
+      }
+      // null: no such panel on screen (Mail); false on a phone means the dialog was asked for.
+      if (open !== null) return;
+    }
+    if (!state.showInReader) return;
     await toggleReaderPanel();
   }
 
@@ -176,11 +224,29 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
     } catch { /* nothing to forget */ }
   }
 
+  /**
+   * When the user was last here, for Catch me up: the background part runs
+   * as long as the webmail is open, so it notes the time every few minutes;
+   * at the next start that time becomes the last visit. A start within a
+   * few notes of the last one (a reload, another tab) is the same visit and
+   * keeps it. (A panel's frame can't do this: the host removes it without
+   * running its cleanup.)
+   */
+  async function markVisit() {
+    try {
+      const last = await api.storage.get(LAST_ACTIVE_KEY);
+      if (Number.isFinite(last) && now() - last > VISIT_GAP_MS) await api.storage.set(LAST_VISIT_KEY, last);
+      await api.storage.set(LAST_ACTIVE_KEY, now());
+    } catch { /* storage full or blocked: Catch me up then looks a day back */ }
+    every(() => { void Promise.resolve(api.storage.set(LAST_ACTIVE_KEY, now())).catch(() => {}); }, LAST_ACTIVE_EVERY_MS);
+  }
+
   return {
     state,
     refresh,
     openPanel,
     openDialog,
+    openViewDialog,
     shortcutToggle,
     async activate() {
       // Drafts and chats left over from a closed tab are not kept.
@@ -188,6 +254,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       await forgetComposerChats();
       await forgetOldReaderChats();
       await api.storage.remove(COMPOSER_CONTEXT_KEY).catch(() => {});
+      await markVisit();
       await refresh(true);
     },
     hooks: {
@@ -198,6 +265,8 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
           void openPanel('composer', context?.composerId, { action: actionId, text: context?.selection?.text ?? '' });
         } else if (surface === READER_MENU_SURFACE) {
           void openPanel('reader', context?.emailId, { action: actionId, text: context?.selection?.text ?? '' });
+        } else if (surface === APP_PANEL && actionId === 'open') {
+          void openViewDialog(context?.view, context?.context);
         }
       },
       // Only the subject: the panel reads the text itself from the composer.
@@ -232,6 +301,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       reader: () => state.configured && state.showInReader,
       thread: (ctx) => state.configured && state.showInReader && Array.isArray(ctx?.emailIds) && ctx.emailIds.length > 1,
       composer: () => state.configured,
+      view: () => state.configured && state.everywhere,
     },
   };
 }

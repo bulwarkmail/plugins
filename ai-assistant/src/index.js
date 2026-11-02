@@ -13,7 +13,7 @@ import { AssistantPanel } from './ui/Panel.jsx';
 import { withStrings } from './lib/i18n.js';
 
 let background = null;
-const bg = () => background ?? { shouldShow: { reader: () => false, thread: () => false, composer: () => false }, hooks: {} };
+const bg = () => background ?? { shouldShow: { reader: () => false, thread: () => false, composer: () => false, view: () => false }, hooks: {} };
 
 /** The shortcut's name in the user's language (read once when the plugin loads). */
 function shortcutLabel() {
@@ -38,8 +38,9 @@ export default {
     onComposerClose: () => bg().hooks.onComposerClose?.(),
     onEmailOpen: () => bg().hooks.onEmailOpen?.(),
   },
-  // Alt+A opens and closes the panel next to the message (the composer
-  // handles its own Alt+A through its Assistant button).
+  // Alt+A opens and closes the panel of the view the user is in: next to
+  // Calendar, Contacts, Files or Settings, else next to the message (the
+  // composer handles its own Alt+A through its Assistant button).
   shortcuts: {
     'toggle-panel': {
       keys: 'Alt+A',
@@ -54,6 +55,9 @@ export default {
     // entries open them.
     'composer-sidebar-right': { component: AssistantPanel, fill: true, startFolded: true, shouldShow: () => bg().shouldShow.composer() },
     'email-detail-sidebar': { component: AssistantPanel, fill: true, startFolded: true, shouldShow: () => bg().shouldShow.reader() },
+    // The same chat next to Calendar, Contacts, Files and Settings (webmail
+    // 1.20 and later; older ones don't know the slot and skip it).
+    'app-side-panel': { component: AssistantPanel, fill: true, startFolded: true, shouldShow: () => bg().shouldShow.view() },
     // The bar above a message, for screens without the panel (phones).
     'email-banner': { component: ReaderBar, shouldShow: () => bg().shouldShow.reader() },
     'thread-summary': { component: ThreadSummary, shouldShow: (ctx) => bg().shouldShow.thread(ctx) },

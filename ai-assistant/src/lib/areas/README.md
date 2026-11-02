@@ -65,6 +65,7 @@ is ready). It returns any of:
   menus: [{ trigger: '@' | '/', atStart?: boolean, label, items: async (query) => [{ id, label, detail?, icon? }], onPick: (item) => void }],
   header: [{ key, icon, label, onClick, pressed? }],  // buttons in the panel header
   overlay: ReactNode | null,   // shown instead of the transcript (a history list)
+  empty: { text?, actions: [{ id, label, icon, run, busy? }] } | null,  // the empty transcript: its text, and buttons to start (Catch me up)
   privacyParts: ['ctx.privacy'],  // locale keys of sentences the privacy notice adds
 }
 ```
