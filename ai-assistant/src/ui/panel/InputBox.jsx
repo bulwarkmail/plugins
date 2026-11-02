@@ -7,7 +7,7 @@ import { Button, Select, Textarea } from '@plugin-host/ui';
 import { savePrefs } from '../../lib/assistant.js';
 import { COMPOSER_PANEL } from '../../lib/background.js';
 import { INPUT_MAX_HEIGHT } from './model.js';
-import { ActionsMenu, actionLabel, actionsFor } from './ActionsMenu.jsx';
+import { ActionsMenu, actionLabel, actionsFor, startAction } from './ActionsMenu.jsx';
 import { ContextChips, rowFit } from './ContextChips.jsx';
 
 /** The Actions button's width with its text, until it is measured. */
@@ -31,7 +31,7 @@ export function InputBox({ chat, composerId }) {
     if (el.scrollHeight > 0) el.style.height = `${Math.min(el.scrollHeight, INPUT_MAX_HEIGHT)}px`;
   }, [input, inputRef]);
 
-  const actions = actionsFor(mode, source);
+  const actions = actionsFor(mode, source, { lookups: chat.lookups });
 
   // The chip row never overlaps: it measures its width and shrinks the chip,
   // then the Actions button, to their icons when the text doesn't fit.
@@ -139,7 +139,13 @@ export function InputBox({ chat, composerId }) {
                 disabled={running}
                 compact={fit.actions === 'icon'}
                 rootRef={actionsRef}
-                onPick={(action) => (action === 'translate' ? setTranslating({}) : chat.quick(action))}
+                onPick={(action) => {
+                  if (action === 'translate') return setTranslating({});
+                  const start = startAction(t, action);
+                  if (start?.send) return chat.sendText(start.send);
+                  if (start?.fill) { setInput(start.fill); inputRef.current?.focus(); return undefined; }
+                  return chat.quick(action);
+                }}
               />
             ))}
           </div>

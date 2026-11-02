@@ -3,22 +3,34 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button, Icon } from '@plugin-host/ui';
-import { COMPOSER_ACTIONS, PASSAGE_ACTIONS, READER_ACTIONS } from './model.js';
+import { COMPOSER_ACTIONS, EMPTY_DRAFT_ACTIONS, NO_MESSAGE_ACTIONS, PASSAGE_ACTIONS, READER_ACTIONS } from './model.js';
 
 const ACTION_ICONS = {
   improve: 'wand', shorter: 'arrows-minimize', formal: 'tie', casual: 'mood-smile', grammar: 'spell-check', translate: 'language',
   summary: 'align-left', actions: 'checklist', replies: 'message-reply', explain: 'bulb', reply: 'mail-forward',
+  today: 'calendar', find: 'search', example_1: 'pencil', example_2: 'pencil', example_3: 'pencil',
 };
 
-/** The quick actions for the current context. */
-export function actionsFor(mode, source) {
-  if (mode === 'composer') return source.scope === 'empty' ? [] : COMPOSER_ACTIONS;
-  return source.scope === 'passage' ? PASSAGE_ACTIONS : source.scope === 'none' ? [] : READER_ACTIONS;
+/** The quick actions for the current context. With nothing to work on, ways to start. */
+export function actionsFor(mode, source, { lookups = true } = {}) {
+  if (mode === 'composer') return source.scope === 'empty' ? EMPTY_DRAFT_ACTIONS : COMPOSER_ACTIONS;
+  if (source.scope === 'none') return lookups ? NO_MESSAGE_ACTIONS : NO_MESSAGE_ACTIONS.filter((a) => a !== 'today');
+  return source.scope === 'passage' ? PASSAGE_ACTIONS : READER_ACTIONS;
+}
+
+/** Entries that start a request instead of working on text: what they put into the chat. */
+export function startAction(t, action) {
+  if (action === 'today') return { send: t('panel.quick.today') };
+  if (action === 'find') return { fill: `${t('panel.find_prefix')} ` };
+  if (/^example_\d$/.test(action)) return { fill: t(`panel.${action}`) };
+  return null;
 }
 
 /** A quick action's name in the menu. */
 export function actionLabel(t, mode, action) {
   if (action === 'translate') return t('assistant.action.translate');
+  if (action === 'today' || action === 'find') return t(`panel.quick.${action}`);
+  if (/^example_\d$/.test(action)) return t(`panel.${action}`);
   if (mode === 'composer') return t(`assistant.action.${action}`);
   return t(action === 'explain' || action === 'reply' ? `panel.quick.${action}` : `reader.${action}`);
 }

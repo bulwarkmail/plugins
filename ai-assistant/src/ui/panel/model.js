@@ -13,6 +13,9 @@ export const COMPOSER_ACTIONS = [...REWRITE_STYLES, 'grammar', 'translate'];
 /** Quick actions on an open message, and on a highlighted passage of it. */
 export const READER_ACTIONS = ['summary', 'actions', 'replies', 'translate'];
 export const PASSAGE_ACTIONS = ['explain', 'translate', 'reply'];
+/** With no message in context, and with an empty draft: ways to start. */
+export const NO_MESSAGE_ACTIONS = ['today', 'find'];
+export const EMPTY_DRAFT_ACTIONS = ['example_1', 'example_2', 'example_3'];
 /** Turns kept in the transcript (older ones are dropped when saving). */
 export const MAX_TURNS = 40;
 /** A pending request from a right-click entry is dropped after this long. */

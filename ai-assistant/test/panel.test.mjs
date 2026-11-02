@@ -387,7 +387,8 @@ describe('taking context out', () => {
     const view = await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
     await click(removeButton());
     expect(screen.queryByText('This message')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull();
+    // Actions stays, with ways to start instead of the message's actions.
+    expect(screen.getByRole('button', { name: 'Actions' })).toBeTruthy();
     await type('write a haiku about autumn');
     await pressEnter();
     await settled();
@@ -469,12 +470,12 @@ describe('the reader panel across messages', () => {
     await waitFor(async () => expect((await api.storage.get('chat:reader'))?.turns.filter((turn) => turn.role === 'context')).toHaveLength(1));
   });
 
-  it('works with no message open: chat yes, actions no', async () => {
+  it('works with no message open: chat yes, actions to start with', async () => {
     const api = makeApi();
     await mount(api, { email: null, selection: null, focusRequest: 0 });
     expect(screen.queryByText('No message open')).toBeNull();
     expect(document.querySelector('[data-context-chip]')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Actions' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Message to the assistant' }).getAttribute('placeholder')).toBe('Ask anything, or search your mail…');
   });
 
@@ -741,5 +742,54 @@ describe('the header', () => {
     expect(document.querySelector('[data-assistant-header]').style.height).toBe('56px');
     expect(slot.style.visibility).toBe('visible');
     expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy();
+  });
+});
+
+describe('the Actions menu with nothing to work on', () => {
+  const entries = async () => {
+    await click(button('Actions'));
+    const names = screen.getAllByRole('menuitem').map((el) => el.textContent);
+    return names;
+  };
+
+  it('offers ways to start in the reader with no message open', async () => {
+    const api = makeApi({ answers: ['Nothing today.'] });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    expect(await entries()).toEqual(["What's on my calendar today?", 'Find a message']);
+    await click(screen.getByRole('menuitem', { name: "What's on my calendar today?" }));
+    await settled();
+    expect(sentPrompt(api).messages.at(-1).content).toBe("What's on my calendar today?");
+  });
+
+  it('starts a search in the input, and leaves out the calendar when lookups are off', async () => {
+    const api = makeApi();
+    await api.storage.set('prefs', { lookups: false });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    expect(await entries()).toEqual(['Find a message']);
+    await click(screen.getByRole('menuitem', { name: 'Find a message' }));
+    const box = screen.getByRole('textbox', { name: 'Message to the assistant' });
+    expect(box.value).toBe('Find the message about ');
+    expect(document.activeElement).toBe(box);
+    expect(api.calls('proxy.fetch')).toHaveLength(0);
+  });
+
+  it('stays when the user takes the message out of the context', async () => {
+    const api = makeApi();
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await click(button('Remove from context'));
+    expect(await entries()).toEqual(["What's on my calendar today?", 'Find a message']);
+  });
+
+  it('offers the examples for an empty draft', async () => {
+    const api = makeApi({ body: '' });
+    await mount(api, { composerId: 'c1', selection: { text: '', empty: true }, focusRequest: 0 });
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Message to the assistant' }).getAttribute('placeholder')).toBe('Describe what the email should say…'));
+    expect(await entries()).toEqual([
+      'Thank Anna for the offer and propose a call on Tuesday at 10',
+      'Decline the invitation politely and suggest next month instead',
+      'Ask for a corrected invoice: the VAT number is missing',
+    ]);
+    await click(screen.getByRole('menuitem', { name: 'Ask for a corrected invoice: the VAT number is missing' }));
+    expect(screen.getByRole('textbox', { name: 'Message to the assistant' }).value).toBe('Ask for a corrected invoice: the VAT number is missing');
   });
 });

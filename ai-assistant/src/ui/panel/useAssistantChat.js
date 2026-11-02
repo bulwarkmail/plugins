@@ -398,7 +398,7 @@ export function useAssistantChat(props) {
 
   return {
     api, t, locale, mode, email, setup, loaded, turns, consent, source, input, setInput, inputRef,
-    target, setTarget, languages, running, translating, setTranslating,
+    target, setTarget, languages, running, translating, setTranslating, lookups,
     removeContext, restoreContext, quick, submit, stop, apply, sendText, insertText, clear, retry,
     patchTurn, answerAction, undoStep,
   };
