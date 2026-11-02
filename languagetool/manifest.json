@@ -11,6 +11,14 @@
     "ui:settings-section"
   ],
   "entrypoint": "index.js",
+  "screenshots": [
+    "media/screenshots/1-popup.webp",
+    "media/screenshots/1-popup-dark.webp",
+    "media/screenshots/2-issue-list.webp",
+    "media/screenshots/3-plain-text.webp",
+    "media/screenshots/4-settings.webp",
+    "media/screenshots/5-admin.webp"
+  ],
   "minAppVersion": "1.20.0",
   "icon": "media/icon.svg",
   "banner": "media/banner.svg",
