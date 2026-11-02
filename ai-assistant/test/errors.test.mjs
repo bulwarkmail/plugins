@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { AiError, errorFromResponse, errorFromStream, messageFor, parseRetryAfter } from '../src/lib/errors.js';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
-const en = manifest.locales.en;
+const en = allStrings().en;
 const t = (key, vars = {}) => (en[key] ?? key).replace(/\{(\w+)\}/g, (m, n) => (n in vars ? String(vars[n]) : m));
 
 describe('parseRetryAfter', () => {

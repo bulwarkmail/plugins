@@ -6,7 +6,7 @@ import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { anthropicSse, streamResponse } from './helpers.mjs';
 import { AssistantPanel, sourceFor, taskForAction } from '../src/ui/Panel.jsx';
 import { chatKey, pendingKey, COMPOSER_CONTEXT_KEY } from '../src/lib/background.js';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
 // The chat panel next to the composer and next to an open message.
 
@@ -21,7 +21,7 @@ const EMAIL = { id: 'M1', subject: 'Thursday', receivedAt: '2026-10-12T09:00:00Z
 function makeApi({ answers = ['Answer.'], body = 'Hello Bob, can we meet tuesday? Thanks', consent = true, handlers = {}, timeZone } = {}) {
   let i = 0;
   const api = fakeApi({
-    translations: manifest.locales,
+    translations: allStrings(),
     ...(timeZone ? { timeZone } : {}),
     handlers: {
       'admin.getAllConfig': async () => CONFIG,

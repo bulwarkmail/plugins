@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, BarButton, Button, Row, Stack, Text } from '@plugin-host/ui';
 import { privacyMessage, runTask } from '../lib/assistant.js';
 import { AiError, messageFor } from '../lib/errors.js';
+import { withStrings } from '../lib/i18n.js';
 
 export const host = () => require('@plugin-host');
 
-/** The api a slot component works with: its `api` prop (tests), else the sandbox's. */
-export const useApi = (props) => props?.api ?? host();
+/** The api a slot component works with: its `api` prop (tests), else the sandbox's; with the assistant's texts. */
+export const useApi = (props) => withStrings(props?.api ?? host());
 
 /** Copy text from inside the sandbox. The async clipboard API needs a
  *  permission the plugin frame doesn't have, so fall back to a selection. */

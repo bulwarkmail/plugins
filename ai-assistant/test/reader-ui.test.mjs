@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { anthropicSse, streamResponse } from './helpers.mjs';
 import { ReaderBar } from '../src/ui/Reader.jsx';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(cleanup);
@@ -14,7 +14,7 @@ const EMAIL = { id: 'M1', subject: 'Thursday', receivedAt: '2026-10-12T09:00:00Z
 
 async function makeApi(answer, { consent = true, confirm = true, reply } = {}) {
   const api = fakeApi({
-    translations: manifest.locales,
+    translations: allStrings(),
     handlers: {
       'admin.getAllConfig': async () => ({ anthropicBaseUrl: 'http://localhost:18099/anthropic/v1' }),
       'proxy.fetch': async () => streamResponse(anthropicSse([answer])),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 import {
   actionToolsFor, describeAction, effectiveActionMode, findFolder, performAction, undoAction,
 } from '../src/lib/actions.js';
@@ -17,7 +17,7 @@ const FOLDERS = [
 ];
 
 const apiWith = (handlers = {}) => fakeApi({
-  translations: manifest.locales,
+  translations: allStrings(),
   handlers: {
     'email.get': async (id) => (id === 'M1' ? MESSAGE : null),
     'mailboxes.list': async () => FOLDERS,

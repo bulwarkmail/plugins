@@ -4,7 +4,7 @@ import * as React from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { SettingsPanel } from '../src/ui/SettingsPanel.jsx';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
 // The plugin's settings: the Actions choice, within what the administrator allows.
 
@@ -14,7 +14,7 @@ afterEach(cleanup);
 const CONFIG = { anthropicBaseUrl: 'http://localhost:18099/anthropic/v1' };
 
 async function show(config) {
-  const api = fakeApi({ translations: manifest.locales, handlers: { 'admin.getAllConfig': async () => config } });
+  const api = fakeApi({ translations: allStrings(), handlers: { 'admin.getAllConfig': async () => config } });
   await act(async () => { render(React.createElement(SettingsPanel, { api })); });
   await screen.findByText('Let the assistant look things up');
   return api;

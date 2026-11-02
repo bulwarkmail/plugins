@@ -6,6 +6,7 @@ import { appBlock, buildPrompt, clip, contextSuffix, composerChatSystem, readerC
 import { defaultTarget, languageOptions } from '../src/lib/languages.js';
 import plugin from '../src/index.js';
 import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
 const configured = { 'admin.getAllConfig': async () => ({ openaiBaseUrl: 'http://localhost:11434/v1' }) };
 
@@ -71,7 +72,7 @@ describe('the context every request carries', () => {
   });
 
   it('says which app, version, account and server it runs in, and the app\'s places by the names the user sees', () => {
-    const de = Object.fromEntries(Object.entries(manifest.locales.de).filter(([k]) => k.startsWith('app.')).map(([k, v]) => [k.slice(4), v]));
+    const de = Object.fromEntries(Object.entries(allStrings().de).filter(([k]) => k.startsWith('app.')).map(([k, v]) => [k.slice(4), v]));
     const block = appBlock({
       app: { product: 'Bulwark Mail', name: 'Rath Mail', version: '1.17.1', edition: 'full', stalwartFeatures: false },
       account: { email: 'linus@rath.li', server: 'mail.rath.li', accounts: 2 },
@@ -86,7 +87,7 @@ describe('the context every request carries', () => {
     expect(block).toContain('undo send (a short delay before a message goes out)');
     expect(block).toContain('Use find_setting to tell the user where a setting is');
     // Without Stalwart's features there is no Security page.
-    expect(block).not.toContain(manifest.locales.de['app.settings.security']);
+    expect(block).not.toContain(allStrings().de['app.settings.security']);
     // An older webmail without api.app: still the product, no version.
     const old = appBlock({}, { panel: 'composer', labels: {} });
     expect(old).toContain('a plugin inside Bulwark Mail: ');
@@ -149,7 +150,7 @@ describe('background', () => {
     await off.activate();
     expect(off.shouldShow.composer()).toBe(false);
     expect(actionsBySurface(offApi)).toEqual({ [COMPOSER_SURFACE]: [], [COMPOSER_MENU_SURFACE]: [], [READER_MENU_SURFACE]: [], [READER_SURFACE]: [] });
-    const onApi = fakeApi({ handlers: configured, translations: manifest.locales });
+    const onApi = fakeApi({ handlers: configured, translations: allStrings() });
     const on = createBackground(onApi);
     await on.activate();
     expect(on.shouldShow.composer()).toBe(true);

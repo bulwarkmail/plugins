@@ -6,6 +6,7 @@
 // buttons only show when they can work.
 
 import { loadSetup } from './assistant.js';
+import { withStrings } from './i18n.js';
 
 export const DRAFT_KEY = 'draft';
 /** What the open composer is: { mode, inReplyToId, originalSubject, at } (onComposerOpen). */
@@ -34,6 +35,7 @@ export const READER_MENU_ACTIONS = ['explain', 'translate', 'reply', 'ask'];
 const MENU_ICONS = { improve: 'sparkles', grammar: 'text-spellcheck', shorter: 'text-decrease', translate: 'language', ask: 'message-circle', explain: 'help-circle', reply: 'arrow-back-up' };
 
 export function createBackground(api, { now = () => Date.now() } = {}) {
+  withStrings(api);
   const state = { configured: false, showInReader: true, checkedAt: 0 };
   let shownActions = null;
   let dialogOpen = false;
