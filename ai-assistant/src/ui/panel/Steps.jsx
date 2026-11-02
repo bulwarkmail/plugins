@@ -24,6 +24,9 @@ function stepLabel(t, step) {
   }
 }
 
+/** Why a step failed, for the user: a reason of actions.js, or an area's own locale key (one with a dot, such as do.refuse.trash). */
+const reasonText = (t, reason) => t(reason && reason.includes('.') ? reason : `action.reason.${reason ?? 'other'}`);
+
 const TOOL_ACTION_ICONS = {
   archive_message: 'archive', move_message: 'folder-symlink', mark_message: 'mail-check', create_event: 'calendar-plus',
   create_task: 'checkbox', create_contact: 'user-plus', draft_reply: 'arrow-back-up', draft_email: 'mail-forward',
@@ -44,7 +47,7 @@ export function ActionCard({ api, step, onAnswer, onUndo }) {
       <Stack gap={2}>
         <Row gap={2} wrap={false} align="start">
           <Icon name={TOOL_ACTION_ICONS[step.name] ?? areaAction(step.name)?.icon ?? 'bolt'} size="sm" className="text-primary" />
-          <Text size="sm">{action.summary}</Text>
+          <Text size="sm" className="whitespace-pre-wrap">{action.summary}</Text>
         </Row>
         {state === 'waiting' && (
           <Row gap={1} justify="end">
@@ -70,7 +73,7 @@ export function ActionCard({ api, step, onAnswer, onUndo }) {
         {state === 'skipped' && <Text size="xs" tone="muted">{t('action.skipped')}</Text>}
         {state === 'undone' && <Text size="xs" tone="muted">{t('action.undone')}</Text>}
         {/* The model's error text stays for the model; the user reads why in their language. */}
-        {state === 'failed' && <Text size="xs" tone="danger">{t(`action.reason.${step.reason ?? 'other'}`)}</Text>}
+        {state === 'failed' && <Text size="xs" tone="danger">{reasonText(t, step.reason)}</Text>}
       </Stack>
     </div>
   );
@@ -135,7 +138,7 @@ function StepRow({ api, mode, replying, step, onSend, onInsert }) {
       </Row>
       {step.widget && <Widget api={api} mode={mode} replying={replying} widget={step.widget} onSend={onSend} onInsert={onInsert} />}
       {step.status === 'failed'
-        ? <Text size="xs" tone="danger">{t(`action.reason.${step.reason ?? 'other'}`)}</Text>
+        ? <Text size="xs" tone="danger">{reasonText(t, step.reason)}</Text>
         : step.result && !step.widget && <Text size="xs" tone="muted" className="whitespace-pre-wrap">{step.result.slice(0, 1200)}</Text>}
     </Stack>
     </div>
