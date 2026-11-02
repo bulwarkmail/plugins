@@ -24,10 +24,21 @@ export function actionLabel(t, mode, action) {
 }
 
 /** The quick actions, in a menu that opens above its button. */
-export function ActionsMenu({ api, actions, actionLabel: labelOf, disabled, onPick }) {
+export function ActionsMenu({ api, actions, actionLabel: labelOf, disabled, onPick, compact = false, rootRef }) {
   const t = api.i18n.t;
   const [open, setOpen] = useState(false);
+  // Where the menu opens: from the button's start, or from its end when that would run past the panel.
+  const [place, setPlace] = useState({ end: false, width: 200 });
   const ref = useRef(null);
+  const toggle = () => {
+    if (!open && ref.current) {
+      const box = ref.current.getBoundingClientRect();
+      const room = window.innerWidth || 0;
+      const width = room ? Math.min(200, room - 16) : 200;
+      setPlace({ end: !!room && box.left + width > room - 8, width });
+    }
+    setOpen((v) => !v);
+  };
   useEffect(() => {
     if (!open) return undefined;
     const away = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
@@ -37,13 +48,23 @@ export function ActionsMenu({ api, actions, actionLabel: labelOf, disabled, onPi
     return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key); };
   }, [open]);
   return (
-    <div ref={ref} style={{ position: 'relative' }} data-assistant-actions>
-      <Button variant="ghost" size="sm" icon="sparkles" disabled={disabled} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        {t('panel.actions')}
-        <Icon name={open ? 'chevron-up' : 'chevron-down'} size="xs" className="text-muted-foreground" />
-      </Button>
+    <div
+      ref={(el) => { ref.current = el; if (rootRef) rootRef.current = el; }}
+      style={{ position: 'relative', flexShrink: 0 }}
+      data-assistant-actions
+      data-compact={compact ? '' : undefined}
+    >
+      {compact ? (
+        // Too narrow for the text: the icon, with the name for the pointer and screen readers.
+        <Button variant="ghost" size="icon" icon="sparkles" disabled={disabled} aria-haspopup="menu" aria-expanded={open} aria-label={t('panel.actions')} title={t('panel.actions')} onClick={toggle} />
+      ) : (
+        <Button variant="ghost" size="sm" icon="sparkles" disabled={disabled} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+          {t('panel.actions')}
+          <Icon name={open ? 'chevron-up' : 'chevron-down'} size="xs" className="text-muted-foreground" />
+        </Button>
+      )}
       {open && (
-        <div role="menu" style={{ position: 'absolute', bottom: 'calc(100% + 4px)', insetInlineStart: 0, minWidth: 200, zIndex: 20, background: 'var(--color-popover, var(--color-background))', color: 'var(--color-foreground)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)', padding: 4 }}>
+        <div role="menu" style={{ position: 'absolute', bottom: 'calc(100% + 4px)', ...(place.end ? { insetInlineEnd: 0 } : { insetInlineStart: 0 }), minWidth: place.width, maxWidth: 'calc(100vw - 16px)', zIndex: 20, background: 'var(--color-popover, var(--color-background))', color: 'var(--color-foreground)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)', padding: 4 }}>
           {actions.map((action) => (
             <button
               key={action}

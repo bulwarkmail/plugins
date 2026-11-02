@@ -2,13 +2,16 @@
 // assistant works on, the quick actions and Send. A click on the box
 // outside its buttons goes to the text field.
 
-import { useCallback, useLayoutEffect, useState } from 'react';
-import { Button, Row, Select, Textarea } from '@plugin-host/ui';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { Button, Select, Textarea } from '@plugin-host/ui';
 import { savePrefs } from '../../lib/assistant.js';
 import { COMPOSER_PANEL } from '../../lib/background.js';
 import { INPUT_MAX_HEIGHT } from './model.js';
 import { ActionsMenu, actionLabel, actionsFor } from './ActionsMenu.jsx';
-import { ContextChips } from './ContextChips.jsx';
+import { ContextChips, rowFit } from './ContextChips.jsx';
+
+/** The Actions button's width with its text, until it is measured. */
+const ACTIONS_GUESS = 104;
 
 export function InputBox({ chat, composerId }) {
   const { api, t, mode, source, email, input, setInput, inputRef, running, target, setTarget, languages, translating, setTranslating } = chat;
@@ -29,6 +32,33 @@ export function InputBox({ chat, composerId }) {
   }, [input, inputRef]);
 
   const actions = actionsFor(mode, source);
+
+  // The chip row never overlaps: it measures its width and shrinks the chip,
+  // then the Actions button, to their icons when the text doesn't fit.
+  const rowRef = useRef(null);
+  const actionsRef = useRef(null);
+  const actionsFull = useRef(0);
+  const [rowWidth, setRowWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = rowRef.current;
+    if (!el) return undefined;
+    setRowWidth(el.clientWidth);
+    if (typeof ResizeObserver !== 'function') return undefined;
+    const observer = new ResizeObserver(() => setRowWidth(el.clientWidth));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const hasChip = (source.removed && !!email) || (source.scope !== 'none' && source.scope !== 'empty');
+  const removable = !source.removed && ['message', 'passage', 'selection'].includes(source.scope);
+  const showActions = actions.length > 0 && !translating;
+  const fit = translating
+    ? { chip: rowWidth && rowWidth < 300 ? 'icon' : 'full', actions: 'full' }
+    : rowFit({ width: rowWidth, actionsWidth: showActions ? (actionsFull.current || ACTIONS_GUESS) : 0, chip: hasChip, removable });
+  // The button's width with its text, measured whenever it shows its text.
+  useLayoutEffect(() => {
+    if (showActions && fit.actions === 'full' && actionsRef.current?.offsetWidth) actionsFull.current = actionsRef.current.offsetWidth;
+  });
+
   const placeholder = mode === 'reader'
     ? t(source.scope === 'none' ? 'panel.placeholder.none' : 'panel.placeholder.read')
     : source.scope === 'empty' ? t('panel.placeholder.write') : t('panel.placeholder.compose');
@@ -74,11 +104,12 @@ export function InputBox({ chat, composerId }) {
           }}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-            <ContextChips api={api} source={source} email={email} onRemove={chat.removeContext} onRestore={chat.restoreContext} />
+          <div ref={rowRef} data-chip-row style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
+            <ContextChips api={api} source={source} email={email} onRemove={chat.removeContext} onRestore={chat.restoreContext} fit={fit.chip} />
             {(actions.length > 0 || translating) && (translating ? (
-              <Row gap={1} wrap={false}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '1 1 auto', minWidth: 0 }}>
                 <Select
+                  style={{ flex: '1 1 auto', minWidth: 0, maxWidth: '100%' }}
                   // Starts on an empty entry, so the last language used can be picked too.
                   value=""
                   autoFocus
@@ -99,13 +130,15 @@ export function InputBox({ chat, composerId }) {
                   }}
                 />
                 <Button variant="ghost" size="icon" icon="x" aria-label={t('common.cancel')} onClick={() => setTranslating(null)} />
-              </Row>
+              </div>
             ) : (
               <ActionsMenu
                 api={api}
                 actions={actions}
                 actionLabel={(action) => actionLabel(t, mode, action)}
                 disabled={running}
+                compact={fit.actions === 'icon'}
+                rootRef={actionsRef}
                 onPick={(action) => (action === 'translate' ? setTranslating({}) : chat.quick(action))}
               />
             ))}
