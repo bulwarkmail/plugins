@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Ihre Einstellungen gelesen",
   "panel.steps.kind.find_setting": "Einstellungen",
   "panel.steps.kind.read_my_settings": "Einstellungen",
-  "shortcut.toggle": "KI-Assistent öffnen oder schließen"
+  "shortcut.toggle": "KI-Assistent öffnen oder schließen",
+  "panel.menu.count": "{count} Vorschläge",
+  "panel.menu.none": "Keine Treffer"
 }

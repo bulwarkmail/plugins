@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Uw instellingen gelezen",
   "panel.steps.kind.find_setting": "Instellingen",
   "panel.steps.kind.read_my_settings": "Instellingen",
-  "shortcut.toggle": "De AI-assistent openen of sluiten"
+  "shortcut.toggle": "De AI-assistent openen of sluiten",
+  "panel.menu.count": "{count} suggesties",
+  "panel.menu.none": "Geen resultaten"
 }

@@ -61,7 +61,7 @@ export function InputBox({ chat, composerId }) {
   });
 
   // The `/` and `@` menus of the 2.2 areas, under the text field.
-  const menu = useInputMenu({ menus: chat.areas.menus, input, setInput, inputRef, idBase: `assistant-menu-${mode}` });
+  const menu = useInputMenu({ menus: chat.areas.menus, input, setInput, inputRef, idBase: `assistant-menu-${mode}`, t });
 
   const placeholder = mode === 'reader'
     ? t(source.scope === 'none' ? 'panel.placeholder.none' : 'panel.placeholder.read')

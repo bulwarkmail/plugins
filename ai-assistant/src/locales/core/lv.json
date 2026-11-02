@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Nolasīti jūsu iestatījumi",
   "panel.steps.kind.find_setting": "Iestatījumi",
   "panel.steps.kind.read_my_settings": "Iestatījumi",
-  "shortcut.toggle": "Atvērt vai aizvērt MI asistentu"
+  "shortcut.toggle": "Atvērt vai aizvērt MI asistentu",
+  "panel.menu.count": "Ieteikumi: {count}",
+  "panel.menu.none": "Nav atbilstību"
 }

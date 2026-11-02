@@ -89,7 +89,7 @@ describe('the history', () => {
     expect(button.getAttribute('aria-pressed')).toBe('true');
     const list = screen.getByRole('list', { name: 'Earlier chats' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
-    expect(screen.getByRole('status').textContent).toBe('Chats: 2');
+    expect(document.querySelector('[data-chat-history] [role="status"]').textContent).toBe('Chats: 2');
     const search = screen.getByRole('searchbox', { name: 'Search chats' });
     await act(frame);
     expect(document.activeElement).toBe(search);
@@ -124,7 +124,7 @@ describe('the history', () => {
     await mount(api);
     await click(screen.getByRole('button', { name: 'Earlier chats' }));
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'thai' } });
-    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Matching chats: 1'));
+    await waitFor(() => expect(document.querySelector('[data-chat-history] [role="status"]').textContent).toBe('Matching chats: 1'));
     expect(screen.getByRole('listitem').textContent).toContain('Lunch on Friday?');
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } });
     await click(screen.getByRole('button', { name: 'Rename “Who is Jan?”' }));
