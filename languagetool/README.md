@@ -72,8 +72,9 @@ LanguageTool server:
 - as a form POST to `<server>/v2/check` with the text, the language,
   preferred variants, native language, level and the administrator's
   turned-off rules and categories;
-- never for a message that will be signed or encrypted (Bulwark doesn't
-  hand the text to the plugin then).
+- nothing while a message is set to be signed or encrypted (Bulwark doesn't
+  hand the text to the plugin then; what was typed before that may already
+  have been checked).
 
 Inline images and mentions are sent as placeholders, not as their content.
 Your dictionary, ignored issues and your own turned-off rules are applied in
@@ -204,7 +205,7 @@ several words also adds each word.
 3. Optionally turn off **Users may change language, level and turned-off
    rules**, so everyone checks with your language, level and rules.
 
-Messages that will be signed or encrypted are still never checked.
+Nothing is checked while a message is set to be signed or encrypted.
 
 ## When a check fails
 

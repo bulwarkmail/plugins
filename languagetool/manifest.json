@@ -3,7 +3,7 @@
   "name": "Proofreading (LanguageTool)",
   "version": "1.0.0",
   "author": "Bulwark Mail Community",
-  "description": "Underlines spelling, grammar and style mistakes while you write, with suggestions to fix them. Sends the text you write to the LanguageTool server your administrator set up (self-hosted, or the public api.languagetool.org only if the administrator allows it), never for a signed or encrypted message.",
+  "description": "Underlines spelling, grammar and style mistakes while you write, with suggestions to fix them. Sends the text you write to the LanguageTool server your administrator set up (self-hosted, or the public api.languagetool.org only if the administrator allows it). Nothing is sent while a message is set to be signed or encrypted.",
   "type": "ui-extension",
   "permissions": [
     "compose:check",
