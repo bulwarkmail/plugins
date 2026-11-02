@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Looked up “{query}” in the settings",
   "panel.step.read_my_settings": "Read your settings",
   "panel.steps.kind.find_setting": "Settings",
-  "panel.steps.kind.read_my_settings": "Settings"
+  "panel.steps.kind.read_my_settings": "Settings",
+  "shortcut.toggle": "Open or close the AI assistant"
 }

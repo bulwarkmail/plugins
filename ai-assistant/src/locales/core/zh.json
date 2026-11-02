@@ -269,5 +269,6 @@
   "panel.step.find_setting": "已在设置中搜索“{query}”",
   "panel.step.read_my_settings": "已读取你的设置",
   "panel.steps.kind.find_setting": "设置",
-  "panel.steps.kind.read_my_settings": "设置"
+  "panel.steps.kind.read_my_settings": "设置",
+  "shortcut.toggle": "打开或关闭 AI 助手"
 }

@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Iestatījumos meklēts “{query}”",
   "panel.step.read_my_settings": "Nolasīti jūsu iestatījumi",
   "panel.steps.kind.find_setting": "Iestatījumi",
-  "panel.steps.kind.read_my_settings": "Iestatījumi"
+  "panel.steps.kind.read_my_settings": "Iestatījumi",
+  "shortcut.toggle": "Atvērt vai aizvērt MI asistentu"
 }

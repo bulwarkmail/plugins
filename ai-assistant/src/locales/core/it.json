@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Cercato «{query}» nelle impostazioni",
   "panel.step.read_my_settings": "Lette le tue impostazioni",
   "panel.steps.kind.find_setting": "Impostazioni",
-  "panel.steps.kind.read_my_settings": "Impostazioni"
+  "panel.steps.kind.read_my_settings": "Impostazioni",
+  "shortcut.toggle": "Apri o chiudi l'assistente IA"
 }

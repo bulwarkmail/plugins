@@ -269,5 +269,6 @@
   "panel.step.find_setting": "V nastavení hledáno „{query}“",
   "panel.step.read_my_settings": "Přečteno vaše nastavení",
   "panel.steps.kind.find_setting": "Nastavení",
-  "panel.steps.kind.read_my_settings": "Nastavení"
+  "panel.steps.kind.read_my_settings": "Nastavení",
+  "shortcut.toggle": "Otevřít nebo zavřít asistenta AI"
 }

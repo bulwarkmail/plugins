@@ -269,5 +269,6 @@
   "panel.step.find_setting": "In de instellingen gezocht naar '{query}'",
   "panel.step.read_my_settings": "Uw instellingen gelezen",
   "panel.steps.kind.find_setting": "Instellingen",
-  "panel.steps.kind.read_my_settings": "Instellingen"
+  "panel.steps.kind.read_my_settings": "Instellingen",
+  "shortcut.toggle": "De AI-assistent openen of sluiten"
 }

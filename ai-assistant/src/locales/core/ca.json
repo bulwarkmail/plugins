@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Cercat «{query}» a la configuració",
   "panel.step.read_my_settings": "S'ha llegit la teva configuració",
   "panel.steps.kind.find_setting": "Configuració",
-  "panel.steps.kind.read_my_settings": "Configuració"
+  "panel.steps.kind.read_my_settings": "Configuració",
+  "shortcut.toggle": "Obre o tanca l'assistent d'IA"
 }

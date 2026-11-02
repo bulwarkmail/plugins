@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Ayarlarda \"{query}\" arandı",
   "panel.step.read_my_settings": "Ayarlarınız okundu",
   "panel.steps.kind.find_setting": "Ayarlar",
-  "panel.steps.kind.read_my_settings": "Ayarlar"
+  "panel.steps.kind.read_my_settings": "Ayarlar",
+  "shortcut.toggle": "Yapay zekâ asistanını aç veya kapat"
 }

@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Поиск «{query}» в настройках",
   "panel.step.read_my_settings": "Прочитаны ваши настройки",
   "panel.steps.kind.find_setting": "Настройки",
-  "panel.steps.kind.read_my_settings": "Настройки"
+  "panel.steps.kind.read_my_settings": "Настройки",
+  "shortcut.toggle": "Открыть или закрыть ИИ-ассистента"
 }

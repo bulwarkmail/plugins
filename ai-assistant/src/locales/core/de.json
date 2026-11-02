@@ -269,5 +269,6 @@
   "panel.step.find_setting": "In den Einstellungen nach „{query}“ gesucht",
   "panel.step.read_my_settings": "Ihre Einstellungen gelesen",
   "panel.steps.kind.find_setting": "Einstellungen",
-  "panel.steps.kind.read_my_settings": "Einstellungen"
+  "panel.steps.kind.read_my_settings": "Einstellungen",
+  "shortcut.toggle": "KI-Assistent öffnen oder schließen"
 }

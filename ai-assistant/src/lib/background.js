@@ -36,7 +36,7 @@ const MENU_ICONS = { improve: 'sparkles', grammar: 'text-spellcheck', shorter: '
 
 export function createBackground(api, { now = () => Date.now() } = {}) {
   withStrings(api);
-  const state = { configured: false, showInReader: true, checkedAt: 0 };
+  const state = { configured: false, showInReader: true, checkedAt: 0, composerOpen: false };
   let shownActions = null;
   let dialogOpen = false;
   const t = (key, vars) => api.i18n.t(key, vars);
@@ -135,6 +135,15 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
     }
   }
 
+  /**
+   * Alt+A outside the composer: the panel next to the message. With a
+   * composer open the composer's own Alt+A has it, so this one stays out.
+   */
+  async function shortcutToggle() {
+    if (state.composerOpen || !state.configured || !state.showInReader) return;
+    await toggleReaderPanel();
+  }
+
   /** The Assistant button and Alt+A: the panel, closed when it is open and nothing is asked. */
   async function toggleComposerPanel(composerId) {
     if (typeof composerId !== 'string' || !composerId) return;
@@ -172,6 +181,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
     refresh,
     openPanel,
     openDialog,
+    shortcutToggle,
     async activate() {
       // Drafts and chats left over from a closed tab are not kept.
       await forgetDraft();
@@ -199,6 +209,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       },
       // What the composer is about, for the chat (a reply knows its original).
       async onComposerOpen(ctx) {
+        state.composerOpen = true;
         await api.storage.set(COMPOSER_CONTEXT_KEY, {
           mode: typeof ctx?.mode === 'string' ? ctx.mode : 'new',
           ...(typeof ctx?.inReplyToId === 'string' ? { inReplyToId: ctx.inReplyToId } : {}),
@@ -208,6 +219,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
         await refresh();
       },
       async onComposerClose() {
+        state.composerOpen = false;
         await forgetDraft();
         await forgetComposerChats();
         await api.storage.remove(COMPOSER_CONTEXT_KEY).catch(() => {});

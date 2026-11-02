@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Recherche de « {query} » dans les paramètres",
   "panel.step.read_my_settings": "Lecture de vos paramètres",
   "panel.steps.kind.find_setting": "Paramètres",
-  "panel.steps.kind.read_my_settings": "Paramètres"
+  "panel.steps.kind.read_my_settings": "Paramètres",
+  "shortcut.toggle": "Ouvrir ou fermer l'assistant IA"
 }

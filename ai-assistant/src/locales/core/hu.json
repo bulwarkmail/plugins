@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Keresés a beállításokban: „{query}”",
   "panel.step.read_my_settings": "A beállításaid beolvasva",
   "panel.steps.kind.find_setting": "Beállítások",
-  "panel.steps.kind.read_my_settings": "Beállítások"
+  "panel.steps.kind.read_my_settings": "Beállítások",
+  "shortcut.toggle": "Az AI-asszisztens megnyitása vagy bezárása"
 }

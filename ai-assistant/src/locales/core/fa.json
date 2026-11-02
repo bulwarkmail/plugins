@@ -269,5 +269,6 @@
   "panel.step.find_setting": "جستجوی «{query}» در تنظیمات",
   "panel.step.read_my_settings": "تنظیمات شما خوانده شد",
   "panel.steps.kind.find_setting": "تنظیمات",
-  "panel.steps.kind.read_my_settings": "تنظیمات"
+  "panel.steps.kind.read_my_settings": "تنظیمات",
+  "shortcut.toggle": "باز یا بستن دستیار هوش مصنوعی"
 }

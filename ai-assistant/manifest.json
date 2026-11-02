@@ -21,6 +21,7 @@
     "calendar:read",
     "contacts:read",
     "ui:toolbar",
+    "ui:keyboard",
     "identity:read",
     "account:read",
     "email:write",

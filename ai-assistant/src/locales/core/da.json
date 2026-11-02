@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Søgte efter \"{query}\" i indstillingerne",
   "panel.step.read_my_settings": "Læste dine indstillinger",
   "panel.steps.kind.find_setting": "Indstillinger",
-  "panel.steps.kind.read_my_settings": "Indstillinger"
+  "panel.steps.kind.read_my_settings": "Indstillinger",
+  "shortcut.toggle": "Åbn eller luk AI-assistenten"
 }

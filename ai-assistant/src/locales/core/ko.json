@@ -269,5 +269,6 @@
   "panel.step.find_setting": "설정에서 \"{query}\"을(를) 검색했습니다",
   "panel.step.read_my_settings": "설정을 읽었습니다",
   "panel.steps.kind.find_setting": "설정",
-  "panel.steps.kind.read_my_settings": "설정"
+  "panel.steps.kind.read_my_settings": "설정",
+  "shortcut.toggle": "AI 어시스턴트 열기 또는 닫기"
 }

@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Pesquisado «{query}» nas definições",
   "panel.step.read_my_settings": "Lidas as suas definições",
   "panel.steps.kind.find_setting": "Definições",
-  "panel.steps.kind.read_my_settings": "Definições"
+  "panel.steps.kind.read_my_settings": "Definições",
+  "shortcut.toggle": "Abrir ou fechar o assistente de IA"
 }

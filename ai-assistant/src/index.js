@@ -10,9 +10,21 @@ import { SettingsPanel } from './ui/SettingsPanel.jsx';
 import { Dialog } from './ui/Dialog.jsx';
 import { ReaderBar, ThreadSummary } from './ui/Reader.jsx';
 import { AssistantPanel } from './ui/Panel.jsx';
+import { withStrings } from './lib/i18n.js';
 
 let background = null;
 const bg = () => background ?? { shouldShow: { reader: () => false, thread: () => false, composer: () => false }, hooks: {} };
+
+/** The shortcut's name in the user's language (read once when the plugin loads). */
+function shortcutLabel() {
+  try {
+    // eslint-disable-next-line no-undef
+    const api = withStrings(require('@plugin-host'));
+    return api.i18n.t('shortcut.toggle');
+  } catch {
+    return 'AI assistant';
+  }
+}
 
 export default {
   async activate(api) {
@@ -25,6 +37,15 @@ export default {
     onComposerOpen: (ctx) => bg().hooks.onComposerOpen?.(ctx),
     onComposerClose: () => bg().hooks.onComposerClose?.(),
     onEmailOpen: () => bg().hooks.onEmailOpen?.(),
+  },
+  // Alt+A opens and closes the panel next to the message (the composer
+  // handles its own Alt+A through its Assistant button).
+  shortcuts: {
+    'toggle-panel': {
+      keys: 'Alt+A',
+      get label() { return shortcutLabel(); },
+      handler: () => bg().shortcutToggle?.(),
+    },
   },
   slots: {
     // The chat panels: next to the message being written and next to the

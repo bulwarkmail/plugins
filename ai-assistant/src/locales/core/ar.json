@@ -269,5 +269,6 @@
   "panel.step.find_setting": "تم البحث عن \"{query}\" في الإعدادات",
   "panel.step.read_my_settings": "تمت قراءة إعداداتك",
   "panel.steps.kind.find_setting": "الإعدادات",
-  "panel.steps.kind.read_my_settings": "الإعدادات"
+  "panel.steps.kind.read_my_settings": "الإعدادات",
+  "shortcut.toggle": "فتح مساعد الذكاء الاصطناعي أو إغلاقه"
 }

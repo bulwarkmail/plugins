@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Căutat „{query}” în setări",
   "panel.step.read_my_settings": "Citite setările tale",
   "panel.steps.kind.find_setting": "Setări",
-  "panel.steps.kind.read_my_settings": "Setări"
+  "panel.steps.kind.read_my_settings": "Setări",
+  "shortcut.toggle": "Deschide sau închide asistentul AI"
 }

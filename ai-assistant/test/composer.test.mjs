@@ -187,6 +187,23 @@ describe('background', () => {
     }
   });
 
+  it('opens and closes the reader panel with Alt+A, but leaves Alt+A to an open composer', async () => {
+    const api = fakeApi({ handlers: { ...configured, 'ui.togglePanel': async () => true } });
+    const bg = createBackground(api);
+    await bg.activate();
+    expect(typeof plugin.shortcuts['toggle-panel'].handler).toBe('function');
+    expect(plugin.shortcuts['toggle-panel'].keys).toBe('Alt+A');
+    expect(manifest.permissions).toContain('ui:keyboard');
+    await bg.shortcutToggle();
+    expect(api.calls('ui.togglePanel').map((c) => c.args)).toEqual([['email-detail-sidebar']]);
+    await bg.hooks.onComposerOpen({ mode: 'new' });
+    await bg.shortcutToggle();
+    expect(api.calls('ui.togglePanel')).toHaveLength(1);
+    await bg.hooks.onComposerClose();
+    await bg.shortcutToggle();
+    expect(api.calls('ui.togglePanel')).toHaveLength(2);
+  });
+
   it('takes the buttons away again when the service is removed, and the reader entries when the reader is off', async () => {
     let config = { anthropicBaseUrl: 'https://api.anthropic.com/v1' };
     const api = fakeApi({ handlers: { 'admin.getAllConfig': async () => config } });

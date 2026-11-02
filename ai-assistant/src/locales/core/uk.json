@@ -269,5 +269,6 @@
   "panel.step.find_setting": "Пошук «{query}» у налаштуваннях",
   "panel.step.read_my_settings": "Прочитано ваші налаштування",
   "panel.steps.kind.find_setting": "Налаштування",
-  "panel.steps.kind.read_my_settings": "Налаштування"
+  "panel.steps.kind.read_my_settings": "Налаштування",
+  "shortcut.toggle": "Відкрити або закрити ШІ-асистента"
 }
