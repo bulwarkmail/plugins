@@ -136,6 +136,7 @@
   "panel.quick.find": "Găsește un mesaj",
   "panel.find_prefix": "Găsește mesajul despre",
   "panel.new_chat": "Conversație nouă",
+  "panel.storage_full": "Spațiul asistentului este plin. Începeți o conversație nouă ca să eliberați spațiu.",
   "panel.empty.compose": "Alege o acțiune din meniul Acțiuni sau spune ce să schimbi. Selectează text din mesaj ca să lucrezi doar cu acea parte.",
   "panel.empty.write": "Descrie e-mailul și asistentul îl scrie. Îl poți insera apoi și continua editarea.",
   "panel.empty.read": "Alege o acțiune din meniul Acțiuni sau întreabă despre acest mesaj. Selectează un pasaj ca să întrebi despre acea parte.",

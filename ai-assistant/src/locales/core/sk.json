@@ -136,6 +136,7 @@
   "panel.quick.find": "Nájsť správu",
   "panel.find_prefix": "Nájdi správu o",
   "panel.new_chat": "Nový chat",
+  "panel.storage_full": "Úložisko asistenta je plné. Začnite nový chat a uvoľnite miesto.",
   "panel.empty.compose": "Vyberte akciu v ponuke Akcie alebo povedzte, čo zmeniť. Označte text v správe, ak chcete pracovať len s touto časťou.",
   "panel.empty.write": "Opíšte e-mail a asistent ho napíše. Potom ho môžete vložiť a ďalej upravovať.",
   "panel.empty.read": "Vyberte akciu v ponuke Akcie alebo sa opýtajte na túto správu. Označte pasáž, ak sa chcete opýtať na túto časť.",

@@ -136,6 +136,7 @@
   "panel.quick.find": "Znajdź wiadomość",
   "panel.find_prefix": "Znajdź wiadomość o",
   "panel.new_chat": "Nowy czat",
+  "panel.storage_full": "Pamięć asystenta jest pełna. Rozpocznij nowy czat, aby zwolnić miejsce.",
   "panel.empty.compose": "Wybierz akcję z menu Akcje lub powiedz, co zmienić. Zaznacz tekst w wiadomości, aby pracować tylko nad tą częścią.",
   "panel.empty.write": "Opisz e-mail, a asystent go napisze. Potem możesz go wstawić i dalej edytować.",
   "panel.empty.read": "Wybierz akcję z menu Akcje lub zapytaj o tę wiadomość. Zaznacz fragment, aby zapytać o tę część.",

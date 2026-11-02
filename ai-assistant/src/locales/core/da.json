@@ -136,6 +136,7 @@
   "panel.quick.find": "Find en besked",
   "panel.find_prefix": "Find beskeden om",
   "panel.new_chat": "Ny chat",
+  "panel.storage_full": "Assistentens lager er fuldt. Start en ny chat for at frigøre plads.",
   "panel.empty.compose": "Vælg en handling i menuen Handlinger, eller sig, hvad der skal ændres. Markér tekst i beskeden for kun at arbejde med den del.",
   "panel.empty.write": "Beskriv e-mailen, så skriver assistenten den. Du kan indsætte den og redigere videre.",
   "panel.empty.read": "Vælg en handling i menuen Handlinger, eller spørg om denne besked. Markér et afsnit for at spørge om den del.",

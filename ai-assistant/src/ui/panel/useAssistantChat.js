@@ -21,7 +21,7 @@ import { defaultTarget, languageOptions } from '../../lib/languages.js';
 import { diffSuggestions } from '../../lib/grammar.js';
 import { COMPOSER_CONTEXT_KEY, DRAFT_KEY, READER_CHAT_KEY, chatKey, pendingKey } from '../../lib/background.js';
 import {
-  MAX_TURNS, PENDING_TTL_MS, appLabels, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, topicSubject, uid,
+  MAX_TURNS, PENDING_TTL_MS, appLabels, storedTurns, contextKey, effectiveSource, lastTopic, loadTurns, taskForAction, topicSubject, uid,
 } from './model.js';
 
 /** Scopes that are part of the text; a quick action on them says so in its bubble. */
@@ -117,14 +117,24 @@ export function useAssistantChat(props) {
   // they pick text or come back to the panel.
   useEffect(() => { void refreshBody(); }, [refreshBody, selection?.text, props.focusRequest]);
 
-  // Save the transcript as it changes (not while an answer streams).
+  // Save the transcript as it changes (not while an answer streams). When
+  // the plugin's storage is full the user hears it once, not on every turn.
+  const storageWarned = useRef(false);
   useEffect(() => {
     if (!loaded || !key || running) return;
     const timer = setTimeout(() => {
-      void api.storage.set(key, { turns: turns.slice(-MAX_TURNS), at: Date.now() }).catch(() => {});
+      void Promise.resolve(api.storage.set(key, { turns: storedTurns(turns, mode), at: Date.now() })).then(
+        () => { storageWarned.current = false; },
+        (err) => {
+          api.log?.warn?.('could not save the chat', err?.message ?? err);
+          if (storageWarned.current) return;
+          storageWarned.current = true;
+          api.toast?.error?.(t('panel.storage_full'));
+        },
+      );
     }, 300);
     return () => clearTimeout(timer);
-  }, [api, key, turns, loaded, running]);
+  }, [api, key, turns, loaded, running, mode, t]);
 
   // ─── The transcript ───
   const patchTurn = useCallback((turnId, patch) => {

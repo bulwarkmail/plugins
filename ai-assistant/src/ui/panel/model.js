@@ -18,6 +18,30 @@ export const NO_MESSAGE_ACTIONS = ['today', 'find'];
 export const EMPTY_DRAFT_ACTIONS = ['example_1', 'example_2', 'example_3'];
 /** Turns kept in the transcript (older ones are dropped when saving). */
 export const MAX_TURNS = 40;
+/** Characters of a message's text kept with a saved reader turn (the model reads the message itself, not the transcript). */
+export const STORED_SOURCE_CHARS = 2000;
+
+/**
+ * The transcript as it is saved: the newest MAX_TURNS turns, and in the
+ * reader the message text each turn carried clipped, so a long chat doesn't
+ * fill the plugin's storage. The composer keeps its text (its diffs need it,
+ * and its chat goes when the draft closes); a failed turn keeps its input for
+ * Retry.
+ */
+export function storedTurns(turns, mode) {
+  const clip = (text) => (typeof text === 'string' && text.length > STORED_SOURCE_CHARS ? text.slice(0, STORED_SOURCE_CHARS) : text);
+  return turns.slice(-MAX_TURNS).map((turn) => {
+    if (mode !== 'reader' || turn.role !== 'assistant') return turn;
+    const out = { ...turn, source: clip(turn.source) };
+    if (turn.status !== 'error' && turn.input && typeof turn.input === 'object') {
+      out.input = { ...turn.input };
+      if (typeof out.input.text === 'string') out.input.text = clip(out.input.text);
+      if (out.input.email && typeof out.input.email.text === 'string') out.input.email = { ...out.input.email, text: clip(out.input.email.text) };
+    }
+    return out;
+  });
+}
+
 /** A pending request from a right-click entry is dropped after this long. */
 export const PENDING_TTL_MS = 60_000;
 

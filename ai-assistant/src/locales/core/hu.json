@@ -136,6 +136,7 @@
   "panel.quick.find": "Üzenet keresése",
   "panel.find_prefix": "Keresd meg az üzenetet erről:",
   "panel.new_chat": "Új beszélgetés",
+  "panel.storage_full": "Az asszisztens tárhelye megtelt. Kezdjen új csevegést, hogy hely szabaduljon fel.",
   "panel.empty.compose": "Válasszon műveletet a Műveletek menüből, vagy mondja meg, mit módosítson. Jelöljön ki szöveget az üzenetben, hogy csak azzal a résszel dolgozzon.",
   "panel.empty.write": "Írd le az e-mailt, és az asszisztens megírja. Utána beillesztheted és tovább szerkesztheted.",
   "panel.empty.read": "Válasszon műveletet a Műveletek menüből, vagy kérdezzen erről az üzenetről. Jelöljön ki egy részt, hogy arról kérdezzen.",

@@ -145,6 +145,15 @@ describe('background', () => {
     expect(await api.storage.get(DRAFT_KEY)).toBeNull();
   });
 
+  it('forgets the per-message chats of older versions when it starts', async () => {
+    const api = fakeApi({ handlers: configured });
+    await api.storage.set('chat:email:M1', { turns: [{ role: 'user', content: 'x'.repeat(1000) }] });
+    await api.storage.set('chat:reader', { turns: [] });
+    await createBackground(api).activate();
+    expect(await api.storage.get('chat:email:M1')).toBeNull();
+    expect(await api.storage.get('chat:reader')).toEqual({ turns: [] });
+  });
+
   it('forgets a draft left from an earlier session when it starts', async () => {
     const api = fakeApi({ handlers: configured });
     await api.storage.set(DRAFT_KEY, { text: 'old' });

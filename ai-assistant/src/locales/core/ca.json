@@ -136,6 +136,7 @@
   "panel.quick.find": "Cerca un missatge",
   "panel.find_prefix": "Troba el missatge sobre",
   "panel.new_chat": "Xat nou",
+  "panel.storage_full": "L'emmagatzematge de l'assistent és ple. Comença un xat nou per alliberar espai.",
   "panel.empty.compose": "Tria una acció al menú Accions o digues què cal canviar. Ressalta text del missatge per treballar només amb aquesta part.",
   "panel.empty.write": "Descriu el correu i l'assistent l'escriu. Després el pots inserir i continuar editant.",
   "panel.empty.read": "Tria una acció al menú Accions o pregunta sobre aquest missatge. Ressalta un fragment per preguntar sobre aquesta part.",

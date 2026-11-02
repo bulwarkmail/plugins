@@ -136,6 +136,7 @@
   "panel.quick.find": "Atrast ziņojumu",
   "panel.find_prefix": "Atrodi ziņojumu par",
   "panel.new_chat": "Jauna saruna",
+  "panel.storage_full": "Asistenta krātuve ir pilna. Sāciet jaunu tērzēšanu, lai atbrīvotu vietu.",
   "panel.empty.compose": "Izvēlieties darbību izvēlnē Darbības vai pasakiet, ko mainīt. Iezīmējiet tekstu ziņā, lai strādātu tikai ar šo daļu.",
   "panel.empty.write": "Aprakstiet e-pastu, un asistents to uzrakstīs. Pēc tam varat to ievietot un turpināt rediģēt.",
   "panel.empty.read": "Izvēlieties darbību izvēlnē Darbības vai jautājiet par šo ziņu. Iezīmējiet fragmentu, lai jautātu par šo daļu.",

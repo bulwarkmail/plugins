@@ -136,6 +136,7 @@
   "panel.quick.find": "Een bericht zoeken",
   "panel.find_prefix": "Zoek het bericht over",
   "panel.new_chat": "Nieuwe chat",
+  "panel.storage_full": "De opslag van de assistent is vol. Begin een nieuwe chat om ruimte vrij te maken.",
   "panel.empty.compose": "Kies een actie in het menu Acties of zeg wat er anders moet. Markeer tekst in het bericht om alleen aan dat deel te werken.",
   "panel.empty.write": "Beschrijf de e-mail en de assistent schrijft hem. U kunt hem daarna invoegen en verder bewerken.",
   "panel.empty.read": "Kies een actie in het menu Acties of stel een vraag over dit bericht. Markeer een passage om naar dat deel te vragen.",

@@ -136,6 +136,7 @@
   "panel.quick.find": "尋找郵件",
   "panel.find_prefix": "尋找關於以下內容的郵件：",
   "panel.new_chat": "新對話",
+  "panel.storage_full": "助理的儲存空間已滿。開始新的聊天即可釋出空間。",
   "panel.empty.compose": "從「操作」選單中選擇一個操作，或說明要修改什麼。在郵件中選取文字即可只處理該部分。",
   "panel.empty.write": "描述這封郵件，由助理撰寫。之後您可以插入並繼續編輯。",
   "panel.empty.read": "從「操作」選單中選擇一個操作，或就這封郵件提問。選取一段文字即可就該部分提問。",

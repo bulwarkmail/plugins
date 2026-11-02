@@ -136,6 +136,7 @@
   "panel.quick.find": "查找邮件",
   "panel.find_prefix": "查找关于以下内容的邮件：",
   "panel.new_chat": "新对话",
+  "panel.storage_full": "助手的存储空间已满。开始新的聊天可释放空间。",
   "panel.empty.compose": "从“操作”菜单中选择一个操作，或说明要修改什么。在邮件中选中文本即可只处理该部分。",
   "panel.empty.write": "描述这封邮件，助手来写。之后您可以插入并继续编辑。",
   "panel.empty.read": "从“操作”菜单中选择一个操作，或就这封邮件提问。选中一段文字即可就该部分提问。",

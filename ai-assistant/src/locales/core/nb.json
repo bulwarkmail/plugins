@@ -136,6 +136,7 @@
   "panel.quick.find": "Finn en melding",
   "panel.find_prefix": "Finn meldingen om",
   "panel.new_chat": "Ny samtale",
+  "panel.storage_full": "Assistentens lagring er full. Start en ny chat for å frigjøre plass.",
   "panel.empty.compose": "Velg en handling i menyen Handlinger, eller si hva som skal endres. Marker tekst i meldingen for å jobbe bare med den delen.",
   "panel.empty.write": "Beskriv e-posten, så skriver assistenten den. Du kan sette den inn og redigere videre.",
   "panel.empty.read": "Velg en handling i menyen Handlinger, eller spør om denne meldingen. Marker et avsnitt for å spørre om den delen.",

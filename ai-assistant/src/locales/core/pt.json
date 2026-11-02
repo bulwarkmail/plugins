@@ -136,6 +136,7 @@
   "panel.quick.find": "Encontrar uma mensagem",
   "panel.find_prefix": "Encontra a mensagem sobre",
   "panel.new_chat": "Nova conversa",
+  "panel.storage_full": "O armazenamento do assistente está cheio. Inicie uma nova conversa para libertar espaço.",
   "panel.empty.compose": "Escolha uma ação no menu Ações ou diga o que mudar. Destaque texto na mensagem para trabalhar só nessa parte.",
   "panel.empty.write": "Descreva o e-mail e o assistente escreve-o. Depois pode inseri-lo e continuar a editar.",
   "panel.empty.read": "Escolha uma ação no menu Ações ou pergunte sobre esta mensagem. Destaque um trecho para perguntar sobre essa parte.",

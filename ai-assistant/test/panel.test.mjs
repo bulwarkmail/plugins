@@ -824,6 +824,39 @@ describe('words for every platform and lookup', () => {
   });
 });
 
+describe('the saved chat', () => {
+  it('keeps only the start of a long message with each reader turn', async () => {
+    const long = { ...EMAIL, text: 'x'.repeat(9000) };
+    const api = makeApi({ answers: ['- point'] });
+    await mount(api, { email: long, selection: { text: '' }, focusRequest: 0 });
+    await quickAction('Summarize');
+    await settled();
+    // The model got all of it...
+    expect(sentPrompt(api).messages[0].content.length).toBeGreaterThan(9000);
+    // ...the storage keeps 2,000 characters.
+    await waitFor(async () => expect((await api.storage.get('chat:reader'))?.turns).toHaveLength(2));
+    const saved = (await api.storage.get('chat:reader')).turns[1];
+    expect(saved.source.length).toBe(2000);
+    expect(JSON.stringify(saved).length).toBeLessThan(5000);
+  });
+
+  it('says once when the storage is full', async () => {
+    const api = makeApi({ answers: ['One.', 'Two.'] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    api.storage.set = async () => { throw new Error('Plugin storage is full (1024 KB per account)'); };
+    await type('first');
+    await pressEnter();
+    await settled();
+    await waitFor(() => expect(api.calls('toast.error')).toHaveLength(1));
+    expect(api.calls('toast.error')[0].args[0]).toBe("The assistant's storage is full. Start a new chat to free space.");
+    await type('second');
+    await pressEnter();
+    await settled();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(api.calls('toast.error')).toHaveLength(1);
+  });
+});
+
 describe('a failed action', () => {
   it('says why in the user\'s words, and keeps the model\'s text for the model', async () => {
     const ev = (event, data) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;

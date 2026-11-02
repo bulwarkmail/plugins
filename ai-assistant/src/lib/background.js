@@ -159,6 +159,14 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
     } catch { /* nothing to forget */ }
   }
 
+  /** The per-message chats of versions before the one reader chat (chat:email:*), never read any more. */
+  async function forgetOldReaderChats() {
+    try {
+      const keys = await api.storage.keys();
+      await Promise.all(keys.filter((k) => k.startsWith('chat:email:')).map((k) => api.storage.remove(k)));
+    } catch { /* nothing to forget */ }
+  }
+
   return {
     state,
     refresh,
@@ -168,6 +176,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       // Drafts and chats left over from a closed tab are not kept.
       await forgetDraft();
       await forgetComposerChats();
+      await forgetOldReaderChats();
       await api.storage.remove(COMPOSER_CONTEXT_KEY).catch(() => {});
       await refresh(true);
     },
