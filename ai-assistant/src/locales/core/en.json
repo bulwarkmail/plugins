@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Read the message you reply to",
   "panel.step.running": "looking up…",
   "panel.step.failed": "failed",
+  "panel.step.generic": "Looked something up",
+  "panel.steps.kind.other": "Other",
   "settings.show_in_reader_hint": "The panel beside an open message, and the bar above it on phones.",
   "settings.lookups": "Let the assistant look things up",
   "settings.lookups_hint": "When an answer needs it: your calendar, your contacts and the message you reply to. Each lookup is shown in the chat.",

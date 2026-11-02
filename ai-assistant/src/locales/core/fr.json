@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Message auquel vous répondez lu",
   "panel.step.running": "recherche…",
   "panel.step.failed": "échec",
+  "panel.step.generic": "A consulté quelque chose",
+  "panel.steps.kind.other": "Autre",
   "settings.show_in_reader_hint": "Le panneau à côté d'un message ouvert, et la barre au-dessus sur téléphone.",
   "settings.lookups": "Laisser l'assistant consulter vos données",
   "settings.lookups_hint": "Quand une réponse en a besoin : votre agenda, vos contacts et le message auquel vous répondez. Chaque consultation apparaît dans la discussion.",

@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Izlasīta ziņa, uz kuru atbildat",
   "panel.step.running": "meklē…",
   "panel.step.failed": "neizdevās",
+  "panel.step.generic": "Kaut ko uzmeklēja",
+  "panel.steps.kind.other": "Cits",
   "settings.show_in_reader_hint": "Panelis blakus atvērtai ziņai un tālrunī josla virs tās.",
   "settings.lookups": "Ļaut asistentam meklēt datus",
   "settings.lookups_hint": "Kad atbildei tas vajadzīgs: jūsu kalendārs, kontakti un ziņa, uz kuru atbildat. Katra meklēšana tiek parādīta sarunā.",

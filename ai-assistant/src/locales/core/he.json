@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "ההודעה שאליה אתם משיבים נקראה",
   "panel.step.running": "מחפש…",
   "panel.step.failed": "נכשל",
+  "panel.step.generic": "בדק משהו",
+  "panel.steps.kind.other": "אחר",
   "settings.show_in_reader_hint": "החלונית לצד הודעה פתוחה, ובטלפון הסרגל מעליה.",
   "settings.lookups": "לאפשר לעוזר לחפש נתונים",
   "settings.lookups_hint": "כשהתשובה דורשת זאת: היומן שלכם, אנשי הקשר וההודעה שאליה אתם משיבים. כל חיפוש מוצג בשיחה.",

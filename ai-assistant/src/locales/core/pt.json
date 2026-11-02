@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Mensagem a que responde lida",
   "panel.step.running": "a consultar…",
   "panel.step.failed": "falhou",
+  "panel.step.generic": "Consultou algo",
+  "panel.steps.kind.other": "Outro",
   "settings.show_in_reader_hint": "O painel ao lado de uma mensagem aberta e, no telemóvel, a barra por cima.",
   "settings.lookups": "Deixar o assistente consultar os seus dados",
   "settings.lookups_hint": "Quando uma resposta precisa: o seu calendário, os seus contactos e a mensagem a que responde. Cada consulta aparece na conversa.",

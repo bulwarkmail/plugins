@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { anthropicSse, streamResponse } from './helpers.mjs';
 import { AssistantPanel, sourceFor, taskForAction } from '../src/ui/Panel.jsx';
+import { undoHint } from '../src/ui/panel/Turns.jsx';
 import { chatKey, pendingKey, COMPOSER_CONTEXT_KEY } from '../src/lib/background.js';
 import { allStrings } from '../src/lib/i18n.js';
 
@@ -796,6 +797,30 @@ describe('quick action names', () => {
     expect(userBubble()).toBe('Translate to German · highlighted text');
     expect(JSON.stringify(sentPrompt(api).messages)).toContain('Thursday at 3');
     expect(screen.queryByRole('combobox', { name: 'Translate into' })).toBeNull();
+  });
+});
+
+describe('words for every platform and lookup', () => {
+  it('names the undo key of a Mac on a Mac', () => {
+    const t = (key) => allStrings().de[key];
+    expect(undoHint(t, 'Win32')).toBe('Strg+Z macht es rückgängig');
+    expect(undoHint(t, 'MacIntel')).toBe('⌘Z macht es rückgängig');
+    expect(undoHint((key) => allStrings().ja[key], 'macOS')).toBe('⌘Zで元に戻せます');
+  });
+
+  it('never shows the code name of a lookup it has no words for', async () => {
+    const api = makeApi();
+    // A saved answer with a lookup this version has no words for.
+    await api.storage.set('chat:reader', { turns: [
+      { id: 'u1', role: 'user', content: 'what is in the file?', label: 'what is in the file?', emailId: 'M1' },
+      { id: 'a1', role: 'assistant', content: 'A list.', status: 'done', task: 'chat', show: 'chat', steps: [{ id: 's1', name: 'read_attachment', args: { name: 'list.txt' }, status: 'done', result: 'milk, eggs' }] },
+    ] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const box = await waitFor(() => { const el = document.querySelector('[data-steps]'); if (!el) throw new Error('no steps'); return el; });
+    expect(box.textContent).not.toContain('read_attachment');
+    expect(box.textContent).toContain('Other');
+    await click(within(box).getByRole('button'));
+    expect(box.textContent).toContain('Looked something up');
   });
 });
 

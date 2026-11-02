@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Prečítaná správa, na ktorú odpovedáte",
   "panel.step.running": "vyhľadáva sa…",
   "panel.step.failed": "zlyhalo",
+  "panel.step.generic": "Niečo vyhľadal",
+  "panel.steps.kind.other": "Ostatné",
   "settings.show_in_reader_hint": "Panel vedľa otvorenej správy a na telefóne lišta nad ňou.",
   "settings.lookups": "Povoliť asistentovi vyhľadávať údaje",
   "settings.lookups_hint": "Keď to odpoveď vyžaduje: váš kalendár, vaše kontakty a správa, na ktorú odpovedáte. Každé vyhľadanie sa zobrazí v chate.",

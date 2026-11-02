@@ -18,7 +18,8 @@ function stepLabel(t, step) {
     case 'read_message': return t('panel.step.read_message');
     case 'find_setting': return t('panel.step.find_setting', { query: args.query ?? '' });
     case 'read_my_settings': return t('panel.step.read_my_settings');
-    default: return step.name;
+    // A lookup without its own words (a newer one) never shows its code name.
+    default: return t('panel.step.generic');
   }
 }
 
@@ -86,7 +87,7 @@ export function StepsGroup({ api, mode, replying, steps, running, onSend, onInse
   const failed = steps.some((s) => s.status === 'failed');
   const chips = [];
   for (const step of steps) {
-    const label = t(`panel.steps.kind.${step.name}`);
+    const label = step.name in STEP_ICONS ? t(`panel.steps.kind.${step.name}`) : t('panel.steps.kind.other');
     const prev = chips.find((c) => c.label === label);
     if (prev) { prev.count++; prev.status = step.status === 'failed' || prev.status === 'failed' ? 'failed' : step.status === 'running' ? 'running' : prev.status; }
     else chips.push({ label, count: 1, status: step.status });

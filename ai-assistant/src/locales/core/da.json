@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Læste beskeden du svarer på",
   "panel.step.running": "slår op…",
   "panel.step.failed": "mislykkedes",
+  "panel.step.generic": "Slog noget op",
+  "panel.steps.kind.other": "Andet",
   "settings.show_in_reader_hint": "Panelet ved siden af en åben besked, og på telefonen bjælken over den.",
   "settings.lookups": "Lad assistenten slå ting op",
   "settings.lookups_hint": "Når et svar kræver det: din kalender, dine kontakter og beskeden du svarer på. Hvert opslag vises i chatten.",

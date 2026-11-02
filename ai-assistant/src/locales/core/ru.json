@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Прочитано сообщение, на которое вы отвечаете",
   "panel.step.running": "поиск…",
   "panel.step.failed": "не удалось",
+  "panel.step.generic": "Кое-что проверил",
+  "panel.steps.kind.other": "Другое",
   "settings.show_in_reader_hint": "Панель рядом с открытым сообщением, а на телефоне полоса над ним.",
   "settings.lookups": "Разрешить ассистенту искать данные",
   "settings.lookups_hint": "Когда это нужно для ответа: ваш календарь, контакты и сообщение, на которое вы отвечаете. Каждый поиск показывается в чате.",

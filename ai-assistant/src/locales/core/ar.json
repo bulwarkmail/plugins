@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "تمت قراءة الرسالة التي ترد عليها",
   "panel.step.running": "جارٍ البحث…",
   "panel.step.failed": "فشل",
+  "panel.step.generic": "بحث عن شيء",
+  "panel.steps.kind.other": "أخرى",
   "settings.show_in_reader_hint": "اللوحة بجانب الرسالة المفتوحة، وعلى الهاتف الشريط فوقها.",
   "settings.lookups": "السماح للمساعد بالبحث في بياناتك",
   "settings.lookups_hint": "عندما تحتاج الإجابة إلى ذلك: تقويمك وجهات اتصالك والرسالة التي ترد عليها. يظهر كل بحث في المحادثة.",

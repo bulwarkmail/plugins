@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Het bericht gelezen waarop u antwoordt",
   "panel.step.running": "bezig met opzoeken…",
   "panel.step.failed": "mislukt",
+  "panel.step.generic": "Iets opgezocht",
+  "panel.steps.kind.other": "Overig",
   "settings.show_in_reader_hint": "Het paneel naast een geopend bericht en op de telefoon de balk erboven.",
   "settings.lookups": "Assistent dingen laten opzoeken",
   "settings.lookups_hint": "Als een antwoord het nodig heeft: uw agenda, uw contacten en het bericht waarop u antwoordt. Elke opzoeking wordt in de chat getoond.",

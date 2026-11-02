@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Przeczytano wiadomość, na którą odpowiadasz",
   "panel.step.running": "wyszukiwanie…",
   "panel.step.failed": "nie powiodło się",
+  "panel.step.generic": "Coś sprawdził",
+  "panel.steps.kind.other": "Inne",
   "settings.show_in_reader_hint": "Panel obok otwartej wiadomości, a na telefonie pasek nad nią.",
   "settings.lookups": "Pozwól asystentowi sprawdzać dane",
   "settings.lookups_hint": "Gdy odpowiedź tego wymaga: Twój kalendarz, kontakty i wiadomość, na którą odpowiadasz. Każde sprawdzenie jest pokazywane w czacie.",

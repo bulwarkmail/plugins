@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "已讀取您回覆的郵件",
   "panel.step.running": "搜尋中…",
   "panel.step.failed": "失敗",
+  "panel.step.generic": "查了一些資訊",
+  "panel.steps.kind.other": "其他",
   "settings.show_in_reader_hint": "開啟郵件旁的面板；在手機上則是郵件上方的工具列。",
   "settings.lookups": "允許助理查閱資料",
   "settings.lookups_hint": "當回答需要時：您的行事曆、聯絡人和您回覆的郵件。每次查閱都會顯示在對話中。",

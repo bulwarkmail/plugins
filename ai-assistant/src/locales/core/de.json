@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Die Nachricht gelesen, auf die Sie antworten",
   "panel.step.running": "wird nachgeschlagen…",
   "panel.step.failed": "fehlgeschlagen",
+  "panel.step.generic": "Etwas nachgesehen",
+  "panel.steps.kind.other": "Sonstiges",
   "settings.show_in_reader_hint": "Das Panel neben einer geöffneten Nachricht und auf dem Telefon die Leiste darüber.",
   "settings.lookups": "Assistenten nachschlagen lassen",
   "settings.lookups_hint": "Wenn eine Antwort es braucht: Ihr Kalender, Ihre Kontakte und die Nachricht, auf die Sie antworten. Jedes Nachschlagen wird im Chat angezeigt.",

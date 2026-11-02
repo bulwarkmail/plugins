@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "返信先のメッセージを読みました",
   "panel.step.running": "検索中…",
   "panel.step.failed": "失敗",
+  "panel.step.generic": "情報を調べました",
+  "panel.steps.kind.other": "その他",
   "settings.show_in_reader_hint": "開いたメッセージの横のパネルと、スマートフォンではその上のバー。",
   "settings.lookups": "アシスタントに情報の参照を許可",
   "settings.lookups_hint": "回答に必要なとき：カレンダー、連絡先、返信先のメッセージ。参照はすべてチャットに表示されます。",

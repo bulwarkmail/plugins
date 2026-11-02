@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Elolvasta az üzenetet, amelyre válaszolsz",
   "panel.step.running": "keresés…",
   "panel.step.failed": "sikertelen",
+  "panel.step.generic": "Utánanézett valaminek",
+  "panel.steps.kind.other": "Egyéb",
   "settings.show_in_reader_hint": "A panel a megnyitott üzenet mellett, telefonon a sáv fölötte.",
   "settings.lookups": "Az asszisztens kereshessen adatokat",
   "settings.lookups_hint": "Ha a válaszhoz kell: a naptárad, a névjegyeid és az üzenet, amelyre válaszolsz. Minden keresés megjelenik a beszélgetésben.",

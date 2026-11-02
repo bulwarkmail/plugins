@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "پیامی که به آن پاسخ می‌دهید خوانده شد",
   "panel.step.running": "در حال جستجو…",
   "panel.step.failed": "ناموفق",
+  "panel.step.generic": "چیزی را جست‌وجو کرد",
+  "panel.steps.kind.other": "سایر",
   "settings.show_in_reader_hint": "پنل کنار پیام باز، و در تلفن نوار بالای آن.",
   "settings.lookups": "اجازه جستجو به دستیار",
   "settings.lookups_hint": "وقتی پاسخ به آن نیاز دارد: تقویم شما، مخاطبان شما و پیامی که به آن پاسخ می‌دهید. هر جستجو در گفتگو نشان داده می‌شود.",

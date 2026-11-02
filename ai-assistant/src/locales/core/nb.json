@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Leste meldingen du svarer på",
   "panel.step.running": "slår opp…",
   "panel.step.failed": "mislyktes",
+  "panel.step.generic": "Slo opp noe",
+  "panel.steps.kind.other": "Annet",
   "settings.show_in_reader_hint": "Panelet ved siden av en åpen melding, og på telefonen linjen over den.",
   "settings.lookups": "La assistenten slå opp ting",
   "settings.lookups_hint": "Når et svar trenger det: kalenderen din, kontaktene dine og meldingen du svarer på. Hvert oppslag vises i samtalen.",

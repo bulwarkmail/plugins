@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "답장할 메시지를 읽었습니다",
   "panel.step.running": "찾는 중…",
   "panel.step.failed": "실패",
+  "panel.step.generic": "정보를 찾아봤습니다",
+  "panel.steps.kind.other": "기타",
   "settings.show_in_reader_hint": "열린 메시지 옆의 패널, 휴대전화에서는 그 위의 막대.",
   "settings.lookups": "어시스턴트의 정보 조회 허용",
   "settings.lookups_hint": "답변에 필요할 때: 내 캘린더, 연락처, 답장할 메시지. 모든 조회는 대화에 표시됩니다.",

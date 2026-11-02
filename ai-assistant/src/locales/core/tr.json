@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Yanıtladığınız mesaj okundu",
   "panel.step.running": "aranıyor…",
   "panel.step.failed": "başarısız",
+  "panel.step.generic": "Bir şeye baktı",
+  "panel.steps.kind.other": "Diğer",
   "settings.show_in_reader_hint": "Açık bir mesajın yanındaki panel ve telefonda üstündeki çubuk.",
   "settings.lookups": "Asistan bilgi arayabilsin",
   "settings.lookups_hint": "Yanıt gerektirdiğinde: takviminiz, kişileriniz ve yanıtladığınız mesaj. Her arama sohbette gösterilir.",

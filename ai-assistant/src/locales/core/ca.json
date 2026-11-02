@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Missatge al qual respons llegit",
   "panel.step.running": "cercant…",
   "panel.step.failed": "ha fallat",
+  "panel.step.generic": "Ha consultat una cosa",
+  "panel.steps.kind.other": "Altres",
   "settings.show_in_reader_hint": "El tauler al costat d'un missatge obert i, al telèfon, la barra a sobre.",
   "settings.lookups": "Permet que l'assistent consulti dades",
   "settings.lookups_hint": "Quan una resposta ho necessita: el teu calendari, els teus contactes i el missatge al qual respons. Cada consulta es mostra al xat.",

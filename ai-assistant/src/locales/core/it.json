@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Letto il messaggio a cui rispondi",
   "panel.step.running": "ricerca in corso…",
   "panel.step.failed": "non riuscito",
+  "panel.step.generic": "Ha cercato qualcosa",
+  "panel.steps.kind.other": "Altro",
   "settings.show_in_reader_hint": "Il pannello accanto a un messaggio aperto e, sul telefono, la barra sopra di esso.",
   "settings.lookups": "Lascia che l'assistente consulti i tuoi dati",
   "settings.lookups_hint": "Quando una risposta lo richiede: il tuo calendario, i tuoi contatti e il messaggio a cui rispondi. Ogni consultazione è mostrata nella chat.",

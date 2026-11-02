@@ -15,6 +15,12 @@ import { diffWords, plainParts } from '../../lib/diff.js';
 import { partsOf } from './model.js';
 import { ActionCard, StepsGroup } from './Steps.jsx';
 
+/** "Ctrl+Z takes it back", with the Mac's key on a Mac. */
+export function undoHint(t, platform = typeof navigator !== 'undefined' ? (navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '') : '') {
+  const hint = t('panel.undo_hint');
+  return /mac|iphone|ipad/i.test(platform) ? hint.replace(/\b(?:Ctrl|Strg)\+Z/, '⌘Z') : hint;
+}
+
 /** A line in the transcript: from here on the conversation is about another message, or about none. */
 export function ContextMarker({ api, turn }) {
   const rule = { flex: 1, height: 1, background: 'var(--color-border)' };
@@ -131,7 +137,7 @@ function ProposalCard({ api, mode, turn, text, headers = {}, replying = true, st
       {applied ? (
         <Row gap={2}>
           <Badge tone="success">{t(applied === 'reply' ? 'panel.applied.reply' : applied === 'new' ? 'panel.applied.new' : applied === 'replace' ? 'panel.applied.replace' : 'panel.applied.insert')}</Badge>
-          {applied !== 'reply' && applied !== 'new' && <Text size="xs" tone="muted">{t('panel.undo_hint')}</Text>}
+          {applied !== 'reply' && applied !== 'new' && <Text size="xs" tone="muted">{undoHint(t)}</Text>}
         </Row>
       ) : (
         <Row gap={1}>

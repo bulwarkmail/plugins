@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Mesajul la care răspunzi a fost citit",
   "panel.step.running": "se caută…",
   "panel.step.failed": "a eșuat",
+  "panel.step.generic": "A căutat ceva",
+  "panel.steps.kind.other": "Altele",
   "settings.show_in_reader_hint": "Panoul de lângă un mesaj deschis și, pe telefon, bara de deasupra lui.",
   "settings.lookups": "Permite asistentului să caute date",
   "settings.lookups_hint": "Când un răspuns are nevoie: calendarul tău, contactele tale și mesajul la care răspunzi. Fiecare căutare apare în conversație.",

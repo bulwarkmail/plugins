@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "Таны хариулж буй захидлыг уншлаа",
   "panel.step.running": "хайж байна…",
   "panel.step.failed": "амжилтгүй",
+  "panel.step.generic": "Ямар нэг зүйл хайсан",
+  "panel.steps.kind.other": "Бусад",
   "settings.show_in_reader_hint": "Нээлттэй захидлын хажуу дахь самбар, утсан дээр түүний дээрх мөр.",
   "settings.lookups": "Туслахад мэдээлэл хайхыг зөвшөөрөх",
   "settings.lookups_hint": "Хариултад шаардлагатай үед: таны календарь, харилцагчид болон таны хариулж буй захидал. Хайлт бүр чатад харагдана.",

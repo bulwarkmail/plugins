@@ -167,6 +167,8 @@
   "panel.step.read_original_message": "已读取您回复的邮件",
   "panel.step.running": "正在查找…",
   "panel.step.failed": "失败",
+  "panel.step.generic": "查了一些信息",
+  "panel.steps.kind.other": "其他",
   "settings.show_in_reader_hint": "打开邮件旁的面板；在手机上则是邮件上方的工具栏。",
   "settings.lookups": "允许助手查阅信息",
   "settings.lookups_hint": "当回答需要时：您的日历、联系人和您回复的邮件。每次查阅都会显示在对话中。",
