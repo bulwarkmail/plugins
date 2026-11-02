@@ -36,7 +36,7 @@ export function actionLabel(t, mode, action) {
 }
 
 /** The quick actions, in a menu that opens above its button. */
-export function ActionsMenu({ api, actions, actionLabel: labelOf, disabled, onPick, compact = false, rootRef }) {
+export function ActionsMenu({ api, actions, extra = [], actionLabel: labelOf, disabled, onPick, compact = false, rootRef }) {
   const t = api.i18n.t;
   const [open, setOpen] = useState(false);
   // Where the menu opens: from the button's start, or from its end when that would run past the panel.
@@ -88,6 +88,22 @@ export function ActionsMenu({ api, actions, actionLabel: labelOf, disabled, onPi
             >
               <Icon name={ACTION_ICONS[action] ?? 'sparkles'} size="sm" className="text-muted-foreground" />
               <span>{labelOf(action)}</span>
+            </button>
+          ))}
+          {/* Entries of the 2.2 areas (saved prompts, Catch me up, ...), after a line. */}
+          {extra.length > 0 && actions.length > 0 && <div role="separator" style={{ height: 1, margin: '4px 0', background: 'var(--color-border)' }} />}
+          {extra.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="menuitem"
+              data-quick={item.id}
+              className="bk hover:bg-muted rounded-md"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 8px', background: 'none', border: 0, font: 'inherit', fontSize: '0.875rem', color: 'inherit', textAlign: 'start', cursor: 'pointer' }}
+              onClick={() => { setOpen(false); item.run(); }}
+            >
+              <Icon name={item.icon ?? 'sparkles'} size="sm" className="text-muted-foreground" />
+              <span>{item.label}</span>
             </button>
           ))}
         </div>

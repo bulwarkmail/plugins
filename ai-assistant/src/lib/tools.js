@@ -8,6 +8,7 @@
 import { clip } from './prompts.js';
 import { userZone, whenIn } from './clock.js';
 import { calendarWidget, contactParts, contactsWidget, emailsWidget } from './widgets.js';
+import { areaTool, areaTools, offered } from './areas/index.js';
 
 /** Longest tool result handed to the model, in characters. */
 export const MAX_TOOL_RESULT = 8000;
@@ -93,7 +94,9 @@ export function toolsFor(ctx = {}) {
   if (ctx.lookups !== false) names.push('check_calendar', 'find_contact', 'search_mail', 'read_message', 'read_my_settings');
   // Where a setting is: the app's own texts, nothing of the user's.
   names.push('find_setting');
-  return names.map((name) => ({ name, ...DEFINITIONS[name] }));
+  // The 2.2 areas' lookups (src/lib/areas), where they are offered.
+  const extra = areaTools().filter((tool) => offered(tool, ctx)).map(({ name, description, parameters }) => ({ name, description, parameters }));
+  return [...names.map((name) => ({ name, ...DEFINITIONS[name] })), ...extra];
 }
 
 function person(p) {
@@ -178,6 +181,11 @@ function zoneOf(api, ctx) {
 }
 
 export async function runTool(api, name, args = {}, ctx = {}) {
+  const area = areaTool(name);
+  if (area) {
+    if (!offered(area, ctx)) throw new Error(`${name} is not available here`);
+    return area.run(api, args, ctx);
+  }
   switch (name) {
     case 'read_original_message': {
       if (!ctx.inReplyToId) throw new Error('there is no original message');

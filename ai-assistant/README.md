@@ -140,6 +140,21 @@ settings. Set up one or both services:
 | Instructions for the assistant | Standing instructions for everyone, added to every request (house style, sign-offs, languages, things never to say) |
 | Actions | The most users may choose: off, ask first, or automatic (default: automatic allowed; each user starts with actions off) |
 | Let users connect their own API key | Off by default |
+| More context | Attachments and images of the open message, the whole conversation, the messages selected in the list, and @-mentioned messages, contacts and files. On by default |
+| Anthropic: images, OpenAI-compatible: images | Whether that service's model gets images. Automatic: yes for Anthropic and api.openai.com (apart from text-only models), no for other servers such as Ollama. Without images the model gets the file name only |
+| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once. On by default; each of these asks the user first |
+| Most messages per batch | 1 to 200, default 50 |
+| Change settings | Let users allow the assistant to change their app settings (appearance, reading, composing, list, notifications, calendar view). Off by default |
+| Files | Find, read and attach the user's files, save attachments to Files, create files and folders. Never deletes or shares. On by default |
+| Chat tools | History, saved prompts, slash commands, edit and regenerate. On by default |
+| Prompts for everyone | Saved prompts all users get, one per line: `Name: what to ask` |
+| Remember notes | Users can have the assistant keep short notes about them. On by default |
+| Every view | The assistant in Calendar, Contacts, Files and Settings, and Catch me up. On by default |
+
+What each switch does in detail, and what it sends to the AI service, is
+in "What is sent where". A webmail older than the one these features need
+installs the plugin and leaves them out: the assistant checks what the
+webmail offers (`api.host.features`) and shows only what works.
 
 Without a model the defaults are `gpt-4o-mini` and `claude-haiku-4-5`.
 Lookups need a model that supports tool calls; small local models often

@@ -23,7 +23,17 @@ export function contextChip(t, source, email) {
 }
 
 /** The chip row's context chip: the one in effect, or the one that brings a removed context back. `fit`: 'full' or 'icon'. */
-export function ContextChips({ api, source, email, onRemove, onRestore, fit = 'full' }) {
+export function ContextChips({ api, source, email, onRemove, onRestore, fit = 'full', extra = [] }) {
+  // The 2.2 areas' chips follow the message's (attachments, a thread, files, ...).
+  const more = extra.map((c) => (
+    <ContextChip key={c.key} icon={c.icon} label={c.label} detail={c.detail} title={c.title} onRemove={c.onRemove} removeLabel={c.removeLabel ?? api.i18n.t('panel.context.remove')} onClick={c.onClick} dashed={c.dashed} fit={fit} />
+  ));
+  const own = <OwnChip api={api} source={source} email={email} onRemove={onRemove} onRestore={onRestore} fit={fit} />;
+  return more.length ? <>{own}{more}</> : own;
+}
+
+/** The chip of the message or text the panel works on. */
+function OwnChip({ api, source, email, onRemove, onRestore, fit }) {
   const t = api.i18n.t;
   const chip = contextChip(t, source, email);
   if (source.removed && email) {

@@ -7,9 +7,10 @@ import { useApi } from './common.jsx';
 import { loadSetup, savePrefs, PROVIDER_LABELS } from '../lib/assistant.js';
 import { ACTION_MODES, effectiveActionMode } from '../lib/actions.js';
 import { MAX_INSTRUCTIONS_CHARS } from '../lib/prompts.js';
+import { AREA_SECTIONS } from './settings/index.js';
 import {
   DEFAULT_MODELS, OFFICIAL_BASE_URLS, OWN_CREDENTIALS, PROVIDERS,
-  adminProviders, hostOf, normalizeBaseUrl, userKeysAllowed,
+  adminProviders, areaAllowed, hostOf, normalizeBaseUrl, userKeysAllowed,
 } from '../lib/config.js';
 
 export function SettingsPanel(props) {
@@ -167,6 +168,11 @@ export function SettingsPanel(props) {
           </Row>
         </Stack>
       </Section>
+
+      {/* The 2.2 areas' settings (src/ui/settings), each only when the admin left its area on. */}
+      {AREA_SECTIONS.filter(([area]) => areaAllowed(config, area)).map(([area, AreaSection]) => (
+        <AreaSection key={area} api={api} setup={setup} prefs={prefs} savePrefs={save} />
+      ))}
 
       {allowOwn && (
         <Section title={t('settings.own_title')} description={t('settings.own_hint')}>

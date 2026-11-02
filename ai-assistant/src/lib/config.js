@@ -67,6 +67,56 @@ export function adminProviders(config = {}) {
   return out;
 }
 
+/**
+ * The admin's switch for each 2.2 area (configSchema allow*). Context,
+ * actions, Files, chat tools and every view are on unless switched off;
+ * settings changes are off unless switched on (allowSettingsChanges).
+ */
+export const AREA_SWITCHES = {
+  context: 'allowContext',
+  actions: 'allowMoreActions',
+  files: 'allowFiles',
+  chat: 'allowChatTools',
+  everywhere: 'allowEverywhere',
+};
+
+const flag = (value, fallback) => (value === undefined || value === null || value === '' ? fallback : value === true || value === 'true');
+
+/** Whether the admin left an area on. */
+export function areaAllowed(config = {}, area) {
+  const key = AREA_SWITCHES[area];
+  return key ? flag(config[key], true) : false;
+}
+
+/** Whether the admin allows the assistant to change users' settings (off by default). */
+export function settingsChangesAllowed(config = {}) {
+  return areaAllowed(config, 'actions') && flag(config.allowSettingsChanges, false);
+}
+
+/** Whether users may let the assistant remember notes (on unless switched off). */
+export function memoryAllowed(config = {}) {
+  return areaAllowed(config, 'chat') && flag(config.allowMemory, true);
+}
+
+/** Most messages one batch may change: the admin's batchLimit, 1 to 200 (default 50). */
+export function batchLimit(config = {}) {
+  const n = Number(config.batchLimit);
+  return Number.isFinite(n) && n >= 1 ? Math.min(200, Math.floor(n)) : 50;
+}
+
+/** Whether a provider's model may get images: the admin's choice, else a guess from the address (images: 'auto' | 'yes' | 'no'). */
+export function imagesAllowed(config = {}, endpoint = null) {
+  if (!endpoint) return false;
+  const choice = config[`${endpoint.provider}Images`];
+  if (choice === 'yes') return true;
+  if (choice === 'no') return false;
+  if (endpoint.provider === 'anthropic') return true;
+  // OpenAI's own service reads images, apart from a few text-only models;
+  // other OpenAI-compatible servers (Ollama, vLLM, ...) can't be told apart.
+  const official = /^https:\/\/api\.openai\.com(\/|$)/i.test(endpoint.baseUrl ?? '');
+  return official && !/^(o3-mini|gpt-oss|gpt-3\.5)/i.test(endpoint.model ?? '');
+}
+
 /** Whether users may connect their own key (admin setting, off by default). */
 export function userKeysAllowed(config = {}) {
   return config.allowUserKeys === true || config.allowUserKeys === 'true';

@@ -28,7 +28,20 @@
     "calendar:write",
     "tasks:write",
     "contacts:write",
-    "settings:read"
+    "settings:read",
+    "email:blob-read",
+    "tasks:read",
+    "vacation:read",
+    "vacation:write",
+    "filters:read",
+    "filters:write",
+    "files:read",
+    "files:write"
+  ],
+  "optionalPermissions": [
+    "settings:change",
+    "calendar:respond",
+    "ui:side-panel"
   ],
   "entrypoint": "index.js",
   "minAppVersion": "1.17.0",
@@ -121,6 +134,103 @@
       "label": "Let users connect their own API key",
       "description": "Users then see a Connect button in the plugin's settings. Their key is stored encrypted on the server and replaces the keys above for them.",
       "default": false
+    },
+    "allowContext": {
+      "type": "boolean",
+      "label": "More context",
+      "description": "Let the assistant read the open message's attachments and images, the whole conversation, the messages selected in the list, and messages, contacts and files the user mentions with @.",
+      "default": true
+    },
+    "anthropicImages": {
+      "type": "select",
+      "label": "Anthropic: images",
+      "description": "Whether the Anthropic model gets images (attachments, pictures in a message, image files). Automatic: yes, Anthropic's current models read images.",
+      "default": "auto",
+      "options": [
+        {
+          "label": "Automatic",
+          "value": "auto"
+        },
+        {
+          "label": "Yes, the model reads images",
+          "value": "yes"
+        },
+        {
+          "label": "No, send the file name only",
+          "value": "no"
+        }
+      ]
+    },
+    "openaiImages": {
+      "type": "select",
+      "label": "OpenAI-compatible: images",
+      "description": "Whether the OpenAI-compatible model gets images. Automatic: yes for api.openai.com (apart from text-only models), no for other servers such as Ollama, whose models often can't read them.",
+      "default": "auto",
+      "options": [
+        {
+          "label": "Automatic",
+          "value": "auto"
+        },
+        {
+          "label": "Yes, the model reads images",
+          "value": "yes"
+        },
+        {
+          "label": "No, send the file name only",
+          "value": "no"
+        }
+      ]
+    },
+    "allowMoreActions": {
+      "type": "boolean",
+      "label": "More actions",
+      "description": "Let the assistant answer invitations, change and delete events, tag messages, set the out-of-office reply, create filters and act on many messages at once. Each of these asks the user first.",
+      "default": true
+    },
+    "batchLimit": {
+      "type": "number",
+      "label": "Most messages per batch",
+      "description": "How many messages one batch action (archive, move, mark, tag the results of a search) may change. 1 to 200.",
+      "default": 50,
+      "min": 1,
+      "max": 200
+    },
+    "allowSettingsChanges": {
+      "type": "boolean",
+      "label": "Change settings",
+      "description": "Let users allow the assistant to change their settings (appearance, reading, composing, list, notifications, calendar view). Never account, security, sharing, forwarding or plugin settings, and never one your policy locks. Each change asks first and can be undone. Off by default.",
+      "default": false
+    },
+    "allowFiles": {
+      "type": "boolean",
+      "label": "Files",
+      "description": "Let the assistant find and read the user's files, attach them to drafts, save attachments to Files and create new files and folders. It never deletes or shares files.",
+      "default": true
+    },
+    "allowChatTools": {
+      "type": "boolean",
+      "label": "Chat tools",
+      "description": "Chat history, saved prompts, slash commands, editing and regenerating answers.",
+      "default": true
+    },
+    "prompts": {
+      "type": "string",
+      "multiline": true,
+      "label": "Prompts for everyone",
+      "description": "Saved prompts every user gets in the Actions menu and as / commands. One per line: Name: what to ask.",
+      "default": ""
+    },
+    "allowMemory": {
+      "type": "boolean",
+      "label": "Remember notes",
+      "description": "Let users have the assistant remember short notes about them (their manager's name, how to sign). Notes go to the AI service with every request.",
+      "default": true
+    },
+    "allowEverywhere": {
+      "type": "boolean",
+      "label": "Every view",
+      "description": "Show the assistant in Calendar, Contacts, Files and Settings too, and offer Catch me up.",
+      "default": true
     }
   },
   "credentials": {

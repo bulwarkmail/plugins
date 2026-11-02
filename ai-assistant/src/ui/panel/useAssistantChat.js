@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi } from '../common.jsx';
 import { actionLabel } from './ActionsMenu.jsx';
+import { useAreas } from './areas/index.js';
 import { emailForPrompt } from '../Reader.jsx';
 import { keepEdges } from '../AssistantDialog.jsx';
 import { ensureConsent, loadSetup, savePrefs } from '../../lib/assistant.js';
@@ -72,6 +73,13 @@ export function useAssistantChat(props) {
   const running = turns.some((turn) => turn.status === 'running');
   const lookups = prefs.lookups !== false;
   const actionMode = effectiveActionMode(setup?.config ?? {}, prefs);
+
+  // What the 2.2 areas add (chips, prompt, lookups' context, menus, ...).
+  // They reach the chat's functions through `bridge` once those exist.
+  const bridge = useRef({});
+  const areas = useAreas({ api, t, mode, email, source, turns, setTurns, key, setup, prefs, person, locale, setInput, inputRef, bridge, props }, props);
+  const areasRef = useRef(areas);
+  areasRef.current = areas;
   // Actions waiting for the user's OK: step id → answer(ok).
   const approvals = useRef(new Map());
 
@@ -170,15 +178,19 @@ export function useAssistantChat(props) {
 
   // The notice names what this panel may send: lookups and actions only when they are on.
   const askConsent = useCallback((endpoint) => new Promise((resolve) => {
-    setConsent({ endpoint, scope: { lookups, actions: actionMode !== 'off' }, answer: (ok) => { setConsent(null); resolve(ok); } });
+    setConsent({ endpoint, scope: { lookups, actions: actionMode !== 'off', parts: areasRef.current.privacyParts }, answer: (ok) => { setConsent(null); resolve(ok); } });
   }), [lookups, actionMode]);
 
   /** Who the user is and their standing instructions, for this request. */
-  const extraContext = useCallback(() => contextSuffix({
-    person,
-    instructions: { admin: setup?.config?.instructions, user: prefs.instructions },
-    place: { panel: mode, labels: appLabels(t) },
-  }), [person, setup, prefs, mode, t]);
+  const extraContext = useCallback(() => {
+    const base = contextSuffix({
+      person,
+      instructions: { admin: setup?.config?.instructions, user: prefs.instructions },
+      place: { panel: mode, labels: appLabels(t) },
+    });
+    const blocks = areasRef.current.promptBlocks;
+    return blocks.length ? `${base}\n\n${blocks.join('\n\n')}` : base;
+  }, [person, setup, prefs, mode, t]);
 
   /**
    * One exchange: a quick action (a task of prompts.js) or a typed request
@@ -227,15 +239,16 @@ export function useAssistantChat(props) {
         const prompt = buildPrompt(task, { language: locale, extra, ...taskInput, ...(task === 'actions' ? { now } : {}) });
         text = await streamCompletion(api, endpoint, prompt, { onText, signal: abort.signal });
       } else {
-        const ctx = { inReplyToId: mode === 'composer' ? context?.inReplyToId : undefined, lookups, actions: actionMode, mode, openEmailId: mode === 'reader' ? contextEmail?.id : undefined, settingsName: t('app.nav.settings'), zone: now.zone };
+        const ctx = { ...areasRef.current.toolsCtx, inReplyToId: mode === 'composer' ? context?.inReplyToId : undefined, lookups, actions: actionMode, mode, openEmailId: mode === 'reader' ? contextEmail?.id : undefined, settingsName: t('app.nav.settings'), zone: now.zone, config: setup?.config ?? {}, prefs };
         const tools = [...toolsFor(ctx), ...actionToolsFor(ctx)];
         let autoActions = 0;
         // Lookups run straight away; an action is shown first, then waits for
         // the user's OK (ask-first mode, or past the automatic limit) or runs.
         const callTool = async (name, args, call) => {
           if (!isActionTool(name)) return runTool(api, name, args, ctx);
-          const { summary, plan } = await describeAction(api, name, args, ctx);
-          const ask = actionMode === 'manual' || autoActions >= MAX_AUTO_ACTIONS;
+          const { summary, plan, alwaysAsk } = await describeAction(api, name, args, ctx);
+          // Some actions always ask first, whatever the user's mode.
+          const ask = alwaysAsk === true || actionMode === 'manual' || autoActions >= MAX_AUTO_ACTIONS;
           patchStep(turn.id, call.id, { action: { summary, state: ask ? 'waiting' : 'running' } });
           if (ask) {
             const ok = await new Promise((resolve) => {
@@ -445,7 +458,10 @@ export function useAssistantChat(props) {
     }
   }, [send]);
 
+  bridge.current = { send, sendText, quick, setInput, focus: () => inputRef.current?.focus() };
+
   return {
+    areas,
     api, t, locale, mode, email, setup, loaded, turns, consent, source, input, setInput, inputRef,
     target, setTarget, languages, running, translating, setTranslating, lookups,
     removeContext, restoreContext, quick, submit, stop, apply, replyFor, sendText, insertText, clear, retry,

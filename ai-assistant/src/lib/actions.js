@@ -9,6 +9,8 @@
 // user's language; performAction() carries the plan out and returns the text
 // for the model and, where it can be taken back, how to undo it.
 
+import { areaAction, areaActions, offered } from './areas/index.js';
+
 /** Most actions one answer may take without asking, in automatic mode. */
 export const MAX_AUTO_ACTIONS = 5;
 
@@ -111,7 +113,7 @@ export const ACTION_DEFINITIONS = {
 };
 
 export const ACTION_TOOLS = new Set(Object.keys(ACTION_DEFINITIONS));
-export const isActionTool = (name) => ACTION_TOOLS.has(name);
+export const isActionTool = (name) => ACTION_TOOLS.has(name) || !!areaAction(name);
 
 /**
  * The action tools for a chat. `ctx.actions` is the mode ('off' offers
@@ -120,9 +122,12 @@ export const isActionTool = (name) => ACTION_TOOLS.has(name);
  */
 export function actionToolsFor(ctx = {}) {
   if (!ctx.actions || ctx.actions === 'off') return [];
-  return Object.entries(ACTION_DEFINITIONS)
+  const core = Object.entries(ACTION_DEFINITIONS)
     .filter(([name]) => (name === 'draft_reply' ? !!ctx.openEmailId : name === 'draft_email' ? ctx.mode !== 'composer' : true))
     .map(([name, def]) => ({ name, ...def }));
+  // The 2.2 areas' actions (src/lib/areas), where they are offered.
+  const extra = areaActions().filter((action) => offered(action, ctx)).map(({ name, description, parameters }) => ({ name, description, parameters }));
+  return [...core, ...extra];
 }
 
 /** The mode in effect: the user's choice, at most what the administrator allows. */
@@ -180,6 +185,13 @@ function nextDay(date) {
  * throws with a message for the model when the arguments are wrong.
  */
 export async function describeAction(api, name, args = {}, ctx = {}) {
+  const area = areaAction(name);
+  if (area) {
+    if (!offered(area, ctx)) throw new Error(`${name} is not available here`);
+    const { summary, plan } = await area.describe(api, args, ctx);
+    const alwaysAsk = typeof area.alwaysAsk === 'function' ? area.alwaysAsk(args, ctx) === true : area.alwaysAsk === true;
+    return { summary, plan: { ...plan, name, area: area.area }, alwaysAsk };
+  }
   const t = api.i18n.t;
   const locale = api.i18n?.getLocale?.() ?? 'en';
   switch (name) {
@@ -288,6 +300,11 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
  * can't be taken back); throws when the webmail refused.
  */
 export async function performAction(api, plan) {
+  const area = plan?.area ? areaAction(plan.name) : null;
+  if (area) {
+    const done = await area.perform(api, plan);
+    return { text: done?.text ?? 'Done.', undo: done?.undo ? { ...done.undo, action: plan.name } : null };
+  }
   switch (plan.name) {
     case 'archive_message':
     case 'move_message': {
@@ -335,6 +352,8 @@ export async function performAction(api, plan) {
 
 /** Take an action back. */
 export async function undoAction(api, undo) {
+  const area = undo?.action ? areaAction(undo.action) : null;
+  if (area) return area.undo(api, undo);
   switch (undo?.kind) {
     case 'move': return api.email.move([undo.id], undo.mailboxId);
     case 'keywords':

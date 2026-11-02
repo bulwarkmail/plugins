@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Badge, Button, Icon, LinkButton, Row, Spinner, Stack, Text } from '@plugin-host/ui';
 import { Widget } from '../Widgets.jsx';
+import { areaAction, areaTool } from '../../lib/areas/index.js';
 
 /** One lookup the model made. */
 const STEP_ICONS = { check_calendar: 'calendar', find_contact: 'address-book', search_mail: 'search', read_message: 'mail-opened', read_original_message: 'mail', find_setting: 'settings', read_my_settings: 'adjustments' };
@@ -18,8 +19,8 @@ function stepLabel(t, step) {
     case 'read_message': return t('panel.step.read_message');
     case 'find_setting': return t('panel.step.find_setting', { query: args.query ?? '' });
     case 'read_my_settings': return t('panel.step.read_my_settings');
-    // A lookup without its own words (a newer one) never shows its code name.
-    default: return t('panel.step.generic');
+    // A lookup of a 2.2 area says itself what it did; one without words never shows its code name.
+    default: return areaTool(step.name)?.label?.(t, args) ?? t('panel.step.generic');
   }
 }
 
@@ -42,7 +43,7 @@ export function ActionCard({ api, step, onAnswer, onUndo }) {
     <div data-action={step.name} data-action-state={state} style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '8px 10px' }}>
       <Stack gap={2}>
         <Row gap={2} wrap={false} align="start">
-          <Icon name={TOOL_ACTION_ICONS[step.name] ?? 'bolt'} size="sm" className="text-primary" />
+          <Icon name={TOOL_ACTION_ICONS[step.name] ?? areaAction(step.name)?.icon ?? 'bolt'} size="sm" className="text-primary" />
           <Text size="sm">{action.summary}</Text>
         </Row>
         {state === 'waiting' && (
@@ -87,7 +88,8 @@ export function StepsGroup({ api, mode, replying, steps, running, onSend, onInse
   const failed = steps.some((s) => s.status === 'failed');
   const chips = [];
   for (const step of steps) {
-    const label = step.name in STEP_ICONS ? t(`panel.steps.kind.${step.name}`) : t('panel.steps.kind.other');
+    const area = areaTool(step.name);
+    const label = step.name in STEP_ICONS ? t(`panel.steps.kind.${step.name}`) : area?.kind ? t(area.kind) : t('panel.steps.kind.other');
     const prev = chips.find((c) => c.label === label);
     if (prev) { prev.count++; prev.status = step.status === 'failed' || prev.status === 'failed' ? 'failed' : step.status === 'running' ? 'running' : prev.status; }
     else chips.push({ label, count: 1, status: step.status });
@@ -123,7 +125,7 @@ export function StepsGroup({ api, mode, replying, steps, running, onSend, onInse
 /** One lookup the model made, with a card of what it found. */
 function StepRow({ api, mode, replying, step, onSend, onInsert }) {
   const t = api.i18n.t;
-  const icon = step.status === 'running' ? 'loader-2' : step.status === 'failed' ? 'alert-circle' : (STEP_ICONS[step.name] ?? 'mail');
+  const icon = step.status === 'running' ? 'loader-2' : step.status === 'failed' ? 'alert-circle' : (STEP_ICONS[step.name] ?? areaTool(step.name)?.icon ?? 'mail');
   return (
     <div data-step={step.name} data-step-status={step.status} style={{ paddingTop: 6, borderTop: '1px solid var(--color-border)' }}>
     <Stack gap={1}>

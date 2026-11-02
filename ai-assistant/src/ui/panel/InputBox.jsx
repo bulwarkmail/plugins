@@ -9,6 +9,7 @@ import { COMPOSER_PANEL, READER_PANEL } from '../../lib/background.js';
 import { INPUT_MAX_HEIGHT } from './model.js';
 import { ActionsMenu, actionLabel, actionsFor, startAction } from './ActionsMenu.jsx';
 import { ContextChips, rowFit } from './ContextChips.jsx';
+import { useInputMenu } from './InputMenu.jsx';
 
 /** The Actions button's width with its text, until it is measured. */
 const ACTIONS_GUESS = 104;
@@ -50,7 +51,7 @@ export function InputBox({ chat, composerId }) {
   }, []);
   const hasChip = (source.removed && !!email) || (source.scope !== 'none' && source.scope !== 'empty');
   const removable = !source.removed && ['message', 'passage', 'selection'].includes(source.scope);
-  const showActions = actions.length > 0 && !translating;
+  const showActions = (actions.length > 0 || chat.areas.quick.length > 0) && !translating;
   const fit = translating
     ? { chip: rowWidth && rowWidth < 300 ? 'icon' : 'full', actions: 'full' }
     : rowFit({ width: rowWidth, actionsWidth: showActions ? (actionsFull.current || ACTIONS_GUESS) : 0, chip: hasChip, removable });
@@ -59,12 +60,16 @@ export function InputBox({ chat, composerId }) {
     if (showActions && fit.actions === 'full' && actionsRef.current?.offsetWidth) actionsFull.current = actionsRef.current.offsetWidth;
   });
 
+  // The `/` and `@` menus of the 2.2 areas, under the text field.
+  const menu = useInputMenu({ menus: chat.areas.menus, input, setInput, inputRef, idBase: `assistant-menu-${mode}` });
+
   const placeholder = mode === 'reader'
     ? t(source.scope === 'none' ? 'panel.placeholder.none' : 'panel.placeholder.read')
     : source.scope === 'empty' ? t('panel.placeholder.write') : t('panel.placeholder.compose');
 
   return (
-    <div style={{ padding: '8px 12px 12px', flexShrink: 0 }}>
+    <div style={{ padding: '8px 12px 12px', flexShrink: 0, position: 'relative' }}>
+      {menu.list}
       <div
         data-assistant-input
         data-focused={inputFocused ? '' : undefined}
@@ -88,11 +93,13 @@ export function InputBox({ chat, composerId }) {
           placeholder={placeholder}
           aria-label={t('panel.input_label')}
           title={t('panel.enter_hint')}
+          {...menu.ariaProps}
           style={{ border: 0, borderRadius: 0, boxShadow: 'none', background: 'transparent', padding: '2px 4px 2px 0', minHeight: 24, maxHeight: INPUT_MAX_HEIGHT, overflowY: 'auto', resize: 'none', lineHeight: 1.5 }}
           onFocus={() => setInputFocused(true)}
           onBlur={() => setInputFocused(false)}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
+            if (menu.onKeyDown(e)) return;
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) {
               e.preventDefault();
               chat.submit();
@@ -106,8 +113,8 @@ export function InputBox({ chat, composerId }) {
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
           <div ref={rowRef} data-chip-row style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-            <ContextChips api={api} source={source} email={email} onRemove={chat.removeContext} onRestore={chat.restoreContext} fit={fit.chip} />
-            {(actions.length > 0 || translating) && (translating ? (
+            <ContextChips api={api} source={source} email={email} onRemove={chat.removeContext} onRestore={chat.restoreContext} fit={fit.chip} extra={chat.areas.chips} />
+            {(actions.length > 0 || chat.areas.quick.length > 0 || translating) && (translating ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '1 1 auto', minWidth: 0 }}>
                 <Select
                   style={{ flex: '1 1 auto', minWidth: 0, maxWidth: '100%' }}
@@ -137,6 +144,7 @@ export function InputBox({ chat, composerId }) {
               <ActionsMenu
                 api={api}
                 actions={actions}
+                extra={chat.areas.quick}
                 actionLabel={(action) => actionLabel(t, mode, action)}
                 disabled={running}
                 compact={fit.actions === 'icon'}

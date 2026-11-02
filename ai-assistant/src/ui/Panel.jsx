@@ -41,8 +41,9 @@ export function AssistantPanel(props) {
 
   return (
     <div style={fill} data-assistant-panel={mode}>
-      <Header api={chat.api} hasTurns={turns.length > 0} onClear={chat.clear} />
-      <Transcript chat={chat} onExample={(text) => { chat.setInput(text); chat.inputRef.current?.focus(); }} />
+      <Header api={chat.api} hasTurns={turns.length > 0} onClear={chat.clear} extra={chat.areas.header} />
+      {/* An area's view in place of the transcript (a list of old chats), else the chat. */}
+      {chat.areas.overlay ?? <Transcript chat={chat} onExample={(text) => { chat.setInput(text); chat.inputRef.current?.focus(); }} />}
       <InputBox chat={chat} composerId={props.composerId} />
     </div>
   );

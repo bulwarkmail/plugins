@@ -7,7 +7,7 @@ import { Button, Icon } from '@plugin-host/ui';
 
 export const HEADER_HEIGHT = 56;
 
-export function Header({ api, hasTurns, onClear }) {
+export function Header({ api, hasTurns, onClear, extra = [] }) {
   const t = api.i18n.t;
   return (
     <div
@@ -21,6 +21,14 @@ export function Header({ api, hasTurns, onClear }) {
         <Icon name="sparkles" size="sm" className="text-primary" />
         <span className="bk text-sm font-semibold text-foreground truncate">{t('composer.title')}</span>
       </h2>
+      {/* Buttons of the 2.2 areas (history, ...), then New chat. */}
+      {extra.length > 0 && (
+        <span style={{ display: 'inline-flex', flexShrink: 0, marginInlineStart: 'auto' }}>
+          {extra.map((b) => (
+            <Button key={b.key} variant="ghost" size="icon" icon={b.icon} className="h-9 w-9" title={b.label} aria-label={b.label} aria-pressed={b.pressed === undefined ? undefined : !!b.pressed} onClick={b.onClick} />
+          ))}
+        </span>
+      )}
       {/* Hidden, not removed, while there is nothing to clear: the row keeps its shape. */}
       <span style={{ display: 'inline-flex', flexShrink: 0, visibility: hasTurns ? 'visible' : 'hidden' }} aria-hidden={hasTurns ? undefined : 'true'}>
         <Button variant="ghost" size="icon" icon="eraser" className="h-9 w-9" title={t('panel.new_chat')} aria-label={t('panel.new_chat')} disabled={!hasTurns} onClick={onClear} />
