@@ -7,6 +7,9 @@
 
 import { loadSetup } from './assistant.js';
 import { withStrings } from './i18n.js';
+import { areaAllowed } from './config.js';
+import { has } from './caps.js';
+import { APP_PANEL, viewOf } from './areas/everywhere.js';
 
 export const DRAFT_KEY = 'draft';
 /** What the open composer is: { mode, inReplyToId, originalSubject, at } (onComposerOpen). */
@@ -36,7 +39,7 @@ const MENU_ICONS = { improve: 'sparkles', grammar: 'text-spellcheck', shorter: '
 
 export function createBackground(api, { now = () => Date.now() } = {}) {
   withStrings(api);
-  const state = { configured: false, showInReader: true, checkedAt: 0, composerOpen: false };
+  const state = { configured: false, showInReader: true, everywhere: false, checkedAt: 0, composerOpen: false };
   let shownActions = null;
   let dialogOpen = false;
   const t = (key, vars) => api.i18n.t(key, vars);
@@ -76,6 +79,8 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       const setup = await loadSetup(api);
       state.configured = !!setup.endpoint;
       state.showInReader = setup.prefs.showInReader !== false;
+      // The panel next to Calendar, Contacts, Files and Settings: the admin's switch, then the user's.
+      state.everywhere = areaAllowed(setup.config ?? {}, 'everywhere') && setup.prefs.everywhere !== false;
     } catch {
       state.configured = false;
     }
@@ -93,6 +98,29 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
         slot: 'plugin-dialog',
         width: 680,
         extraProps: { composerId },
+      });
+    } catch (err) {
+      api.log?.warn?.('assistant dialog failed', err?.message ?? err);
+      return null;
+    } finally {
+      dialogOpen = false;
+    }
+  }
+
+  /**
+   * The assistant as a dialog for a view where its panel has no room (a
+   * phone, Settings below 1024 px): the webmail's app-side-panel button
+   * asks for it with what the view shows.
+   */
+  async function openViewDialog(view, context) {
+    if (!viewOf({ view }) || dialogOpen || !state.configured || !state.everywhere) return null;
+    dialogOpen = true;
+    try {
+      return await api.ui.openDialog({
+        title: t('composer.title'),
+        slot: 'plugin-dialog',
+        width: 560,
+        extraProps: { view, context: context && typeof context === 'object' ? context : {} },
       });
     } catch (err) {
       api.log?.warn?.('assistant dialog failed', err?.message ?? err);
@@ -136,11 +164,26 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
   }
 
   /**
-   * Alt+A outside the composer: the panel next to the message. With a
-   * composer open the composer's own Alt+A has it, so this one stays out.
+   * Alt+A outside the composer: the panel of the view the user is in (the
+   * app-side-panel of Calendar, Contacts, Files and Settings), else the one
+   * next to the message. With a composer open the composer's own Alt+A has
+   * it, so this one stays out.
    */
   async function shortcutToggle() {
-    if (state.composerOpen || !state.configured || !state.showInReader) return;
+    // Right after the page loads the first look may still be under way.
+    if (!state.configured) await refresh();
+    if (state.composerOpen || !state.configured) return;
+    if (state.everywhere && has(api, 'sidePanel')) {
+      let open = null;
+      try {
+        open = await api.ui.togglePanel(APP_PANEL);
+      } catch (err) {
+        api.log?.warn?.('togglePanel failed', err?.message ?? err);
+      }
+      // null: no such panel on screen (Mail); false on a phone means the dialog was asked for.
+      if (open !== null) return;
+    }
+    if (!state.showInReader) return;
     await toggleReaderPanel();
   }
 
@@ -181,6 +224,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
     refresh,
     openPanel,
     openDialog,
+    openViewDialog,
     shortcutToggle,
     async activate() {
       // Drafts and chats left over from a closed tab are not kept.
@@ -198,6 +242,8 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
           void openPanel('composer', context?.composerId, { action: actionId, text: context?.selection?.text ?? '' });
         } else if (surface === READER_MENU_SURFACE) {
           void openPanel('reader', context?.emailId, { action: actionId, text: context?.selection?.text ?? '' });
+        } else if (surface === APP_PANEL && actionId === 'open') {
+          void openViewDialog(context?.view, context?.context);
         }
       },
       // Only the subject: the panel reads the text itself from the composer.
@@ -232,6 +278,7 @@ export function createBackground(api, { now = () => Date.now() } = {}) {
       reader: () => state.configured && state.showInReader,
       thread: (ctx) => state.configured && state.showInReader && Array.isArray(ctx?.emailIds) && ctx.emailIds.length > 1,
       composer: () => state.configured,
+      view: () => state.configured && state.everywhere,
     },
   };
 }

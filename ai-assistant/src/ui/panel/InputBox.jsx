@@ -6,6 +6,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Button, Select, Textarea } from '@plugin-host/ui';
 import { savePrefs } from '../../lib/assistant.js';
 import { COMPOSER_PANEL, READER_PANEL } from '../../lib/background.js';
+import { APP_PANEL } from '../../lib/areas/everywhere.js';
 import { INPUT_MAX_HEIGHT } from './model.js';
 import { ActionsMenu, actionLabel, actionsFor, startAction } from './ActionsMenu.jsx';
 import { ContextChips, rowFit } from './ContextChips.jsx';
@@ -106,7 +107,7 @@ export function InputBox({ chat, composerId }) {
             } else if (e.key === 'Escape' && !input) {
               // Back to the message; Alt+A or the toolbar button brings the panel back.
               e.preventDefault();
-              const closing = mode === 'composer' ? api.ui.closePanel?.(COMPOSER_PANEL, { composerId }) : api.ui.closePanel?.(READER_PANEL);
+              const closing = mode === 'composer' ? api.ui.closePanel?.(COMPOSER_PANEL, { composerId }) : api.ui.closePanel?.(chat.view ? APP_PANEL : READER_PANEL);
               void closing?.catch?.(() => {});
             }
           }}
