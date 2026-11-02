@@ -36,7 +36,9 @@
     "filters:read",
     "filters:write",
     "files:read",
-    "files:write"
+    "files:write",
+    "templates:read",
+    "templates:write"
   ],
   "optionalPermissions": [
     "settings:change",

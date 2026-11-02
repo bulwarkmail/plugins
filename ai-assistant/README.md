@@ -123,6 +123,33 @@ Mail text is put between tags and the model is told that it is data, not
 instructions, so a message that says "ignore your instructions" is
 summarised, not obeyed. Very long texts are cut at 30 000 characters.
 
+## Chat tools
+
+- **Earlier chats.** Next to a message the assistant keeps one running
+  chat. After 8 hours without use, the next time the panel opens the chat
+  moves to Earlier chats (the clock button in the panel's header) and a
+  fresh one starts; New chat does the same at once. There you can search
+  the chats, read one, continue it, rename it or delete it. The newest 30
+  chats are kept, at most 400 KB together. The composer keeps its own
+  chat per draft.
+- **Saved prompts.** Add your own in Settings > AI Assistant > Chat; the
+  administrator can add some for everyone. They are in the Actions menu
+  and run like a typed request, on the message or text the panel works on.
+- **Slash commands.** Type `/` at the start of the input for a list of the
+  quick actions and saved prompts. Type to filter, arrow keys to move,
+  Enter runs, Tab completes the name, Escape closes the list.
+- **Edit and Answer again.** The pencil next to your last question puts it
+  back into the input; sending it replaces that question and its answer.
+  Answer again asks for a new last answer.
+- **Remember.** "Remember that my manager is Jan": the assistant asks
+  before it keeps a note. Notes (at most 50, 200 characters each) go with
+  every request; see, change and delete them in the settings, or switch
+  them off there.
+- **Templates.** With lookups on, the assistant can read your message
+  templates. In the composer it can put one into the draft (filling in the
+  placeholders it knows), and it can save a written reply as a new
+  template after you agree.
+
 ## Setting it up (administrator)
 
 Install `ai-assistant.zip` in the admin dashboard, then fill in its
@@ -196,6 +223,10 @@ encrypted on the server and only sent to the address they approved there.
 | Summarize a conversation | Sender, date, subject and text (without quotes) of up to 20 messages |
 | Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, the message you reply to, and the settings it reads |
 | Let it do something (actions on) | What the action did, and the names of your folders when it files a message |
+| Anything, with notes kept (chat tools) | The notes you asked it to remember |
+| Run a saved prompt or a / command | The prompt's text, as if you typed it, with the message or text the panel works on |
+| Ask about your templates (lookups on) | The names, categories, subjects, placeholders and the first 300 characters of your templates |
+| Have it save a template | Nothing more: the text it saves is your draft's own text or what it wrote |
 
 The privacy notice before the first request lists the same, and names
 lookups and actions only when they are switched on. When an update makes
@@ -203,7 +234,8 @@ the assistant send more, the notice comes once more.
 
 Nothing else leaves the webmail. In the browser the plugin keeps your
 choices, which services you confirmed, the chats of the open composer and
-of the messages you talked about, and, while a composer is open, the
+of the messages you talked about, the earlier chats, your saved prompts
+and the notes you asked it to remember, and, while a composer is open, the
 draft's subject and what the composer is a reply to (removed when the
 composer closes).
 
@@ -233,6 +265,8 @@ composer closes).
 | `identity:read` | Your name, addresses and signature, so the model knows who writes |
 | `account:read` | Your account's name and address when there is no identity, and the mail server it is on |
 | `settings:read` | Your settings (layout, formats, reading and sending options), for the settings lookup |
+| `templates:read` | Your message templates, for the templates lookup and to put one into the draft |
+| `templates:write` | Save a written reply as a template when you agree (and delete it again on Undo) |
 
 ## Credentials
 
