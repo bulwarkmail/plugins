@@ -110,8 +110,13 @@ export async function composeWith(page, text, { plain = false } = {}) {
   await page.getByRole('button', { name: 'Compose' }).first().click();
   const box = plain ? ui.plainBody(page) : ui.editor(page);
   await expect(box).toBeVisible({ timeout: 30_000 });
+  // A new message puts the focus in To a moment after it opens: wait for
+  // that, or the text typed meanwhile ends up in the address field.
+  await expect(page.locator('[data-testid="composer-to"] input').first()).toBeFocused({ timeout: 10_000 }).catch(() => {});
   await box.click();
   await box.pressSequentially(text, { delay: 5 });
+  if (plain) expect(await box.inputValue()).toContain(text);
+  else await expect(box).toContainText(text);
   // The one-time notice would cover the text on small screens.
   const notice = ui.notice(page);
   if (await notice.isVisible().catch(() => false)) await notice.getByRole('button', { name: 'OK' }).click();
