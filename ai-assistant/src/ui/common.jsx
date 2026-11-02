@@ -107,7 +107,7 @@ export function ConsentNotice({ api, consent }) {
     <Alert tone="info" icon="shield">
       <Stack gap={1}>
         <Text weight="medium">{t('privacy.title')}</Text>
-        <Text>{privacyMessage(t, consent.endpoint)}</Text>
+        <Text>{privacyMessage(t, consent.endpoint, consent.scope)}</Text>
       </Stack>
     </Alert>
   );

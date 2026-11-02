@@ -22,7 +22,7 @@ async function makeApi(answer, { consent = true, confirm = true, reply } = {}) {
       'compose.reply': reply ?? (async () => true),
     },
   });
-  if (consent) await api.storage.set('consent:anthropic:http://localhost:18099', true);
+  if (consent) await api.storage.set('consent:v2:anthropic:http://localhost:18099', true);
   return api;
 }
 

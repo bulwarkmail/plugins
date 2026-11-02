@@ -11,7 +11,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(cleanup);
 
 const CONFIG = { anthropicBaseUrl: 'http://localhost:18099/anthropic/v1' };
-const CONSENT = 'consent:anthropic:http://localhost:18099';
+const CONSENT = 'consent:v2:anthropic:http://localhost:18099';
 
 /**
  * A composer with this body and selection, and a model that answers

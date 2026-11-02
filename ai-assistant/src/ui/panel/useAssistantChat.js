@@ -168,9 +168,10 @@ export function useAssistantChat(props) {
     }
   }, [api, patchStep, t]);
 
+  // The notice names what this panel may send: lookups and actions only when they are on.
   const askConsent = useCallback((endpoint) => new Promise((resolve) => {
-    setConsent({ endpoint, answer: (ok) => { setConsent(null); resolve(ok); } });
-  }), []);
+    setConsent({ endpoint, scope: { lookups, actions: actionMode !== 'off' }, answer: (ok) => { setConsent(null); resolve(ok); } });
+  }), [lookups, actionMode]);
 
   /** Who the user is and their standing instructions, for this request. */
   const extraContext = useCallback(() => contextSuffix({

@@ -49,25 +49,42 @@ export async function loadSetup(api) {
   return { config, prefs, accounts, endpoint: resolveEndpoint({ config, prefs, accounts }) };
 }
 
+/**
+ * Where the user's OK for a service is kept. The version goes up when the
+ * notice says more than before, so everyone reads the new one once (v2: 2.2,
+ * which names everything that is sent).
+ */
+export const CONSENT_VERSION = 2;
 export function consentKey(endpoint) {
-  return `consent:${endpoint.provider}:${endpoint.origin}`;
+  return `consent:v${CONSENT_VERSION}:${endpoint.provider}:${endpoint.origin}`;
 }
 
-/** The privacy notice: which service, which server, which model. */
-export function privacyMessage(t, endpoint) {
-  const base = t(endpoint.own ? 'privacy.message_own' : 'privacy.message', {
-    provider: PROVIDER_LABELS[endpoint.provider],
-    host: hostOf(endpoint.baseUrl),
-    model: endpoint.model,
-  });
-  return `${base} ${t('privacy.lookups')}`;
+/**
+ * The privacy notice: which service, server and model, what goes with every
+ * request, and what else goes with what is switched on. `parts`: keys of
+ * further sentences (one per feature that sends more).
+ */
+export function privacyMessage(t, endpoint, { lookups = false, actions = false, parts = [] } = {}) {
+  const lines = [
+    t(endpoint.own ? 'privacy.message_own' : 'privacy.message', {
+      provider: PROVIDER_LABELS[endpoint.provider],
+      host: hostOf(endpoint.baseUrl),
+      model: endpoint.model,
+    }),
+    t('privacy.always'),
+  ];
+  if (lookups) lines.push(t('privacy.lookups'));
+  if (actions) lines.push(t('privacy.actions'));
+  for (const key of parts) lines.push(t(key));
+  lines.push(t('privacy.until_asked'));
+  return lines.join(' ');
 }
 
-/** Ask with the host's confirm dialog (not usable from inside a plugin dialog). */
-export function confirmWithHost(api) {
+/** Ask with the host's confirm dialog (not usable from inside a plugin dialog). `scope`: what privacyMessage names. */
+export function confirmWithHost(api, scope = {}) {
   return (endpoint) => api.ui.confirm({
     title: api.i18n.t('privacy.title'),
-    message: privacyMessage(api.i18n.t, endpoint),
+    message: privacyMessage(api.i18n.t, endpoint, scope),
     confirmLabel: api.i18n.t('privacy.continue'),
     cancelLabel: api.i18n.t('common.cancel'),
   });

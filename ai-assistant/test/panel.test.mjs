@@ -15,7 +15,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(cleanup);
 
 const CONFIG = { anthropicBaseUrl: 'http://localhost:18099/anthropic/v1' };
-const CONSENT = 'consent:anthropic:http://localhost:18099';
+const CONSENT = 'consent:v2:anthropic:http://localhost:18099';
 const EMAIL = { id: 'M1', subject: 'Thursday', receivedAt: '2026-10-12T09:00:00Z', from: [{ name: 'Carol', email: 'carol@example.org' }], text: 'Can we meet on Thursday at 3?' };
 
 /** A model that answers each request in turn; the last answer repeats. */
@@ -924,6 +924,49 @@ describe('the privacy notice', () => {
     await click(button('Continue'));
     await settled();
     expect(screen.getByText('Hello.')).toBeTruthy();
+  });
+});
+
+describe('what the notice says is sent', () => {
+  it('names what goes with every request, and lookups and actions only when they are on', async () => {
+    const api = makeApi({ consent: false, answers: ['Hello.'] });
+    await api.storage.set('prefs', { lookups: false, actions: 'off' });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('hi');
+    await pressEnter();
+    const notice = (await screen.findByText(/sends your request to Anthropic/)).textContent;
+    expect(notice).toContain('your name, addresses and signature');
+    expect(notice).toContain('the names of the app and your mail server');
+    expect(notice).toContain('the earlier messages of this chat');
+    expect(notice).not.toContain('calendar events');
+    expect(notice).not.toContain('folders');
+    expect(notice.endsWith('Nothing is sent until you ask.')).toBe(true);
+    cleanup();
+
+    const on = makeApi({ consent: false });
+    await on.storage.set('prefs', { lookups: true, actions: 'manual' });
+    await mount(on, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('hi');
+    await pressEnter();
+    const full = (await screen.findByText(/sends your request to Anthropic/)).textContent;
+    expect(full).toContain('messages from a mail search, calendar events, contacts and your settings');
+    expect(full).toContain('the names of your folders');
+  });
+
+  it('asks again once after the update, since it now names more', async () => {
+    const api = makeApi({ consent: false, answers: ['Hello.'] });
+    await api.storage.set('consent:anthropic:http://localhost:18099', true);
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('hi');
+    await pressEnter();
+    expect(await screen.findByRole('button', { name: 'Continue' })).toBeTruthy();
+  });
+
+  it('does not promise lookups in the empty panel when they are off', async () => {
+    const api = makeApi();
+    await api.storage.set('prefs', { lookups: false });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    expect(screen.getByText('Open a message to work on it, or ask anything.')).toBeTruthy();
   });
 });
 

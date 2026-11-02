@@ -175,11 +175,16 @@ encrypted on the server and only sent to the address they approved there.
 | Describe an empty message | Your description and the subject |
 | Use Improve, Shorten, Formal, Casual, Translate or Fix spelling | The selected text, or your own text of the message (no signature, no quote) |
 | Type a request in the composer | The same text, the subject, whether it is a reply and to what, and the earlier turns of the chat |
-| Anything | Your name, addresses, plain-text signature, time zone, local time and language, and the standing instructions (the administrator's and yours) |
+| Anything | Your name, addresses, plain-text signature, time zone, local time and language, the names of the app and your mail server, the standing instructions (the administrator's and yours), and the earlier turns of the chat |
 | Use Summarize, To-dos and dates, Reply ideas, Explain or Translate on a message | Sender, date, subject and text of the open message (and the highlighted passage) |
 | Type a request about a message | The same, and the earlier turns of the chat |
 | Summarize a conversation | Sender, date, subject and text (without quotes) of up to 20 messages |
-| Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, or the message you reply to |
+| Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, the message you reply to, and the settings it reads |
+| Let it do something (actions on) | What the action did, and the names of your folders when it files a message |
+
+The privacy notice before the first request lists the same, and names
+lookups and actions only when they are switched on. When an update makes
+the assistant send more, the notice comes once more.
 
 Nothing else leaves the webmail. In the browser the plugin keeps your
 choices, which services you confirmed, the chats of the open composer and
