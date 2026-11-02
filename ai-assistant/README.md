@@ -102,6 +102,46 @@ admin settings. The model is told to act only when you ask or agree,
 never because a message says so; ask first is the safer mode for
 mailboxes that receive mail from strangers.
 
+### More actions
+
+With actions on, and on a webmail that offers them, the assistant can
+also:
+
+- answer an invitation (accept, maybe or decline); Bulwark sends the
+  answer to the organiser, so this can't be undone
+- change an event's title, time, place or description (never who is
+  invited), and delete a single event you created; repeating events and
+  events someone else invited you to stay for the calendar
+- add or remove one of your tags on a message
+- turn the out-of-office reply on, with a subject, text and dates, or
+  off; while the reply forwards mail it refuses and points you to
+  Settings > Out of office
+- create a filter that moves, copies, marks as read, stars or tags new
+  mail; never one that forwards, redirects, rejects or deletes mail, and
+  never one that moves mail to the trash
+- archive, move, mark or tag many messages at once, up to the
+  administrator's limit (50 unless set)
+- change one of your app settings, when the administrator allows it and
+  you turn it on; a setting your organisation set stays as it is
+- change a contact's name, addresses, phone numbers, company or postal
+  address
+
+It also looks up your out-of-office reply and your filters when it
+needs them.
+
+Answering an invitation, deleting an event, the out-of-office reply,
+filters, many messages at once, settings and contacts **always ask you
+first**, even in automatic mode. The card says what will happen
+("Archive 12 messages?" with the first five subjects, "Change Time
+format: 12-hour → 24-hour?", the filter in plain words). Undo puts things
+back: the event, the filter, the messages, the setting and the contact
+as they were.
+
+Settings > AI Assistant has a switch for each of these groups. All are
+on except settings changes, which stay off until you turn them on (and
+greyed out unless the administrator allows them). Switches for what your
+webmail doesn't offer are hidden.
+
 ## Answers, cards and what the assistant knows
 
 Answers come as formatted text (bullet lists, bold, small tables, links
@@ -142,7 +182,7 @@ settings. Set up one or both services:
 | Let users connect their own API key | Off by default |
 | More context | Attachments and images of the open message, the whole conversation, the messages selected in the list, and @-mentioned messages, contacts and files. On by default |
 | Anthropic: images, OpenAI-compatible: images | Whether that service's model gets images. Automatic: yes for Anthropic and api.openai.com (apart from text-only models), no for other servers such as Ollama. Without images the model gets the file name only |
-| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once. On by default; each of these asks the user first |
+| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once, contacts. On by default. All but changing an event and tags always ask the user first |
 | Most messages per batch | 1 to 200, default 50 |
 | Change settings | Let users allow the assistant to change their app settings (appearance, reading, composing, list, notifications, calendar view). Off by default |
 | Files | Find, read and attach the user's files, save attachments to Files, create files and folders. Never deletes or shares. On by default |
@@ -196,6 +236,11 @@ encrypted on the server and only sent to the address they approved there.
 | Summarize a conversation | Sender, date, subject and text (without quotes) of up to 20 messages |
 | Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, the message you reply to, and the settings it reads |
 | Let it do something (actions on) | What the action did, and the names of your folders when it files a message |
+| Ask about or change your out-of-office reply | Whether it is on, its dates, subject and text, and whether it forwards mail |
+| Ask about or create a filter | Your filter rules: names, conditions, what they do (folder and tag names, and the address of a forwarding rule) |
+| Tag messages, or file or tag many at once | The names of your tags and folders, and how many messages changed |
+| Change a setting (when allowed) | The setting's name and its old and new value, or why it can't be changed |
+| Change an event, a contact or answer an invitation | The event's title and time, the contact's name, addresses, phones, company and postal address, the invitation's title and organiser |
 
 The privacy notice before the first request lists the same, and names
 lookups and actions only when they are switched on. When an update makes
@@ -226,13 +271,17 @@ composer closes).
 | `compose:open` | Open a reply with a drafted reply or a reply idea in it, and the reply or new message of an action |
 | `calendar:read` | The calendar lookup |
 | `contacts:read` | The contact lookup |
-| `email:write` | Actions: archive, move and mark messages |
-| `calendar:write` | Actions: add an event (and delete it again on Undo) |
+| `email:write` | Actions: archive, move, mark and tag messages, one or many at once |
+| `calendar:write` | Actions: add, change and delete an event (and undo it) |
 | `tasks:write` | Actions: add a task (and delete it again on Undo) |
-| `contacts:write` | Actions: add a contact (and delete it again on Undo) |
+| `contacts:write` | Actions: add or change a contact (and undo it) |
 | `identity:read` | Your name, addresses and signature, so the model knows who writes |
 | `account:read` | Your account's name and address when there is no identity, and the mail server it is on |
-| `settings:read` | Your settings (layout, formats, reading and sending options), for the settings lookup |
+| `settings:read` | Your settings (layout, formats, reading and sending options), for the settings lookup, and what a settings change would do |
+| `calendar:respond` | Actions: answer an invitation (optional; newer webmails) |
+| `settings:change` | Actions: change a setting, and undo it (optional; newer webmails; only when the administrator allows it) |
+| `vacation:read`, `vacation:write` | The out-of-office lookup, and turning it on or off |
+| `filters:read`, `filters:write` | The filters lookup, and creating a filter (and removing it again on Undo) |
 
 ## Credentials
 
