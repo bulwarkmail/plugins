@@ -72,15 +72,12 @@ export function composerPanel(page) {
 
 /**
  * The assistant panel next to an open message. It starts folded: the
- * Assistant button in the message's toolbar opens it (the host's strip
- * button when the toolbar put it behind More).
+ * host's panel button at the end of the reader's toolbar opens it.
  */
 export async function readerPanel(page) {
   const host = page.locator('[data-plugin-detail-panel]');
   if (!(await host.isVisible().catch(() => false))) {
-    const button = page.locator(`[data-plugin-actions="reader-actions"] [aria-label="Assistant"]`).first();
-    if (await button.isVisible().catch(() => false)) await button.click();
-    else await page.getByRole('button', { name: 'Show plugin panel' }).click();
+    await page.locator('[data-plugin-panel-toggle]').first().click({ timeout: 60_000 });
   }
   const frame = page.frameLocator(`[data-plugin-detail-panel] ${SLOT_FRAME}`);
   await expect(frame.getByRole('textbox', { name: 'Message to the assistant' })).toBeVisible({ timeout: 60_000 });

@@ -173,8 +173,8 @@ test('a highlighted passage: explain it from the right-click menu, then draft a 
   try {
     const svc = await setUp(page, api);
     await openMessage(page, 'Can we meet on Thursday?', page.getByText('send me the slides').first());
-    // The plugin declares its reader entries while it starts; its toolbar button shows when it has.
-    await expect(page.locator('[data-plugin-actions="reader-actions"] [aria-label="Assistant"]')).toBeAttached({ timeout: 60_000 });
+    // The plugin offers its panel while it starts; the host's panel button shows when it has.
+    await expect(page.locator('[data-plugin-panel-toggle]').first()).toBeAttached({ timeout: 60_000 });
     const body = await selectInBody(page, 'Thursday at 15:00');
     // A right-click on the selection (a synthetic click would collapse it first, so the event is dispatched as the browser would).
     const menu = page.getByRole('menu');
