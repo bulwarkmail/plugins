@@ -1,0 +1,216 @@
+{
+  "software": {
+    "name": "LanguageTool",
+    "version": "6.9-SNAPSHOT",
+    "buildDate": "2026-09-01 15:16:00 +0000",
+    "apiVersion": 1,
+    "premium": true,
+    "premiumHint": "You might be missing errors only the Premium version can find. Contact us at support<at>languagetoolplus.com.",
+    "status": ""
+  },
+  "warnings": {
+    "incompleteResults": false
+  },
+  "language": {
+    "name": "German (Germany)",
+    "code": "de-DE",
+    "detectedLanguage": {
+      "name": "German (Germany)",
+      "code": "de-DE",
+      "confidence": 0.99,
+      "source": "fasttext"
+    }
+  },
+  "matches": [
+    {
+      "message": "Möglicherweise passen das Nomen und die Wörter, die das Nomen beschreiben, grammatisch nicht zusammen.",
+      "shortMessage": "Kongruenzfehler",
+      "replacements": [
+        {
+          "value": "den"
+        }
+      ],
+      "offset": 17,
+      "length": 3,
+      "context": {
+        "text": "Ich habe gestern dem Brief geschrieben. Das ist ein Feler.",
+        "offset": 17,
+        "length": 3
+      },
+      "sentence": "Ich habe gestern dem Brief geschrieben.",
+      "type": {
+        "typeName": "Other"
+      },
+      "rule": {
+        "id": "DE_AGREEMENT",
+        "subId": "4",
+        "sourceFile": "grammar.xml",
+        "description": "Kongruenz von Nominalphrasen (unvollständig!), z.B. 'mein kleiner(kleines) Haus'",
+        "issueType": "grammar",
+        "category": {
+          "id": "GRAMMAR",
+          "name": "Grammatik"
+        }
+      },
+      "ignoreForIncompleteSentence": false,
+      "contextForSureMatch": 0
+    },
+    {
+      "message": "Möglicher Tippfehler gefunden.",
+      "shortMessage": "Rechtschreibfehler",
+      "replacements": [
+        {
+          "value": "Fehler"
+        },
+        {
+          "value": "Vieler"
+        },
+        {
+          "value": "Feuer"
+        },
+        {
+          "value": "Täler"
+        },
+        {
+          "value": "Feiern"
+        },
+        {
+          "value": "Feder"
+        },
+        {
+          "value": "Feier"
+        },
+        {
+          "value": "Feiert"
+        },
+        {
+          "value": "Felder"
+        },
+        {
+          "value": "Pfeiler"
+        },
+        {
+          "value": "Velar"
+        },
+        {
+          "value": "Vier"
+        },
+        {
+          "value": "Tälern"
+        },
+        {
+          "value": "Väter"
+        },
+        {
+          "value": "Feldern"
+        },
+        {
+          "value": "Aller"
+        },
+        {
+          "value": "Feuern"
+        },
+        {
+          "value": "Feger"
+        },
+        {
+          "value": "Viele"
+        },
+        {
+          "value": "Feuert"
+        },
+        {
+          "value": "Pfälzer"
+        },
+        {
+          "value": "Pfeilern"
+        },
+        {
+          "value": "Vielen"
+        },
+        {
+          "value": "Federn"
+        },
+        {
+          "value": "Velen"
+        },
+        {
+          "value": "Federt"
+        },
+        {
+          "value": "Meter"
+        },
+        {
+          "value": "Verler"
+        },
+        {
+          "value": "Feder-"
+        },
+        {
+          "value": "Eher"
+        },
+        {
+          "value": "Fehlern"
+        }
+      ],
+      "offset": 52,
+      "length": 5,
+      "context": {
+        "text": "...tern dem Brief geschrieben. Das ist ein Feler.",
+        "offset": 43,
+        "length": 5
+      },
+      "sentence": "Das ist ein Feler.",
+      "type": {
+        "typeName": "UnknownWord"
+      },
+      "rule": {
+        "id": "GERMAN_SPELLER_RULE",
+        "description": "Möglicher Rechtschreibfehler",
+        "issueType": "misspelling",
+        "category": {
+          "id": "TYPOS",
+          "name": "Mögliche Tippfehler"
+        },
+        "isPremium": false,
+        "confidence": 0.55
+      },
+      "ignoreForIncompleteSentence": false,
+      "contextForSureMatch": 0
+    }
+  ],
+  "sentenceRanges": [
+    [
+      0,
+      39
+    ],
+    [
+      40,
+      58
+    ]
+  ],
+  "extendedSentenceRanges": [
+    {
+      "from": 0,
+      "to": 39,
+      "detectedLanguages": [
+        {
+          "language": "de",
+          "rate": 1
+        }
+      ]
+    },
+    {
+      "from": 40,
+      "to": 58,
+      "detectedLanguages": [
+        {
+          "language": "de",
+          "rate": 1
+        }
+      ]
+    }
+  ],
+  "_note": "Recorded from api.languagetool.org on 2026-11-02; the DE_AGREEMENT match on \"dem\" was added by hand in the same shape (the free API does not flag it).",
+  "_text": "Ich habe gestern dem Brief geschrieben. Das ist ein Feler."
+}
