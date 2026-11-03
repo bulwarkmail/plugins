@@ -19,6 +19,15 @@ encrypted to it. Nothing here protects anything.
   with AES-256-CBC, ECDH-ES and AES key wrap
 - `ec-p256.p12`: the P-256 certificate and key, password `fixture`
 - `ec-p256-gcm.p7m`: the same recipient, in AuthEnvelopedData with AES-256-GCM
+- `ec-p256-kdf-sha1.p7m`, `-kdf-sha384`, `-kdf-sha512`: other hashes for the KDF
+- `ec-p256-wrap128.p7m`, `-wrap192`: AES-128 and AES-192 key wrap
+- `ec-p256-keyid.p7m`: the recipient named by subject key id (rKeyId)
+- `sign-only-cert.pem`, `encrypt-only-cert.pem`, `server-auth-cert.pem`,
+  `any-eku-cert.pem`: certificates with those uses, for reading key usage. Their
+  keys were thrown away
+- `expired-cert.pem`, `expired-key.pem`: valid in 2020 only
+- `cbc-signed.p7m`: signed by `cert.pem`, then AES-256-CBC. `cbc-badsig.p7m`: the
+  same with one content byte changed before encrypting, so the signature fails
 
 OpenSSL can't write ChaCha20-Poly1305 CMS, so the test builds that one.
 
@@ -47,4 +56,18 @@ for c in P-256:p256 P-384:p384 P-521:p521; do
 done
 openssl pkcs12 -export -in ec-p256-cert.pem -inkey ec-p256-key.pem -out ec-p256.p12 -passout pass:fixture -name "S-MIME EC Test"
 openssl cms -encrypt -binary -aes-256-gcm -in plain.eml -out ec-p256-gcm.p7m -recip ec-p256-cert.pem -keyopt ecdh_kdf_md:sha256
+for md in sha1 sha384 sha512; do
+  openssl cms -encrypt -binary -aes256 -in plain.eml -out ec-p256-kdf-$md.p7m -recip ec-p256-cert.pem -keyopt ecdh_kdf_md:$md
+done
+for bits in 128 192; do
+  openssl cms -encrypt -binary -aes256 -aes$bits-wrap -in plain.eml -out ec-p256-wrap$bits.p7m -recip ec-p256-cert.pem -keyopt ecdh_kdf_md:sha256
+done
+openssl cms -encrypt -binary -aes256 -keyid -in plain.eml -out ec-p256-keyid.p7m -recip ec-p256-cert.pem -keyopt ecdh_kdf_md:sha256
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout expired-key.pem -out expired-cert.pem \
+  -not_before 20200101000000Z -not_after 20210101000000Z -subj "/CN=S-MIME Expired Test" \
+  -addext "subjectAltName=email:smime-expired@example.com" -addext "keyUsage=critical,digitalSignature,keyAgreement" \
+  -addext "extendedKeyUsage=emailProtection"
+openssl cms -sign -binary -nodetach -in plain.eml -signer cert.pem -inkey key.pem -out signed.eml -md sha256
+openssl cms -encrypt -binary -aes256 -in signed.eml -out cbc-signed.p7m cert.pem
+# cbc-badsig.p7m: the same, with one byte of the signed content's DER flipped in signed.eml first.
 ```

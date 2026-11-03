@@ -26,7 +26,7 @@ import {
 import { smimeSign, smimeSignDetached } from './smime-sign.js';
 import { smimeEncrypt } from './smime-encrypt.js';
 import { smimeVerify, smimeVerifyDetached } from './smime-verify.js';
-import { smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, SmimeKeyLockedError } from './smime-decrypt.js';
+import { smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, SmimeKeyLockedError, SmimeNoKeyError } from './smime-decrypt.js';
 import { detectSmime } from './smime-detect.js';
 import { parseMime, extractDetachedSigned } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
@@ -44,7 +44,7 @@ import {
   saveSessionKeys, getSessionKeys, deleteSessionKeys, clearSessionKeys,
 } from './key-storage.js';
 import { unlockedDecryptMaps, forgetRebuiltKeys } from './session-keys.js';
-import { createOsKeys, keystoreCode, keystoreStops, senderKeys } from './os-keys.js';
+import { certValidNow, createOsKeys, keystoreCode, keystoreStops, senderKeys } from './os-keys.js';
 
 const t = translator(host);
 const osKeys = createOsKeys(host);
@@ -53,6 +53,8 @@ const osKeys = createOsKeys(host);
 
 const PREFS_KEY = 'prefs.v1';
 const VERIFY_PREFIX = 'verify:';
+// Set by the banner before it asks for a render that has to run afresh: see shareRender.
+const FRESH_PREFIX = 'fresh:';
 
 const DEFAULT_PREFS = { defaultSign: false, defaultEncrypt: false };
 
@@ -163,8 +165,8 @@ function cmsInnerEntity(cmsBytes, smimeType) {
 
 // This is where a send first needs the OS's list, which can ask the user.
 async function senderKeyRecords(fromEmail) {
-  const { records } = await osKeys.loadPatiently();
-  return senderKeys(fromEmail, await listKeyRecords(), records, osKeys.signCancelled);
+  const { records, state } = await osKeys.loadPatiently();
+  return { ...senderKeys(fromEmail, await listKeyRecords(), records, osKeys.signCancelled), listState: state };
 }
 
 // Ensure a key's private material is unlocked in the session store. If it's
@@ -211,7 +213,13 @@ async function withSigningKey(records, sign) {
       return null; // refuse rather than send unsigned
     }
     try {
-      return await sign(session.signingKey, record);
+      const signed = await sign(session.signingKey, record);
+      if (!certValidNow(record)) host.toast.warning(t('send.signingCertInvalid'));
+      // Not the key this send would have asked for first: say why.
+      if (record.source !== 'os' && records.some((r) => r.source === 'os' && osKeys.signCancelled(r.id))) {
+        host.toast.info(t('send.usedImportedKey'));
+      }
+      return signed;
     } catch (err) {
       const code = keystoreCode(err);
       if (code === null) throw err;
@@ -310,7 +318,7 @@ async function onComposeSend(req) {
 
     const keys = await senderKeyRecords(from.email);
     if (sign ? keys.signing.length === 0 : !keys.encrypting) {
-      host.toast.error(t('send.noKey', { email: from.email }));
+      host.toast.error(t(keys.listState === 'denied' ? 'send.osDenied' : 'send.noKey', { email: from.email }));
       return ABORT;
     }
 
@@ -392,6 +400,7 @@ async function buildOpaqueMessage(mimeInput, { sign, encrypt, keys, allRecipient
       host.toast.error(t('send.missingCertificates', { emails: missing.join(', ') }));
       return null;
     }
+    if (!keys.ownCopyReadable) host.toast.warning(t('send.ownCopyUnreadable'));
     const envBlob = await smimeEncrypt(payloadBytes, found, keys.encrypting.certificate, useAes128());
     payloadBytes = await blobToBytes(envBlob);
     smimeType = 'enveloped-data';
@@ -427,34 +436,161 @@ async function maybeAutoImportSigner(status) {
   }
 }
 
+// `at` lets the banner tell this opening's verdict from an earlier one.
 async function persistVerifyStatus(emailId, status) {
   if (!emailId) return;
-  try { await host.storage.set(VERIFY_PREFIX + emailId, status); } catch { /* ignore */ }
+  try { await host.storage.set(VERIFY_PREFIX + emailId, { ...status, at: Date.now() }); } catch { /* ignore */ }
 }
 
 // Of the hook's 5 s. Listing holds no timer, so what's left here has to cover the rest of the hook.
 const RENDER_LIST_BUDGET_MS = 3500;
 
 // The decrypt keys for a message, with the OS's when they're needed: not when an
-// unlocked imported key fits, as the list may ask the user. Null while the consent
-// dialog is up: the hook can't wait for it, so it renders again once it's answered.
+// unlocked imported key fits, as the list may ask the user. listState 'pending' means
+// the consent dialog is up: the hook can't wait for it, so it renders again once it's
+// answered.
 async function decryptKeysFor(der, started) {
   const keys = await unlockedDecryptMaps();
-  if (!osKeys.available()) return keys;
+  if (!osKeys.available()) return { keys, listState: 'off' };
   const unlockedFits = findDecryptionCandidates(der, keys.keyRecords)
     .some((id) => keys.unlockedKeys.has(id) || keys.legacyUnlockedKeys.has(id));
-  if (unlockedFits) return osKeys.addDecryptKeys(keys, osKeys.known());
+  if (unlockedFits) return { keys: osKeys.addDecryptKeys(keys, osKeys.known()), listState: 'ready' };
   const { records, state } = await osKeys.loadWithin(
     Math.max(0, RENDER_LIST_BUDGET_MS - (Date.now() - started)),
     () => { void Promise.resolve(host.ui.rerenderEmail()).catch(() => {}); },
   );
-  return state === 'pending' ? null : osKeys.addDecryptKeys(keys, records);
+  return { keys: osKeys.addDecryptKeys(keys, records), listState: state };
 }
 
-// What the banner says after a No from the user or a busy store, as stored in the
-// verify status. `at` tells a retry's answer from the last one, even if they read the same.
-function osDecryptStatus(decryptionError) {
-  return { isEncrypted: true, decryptionSuccess: false, decryptionError, at: Date.now() };
+// What the banner says when no key fits and the OS's list is why that may be. No key
+// fitting says nothing while the store couldn't be read.
+const LIST_FAILURES = { denied: 'os-list-denied', busy: 'os-busy', failed: 'os-busy' };
+
+// A render can run twice for one opening: an older webmail renders again when mark-read
+// replaces the message object, and a conversation has a body of its own. Each run asks
+// the OS, which can be a dialog per use, and two PIN cancels in a row lock the key. So
+// a run shares the one in flight, and one that used the OS for a little after. What the
+// user asks for (Try again, Unlock) sets the fresh flag, which goes past this. Holds
+// plain text, so it's short and dropped on sign-out.
+const RENDER_SHARE_MS = 15_000;
+const renderShares = new Map();
+
+async function shareRender(key, ctx, run) {
+  let wantsFresh = false;
+  try { wantsFresh = !!(await host.storage.get(FRESH_PREFIX + ctx.id)); } catch { /* no flag */ }
+  if (wantsFresh) {
+    renderShares.delete(key);
+    try { await host.storage.remove(FRESH_PREFIX + ctx.id); } catch { /* it's only read here */ }
+  }
+  const existing = renderShares.get(key);
+  if (existing) {
+    const result = await existing.promise;
+    // Stamped again, so a banner mounted for this opening counts it as this opening's.
+    if (result?.verification) await persistVerifyStatus(ctx.id, result.verification);
+    return result;
+  }
+
+  const share = {};
+  share.promise = (async () => {
+    const { result, keep } = await run();
+    if (!keep) renderShares.delete(key);
+    else setTimeout(() => { if (renderShares.get(key) === share) renderShares.delete(key); }, RENDER_SHARE_MS);
+    return result;
+  })();
+  renderShares.set(key, share);
+  return share.promise;
+}
+
+function forgetRenders() {
+  renderShares.clear();
+}
+
+async function renderEncrypted(body, ctx, blobId, fromEmail, started) {
+  const failed = (decryptionError) => {
+    const status = { isEncrypted: true, decryptionSuccess: false, decryptionError };
+    return persistVerifyStatus(ctx.id, status).then(() => ({ ...body, handledBy: 'smime', html: '', text: '', attachments: [], verification: status }));
+  };
+
+  // Before anything can ask the user: a banner must not show the last opening's verdict meanwhile.
+  await persistVerifyStatus(ctx.id, { isEncrypted: true, inProgress: true });
+
+  let der;
+  try {
+    const raw = await host.jmap.fetchBlob(blobId);
+    der = normalizeCmsBytes(bytesArrayBuffer(raw instanceof Uint8Array ? raw : new Uint8Array(raw)));
+  } catch (err) {
+    host.log.error('onRenderEmailBody failed', err);
+    await persistVerifyStatus(ctx.id, { isEncrypted: true, decryptionSuccess: false, decryptionError: err && err.message ? err.message : String(err) });
+    return { result: undefined, keep: false }; // fall back to host rendering on unexpected failure
+  }
+
+  try {
+    const { keys, listState } = await decryptKeysFor(der, started);
+    if (listState === 'pending') return { result: await failed('os-pending'), keep: false };
+
+    let result;
+    try {
+      result = await smimeDecrypt({ cmsBytes: der, ...keys });
+    } catch (err) {
+      // Single-banner UX: on failure we surface the status ONLY through the
+      // email-banner slot (which reads the persisted verification), and leave
+      // the body empty rather than stacking a second in-body notice box.
+      const code = keystoreCode(err);
+      if (code === 'cancelled') return { result: await failed('os-cancelled'), keep: true };
+      if (code === 'locked') return { result: await failed('os-busy'), keep: true };
+      if (err instanceof SmimeKeyLockedError) return { result: await failed('locked'), keep: false };
+      if (err instanceof SmimeNoKeyError && LIST_FAILURES[listState]) {
+        return { result: await failed(LIST_FAILURES[listState]), keep: false };
+      }
+      host.log.warn('S/MIME decrypt failed', err);
+      return { result: await failed(err && err.message ? err.message : String(err)), keep: false };
+    }
+
+    // Decrypted inner content may itself be a signed CMS — either nested as a
+    // MIME entity (RFC 8551 sign-then-encrypt, the Outlook/Thunderbird form)
+    // or, more rarely, raw CMS DER. Detect both.
+    let innerBytes = result.mimeBytes;
+    const verification = { isEncrypted: true, decryptionSuccess: true };
+    const innerCt = innerContentType(innerBytes);
+    const innerDet = detectSmime(innerCt, null, null);
+    const looksSigned = innerDet.type === 'signed-data' || innerBytes[0] === 0x30;
+    if (looksSigned) {
+      try {
+        const signedDer = normalizeCmsBytes(bytesArrayBuffer(innerBytes));
+        const v = await smimeVerify(signedDer, fromEmail);
+        v.status.format = 'opaque';
+        innerBytes = v.mimeBytes;
+        Object.assign(verification, v.status, { isEncrypted: true, decryptionSuccess: true });
+        await maybeAutoImportSigner(v.status);
+      } catch { /* not actually signed; keep decrypted content as-is */ }
+    }
+
+    // EFAIL: CBC lets an attacker reshape the plaintext without the key, for instance into
+    // an image URL that carries the rest of the mail away. Only a verified signature shows
+    // nobody did. External content stays off whatever the user trusts, and the note is
+    // only there if this webmail can do as the plugin asks.
+    const unprotected = !result.integrity && verification.cryptoValid !== true;
+    if (unprotected && host.host?.features?.blockExternalContent === true) verification.noIntegrity = true;
+
+    const parsed = parseMime(innerBytes);
+    await persistVerifyStatus(ctx.id, verification);
+    return {
+      result: {
+        ...body,
+        handledBy: 'smime',
+        html: parsed.html || '',
+        text: parsed.text || '',
+        attachments: parsed.attachments,
+        verification,
+        ...(unprotected ? { blockExternalContent: true } : {}),
+      },
+      keep: !!keys.keystoreKeys?.has(result.keyRecordId),
+    };
+  } catch (err) {
+    host.log.error('onRenderEmailBody failed', err);
+    await persistVerifyStatus(ctx.id, { isEncrypted: true, decryptionSuccess: false, decryptionError: err && err.message ? err.message : String(err) });
+    return { result: undefined, keep: false }; // fall back to host rendering on unexpected failure
+  }
 }
 
 async function onRenderEmailBody(body, ctx) {
@@ -523,71 +659,13 @@ async function onRenderEmailBody(body, ctx) {
   const blobId = detection.blobId || ctx.blobId;
   if (!blobId) return undefined;
 
+  if (detection.type === 'enveloped-data') {
+    return shareRender(`${ctx.id}|${blobId}`, ctx, () => renderEncrypted(body, ctx, blobId, fromEmail, started));
+  }
+
   try {
     const raw = await host.jmap.fetchBlob(blobId);
     const der = normalizeCmsBytes(bytesArrayBuffer(raw instanceof Uint8Array ? raw : new Uint8Array(raw)));
-
-    if (detection.type === 'enveloped-data') {
-      const keys = await decryptKeysFor(der, started);
-      if (!keys) {
-        const status = osDecryptStatus('os-pending');
-        await persistVerifyStatus(ctx.id, status);
-        return { ...body, handledBy: 'smime', html: '', text: '', attachments: [], verification: status };
-      }
-      let result;
-      try {
-        result = await smimeDecrypt({ cmsBytes: der, ...keys });
-      } catch (err) {
-        // Single-banner UX: on failure we surface the status ONLY through the
-        // email-banner slot (which reads the persisted verification), and leave
-        // the body empty rather than stacking a second in-body notice box.
-        const code = keystoreCode(err);
-        if (code === 'cancelled' || code === 'locked') {
-          const status = osDecryptStatus(code === 'cancelled' ? 'os-cancelled' : 'os-busy');
-          await persistVerifyStatus(ctx.id, status);
-          return { ...body, handledBy: 'smime', html: '', text: '', attachments: [], verification: status };
-        }
-        if (err instanceof SmimeKeyLockedError) {
-          const status = { isEncrypted: true, decryptionSuccess: false, decryptionError: 'locked' };
-          await persistVerifyStatus(ctx.id, status);
-          return { ...body, handledBy: 'smime', html: '', text: '', attachments: [], verification: status };
-        }
-        host.log.warn('S/MIME decrypt failed', err);
-        const status = { isEncrypted: true, decryptionSuccess: false, decryptionError: err && err.message ? err.message : String(err) };
-        await persistVerifyStatus(ctx.id, status);
-        return { ...body, handledBy: 'smime', html: '', text: '', attachments: [], verification: status };
-      }
-
-      // Decrypted inner content may itself be a signed CMS — either nested as a
-      // MIME entity (RFC 8551 sign-then-encrypt, the Outlook/Thunderbird form)
-      // or, more rarely, raw CMS DER. Detect both.
-      let innerBytes = result.mimeBytes;
-      const verification = { isEncrypted: true, decryptionSuccess: true };
-      const innerCt = innerContentType(innerBytes);
-      const innerDet = detectSmime(innerCt, null, null);
-      const looksSigned = innerDet.type === 'signed-data' || innerBytes[0] === 0x30;
-      if (looksSigned) {
-        try {
-          const signedDer = normalizeCmsBytes(bytesArrayBuffer(innerBytes));
-          const v = await smimeVerify(signedDer, fromEmail);
-          v.status.format = 'opaque';
-          innerBytes = v.mimeBytes;
-          Object.assign(verification, v.status, { isEncrypted: true, decryptionSuccess: true });
-          await maybeAutoImportSigner(v.status);
-        } catch { /* not actually signed; keep decrypted content as-is */ }
-      }
-
-      const parsed = parseMime(innerBytes);
-      await persistVerifyStatus(ctx.id, verification);
-      return {
-        ...body,
-        handledBy: 'smime',
-        html: parsed.html || '',
-        text: parsed.text || '',
-        attachments: parsed.attachments,
-        verification,
-      };
-    }
 
     if (detection.type === 'signed-data') {
       const v = await smimeVerify(der, fromEmail);
@@ -633,7 +711,7 @@ const { EmailBanner, SettingsSection } = makeUi(host, {
   settings, isCapable, getPrefs, setPrefs, detectSmime, ensureKeyUnlocked,
   listKeyRecords, saveKeyRecord, deleteKeyRecord, getSessionKeys, saveSessionKeys, deleteSessionKeys,
   listPublicCerts, savePublicCert, deletePublicCert,
-  osKeys,
+  osKeys, FRESH_PREFIX,
   importPkcs12, unlockPrivateKey, parseCertificatePemOrDer, extractCertificateInfo, generateUUID,
   // The settings page runs in its own iframe; it republishes the composer's
   // Options entries so a newly imported key makes Sign / Encrypt usable.
@@ -680,12 +758,14 @@ export const hooks = {
   // Wipe unlocked keys from the shared session store on sign-out / account switch.
   async onAfterLogout() {
     osKeys.forget();
+    forgetRenders();
     if (settings().lockOnLogout === false) return;
     forgetRebuiltKeys();
     try { await clearSessionKeys(); } catch (err) { host.log.warn('clearSessionKeys failed', err); }
   },
   async onAccountSwitch() {
     osKeys.forget();
+    forgetRenders();
     if (settings().lockOnLogout === false) return;
     forgetRebuiltKeys();
     try { await clearSessionKeys(); } catch (err) { host.log.warn('clearSessionKeys failed', err); }

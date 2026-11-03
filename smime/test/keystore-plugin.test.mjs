@@ -216,7 +216,7 @@ describe('sending', () => {
     expect(sent).toHaveLength(1);
   }, 30_000);
 
-  it.each(['keystore:unsupported', 'keystore:failed', 'keystore:not-found'])('falls back to the imported key on %s', async (refusal) => {
+  it.each(['keystore:unsupported', 'keystore:failed', 'keystore:not-found', 'keystore:locked'])('falls back to the imported key on %s', async (refusal) => {
     const { ks, sent, api, hooks } = plugin({ handlers: { 'ui.prompt': async () => ({ pass: STORAGE_PASS }) } });
     await saveImported();
     ks.refuse('sign', refusal);
@@ -264,12 +264,59 @@ describe('sending', () => {
     expect(toasts(api, 'error')).toEqual([]);
   }, 30_000);
 
-  it('says there is no key after a No to the list, with no other key', async () => {
+  it('says the store was refused after a No to the list, not that the address has no key', async () => {
     const { ks, api, hooks } = plugin();
     ks.refuse('list', 'keystore:cancelled');
     await expect(hooks.onComposeSend(sendRequest())).resolves.toEqual(ABORT);
-    expect(toasts(api, 'error')[0]).toContain(FROM);
+    expect(toasts(api, 'error')).toEqual([en['send.osDenied'].replace('{email}', FROM)]);
   });
+
+  it('says there is no key when the store simply has none', async () => {
+    const { api, hooks } = plugin({ specs: [EC] });
+    await expect(hooks.onComposeSend(sendRequest())).resolves.toEqual(ABORT);
+    expect(toasts(api, 'error')).toEqual([api.i18n.t('send.noKey', { email: FROM })]);
+  });
+
+  it('mentions a restart for a Deny, in the sending and the reading message', () => {
+    expect(en['send.osCancelled']).toMatch(/restart/i);
+    expect(en['banner.osCancelled']).toMatch(/restart/i);
+    expect(en['send.osBusy']).toMatch(/card is missing or locked/);
+    expect(en['banner.osBusy']).toMatch(/card is missing or locked/);
+  });
+
+  it('warns about an expired signing certificate, and still sends', async () => {
+    const expired = { certificate: fixture('expired-cert.pem').toString(), key: fixture('expired-key.pem').toString() };
+    const { api, sent, hooks } = plugin({ specs: [expired] });
+    await expect(hooks.onComposeSend(sendRequest({ fromEmail: 'smime-expired@example.com' }))).resolves.toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(toasts(api, 'warning')).toEqual([en['send.signingCertInvalid']]);
+  });
+
+  it('does not warn about a valid signing certificate', async () => {
+    const { api, hooks } = plugin();
+    await hooks.onComposeSend(sendRequest());
+    expect(toasts(api, 'warning')).toEqual([]);
+    expect(toasts(api, 'info')).toEqual([]);
+  });
+
+  it('warns when the own copy will be unreadable', async () => {
+    const { api, sent, hooks } = plugin({ specs: [{ ...EC, canAgree: false }] });
+    const recipient = new X509Certificate(fixture('cert.pem')).raw;
+    await savePublicCert({ id: 'c', email: 'someone@example.org', certificate: recipient.buffer.slice(recipient.byteOffset, recipient.byteOffset + recipient.byteLength) });
+    await expect(hooks.onComposeSend(sendRequest({ encrypt: true, fromEmail: 'smime-ec@example.com' }))).resolves.toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(toasts(api, 'warning')).toEqual([en['send.ownCopyUnreadable']]);
+  });
+
+  it('says so when a retry signed with the imported key after a No', async () => {
+    const { ks, api, hooks } = plugin({ handlers: { 'ui.prompt': async () => ({ pass: STORAGE_PASS }) } });
+    await saveImported();
+    ks.refuse('sign', 'keystore:cancelled');
+    await hooks.onComposeSend(sendRequest());
+    expect(toasts(api, 'info')).toEqual([]);
+    await hooks.onComposeSend(sendRequest());
+    expect(toasts(api, 'info')).toEqual([en['send.usedImportedKey']]);
+  }, 30_000);
 
   it('waits through a consent dialog that outlasts the RPC timeout', async () => {
     const { ks, sent, hooks } = plugin();
@@ -347,6 +394,7 @@ describe('reading', () => {
     expect(row).toMatchObject({ action: 'retry', tone: 'warning', text: en['banner.osCancelled'] });
 
     ks.allow('decrypt');
+    await api.storage.set('fresh:mail-1', true);
     const retried = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
     expect(retried.text).toContain(PLAINTEXT);
   });
@@ -366,13 +414,35 @@ describe('reading', () => {
     expect((await bannerFor(api)).action).toBe('unlock');
   });
 
-  it('reads as no fitting key after a No to the list', async () => {
+  it('says the store was refused after a No to the list, with no button that cannot help', async () => {
     const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
     ks.refuse('list', 'keystore:cancelled');
     const result = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
     expect(result.handledBy).toBe('smime');
-    expect((await bannerFor(api)).text).toBe(en['banner.undecryptable']);
+    const row = await bannerFor(api);
+    expect(row.text).toBe(en['banner.osListDenied']);
+    expect(row.action).toBeUndefined();
     expect(ks.calls.decrypt).toHaveLength(0);
+  });
+
+  it.each(['keystore:locked', 'keystore:failed'])('offers a retry after %s on the list, and it works', async (refusal) => {
+    const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    ks.refuse('list', refusal);
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(await bannerFor(api)).toMatchObject({ action: 'retry', text: en['banner.osBusy'] });
+
+    ks.allow('list');
+    await api.storage.set('fresh:mail-1', true);
+    const again = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(again.text).toContain(PLAINTEXT);
+  });
+
+  it('keeps the unlock button when a busy list meets a locked imported key', async () => {
+    const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    await saveImported();
+    ks.refuse('list', 'keystore:locked');
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect((await bannerFor(api)).action).toBe('unlock');
   });
 
   it('answers inside the hook budget while the consent dialog is up, and renders again after', async () => {
@@ -416,6 +486,139 @@ describe('reading', () => {
     await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
     expect((await bannerFor(api)).text).toContain('RC2-CBC');
   });
+});
+
+describe('rendering one message again', () => {
+  it('shares a decrypt that is running', async () => {
+    const { ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    const [first, second] = await Promise.all([
+      hooks.onRenderEmailBody(bodyOf(), encryptedMail()),
+      hooks.onRenderEmailBody(bodyOf(), encryptedMail()),
+    ]);
+    expect(first.text).toContain(PLAINTEXT);
+    expect(second.text).toContain(PLAINTEXT);
+    expect(ks.calls.decrypt).toHaveLength(1);
+  });
+
+  it('shares one that just finished', async () => {
+    const { ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    const again = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(again.text).toContain(PLAINTEXT);
+    expect(ks.calls.decrypt).toHaveLength(1);
+  });
+
+  it('shares a No, so mark-read does not ask for the PIN a second time', async () => {
+    const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    ks.refuse('decrypt', 'keystore:cancelled');
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    const again = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(ks.calls.decrypt).toHaveLength(1);
+    expect(again.verification.decryptionError).toBe('os-cancelled');
+    expect((await api.storage.get('verify:mail-1')).decryptionError).toBe('os-cancelled');
+  });
+
+  it('runs again on a retry', async () => {
+    const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    ks.refuse('decrypt', 'keystore:cancelled');
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    ks.allow('decrypt');
+    await api.storage.set('fresh:mail-1', true);
+    const again = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(again.text).toContain(PLAINTEXT);
+    expect(ks.calls.decrypt).toHaveLength(2);
+    expect(await api.storage.get('fresh:mail-1')).toBeFalsy();
+  });
+
+  it('keeps other messages apart', async () => {
+    const { ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail({ id: 'mail-2', blobId: 'blob-2' }));
+    expect(ks.calls.decrypt).toHaveLength(2);
+  });
+
+  it('forgets on sign-out', async () => {
+    const { ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    await hooks.onAfterLogout();
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(ks.calls.decrypt).toHaveLength(2);
+  });
+
+  it('does not hold on to a locked verdict from an imported key', async () => {
+    const { api, hooks } = plugin({ features: {}, handlers: { ...withMail('cbc.p7m'), 'ui.prompt': async () => ({ pass: STORAGE_PASS }) } });
+    await saveImported();
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect((await bannerFor(api)).action).toBe('unlock');
+    await hooks.onComposeSend(sendRequest());
+    const again = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(again.text).toContain(PLAINTEXT);
+  }, 30_000);
+});
+
+describe('the stored status', () => {
+  it('says in progress, with a time, before anything is asked of the OS', async () => {
+    let during;
+    const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    await api.storage.set('verify:mail-1', { isEncrypted: true, decryptionSuccess: true, at: 1 });
+    ks.refuse('decrypt', async () => { during = await api.storage.get('verify:mail-1'); });
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(during).toMatchObject({ isEncrypted: true, inProgress: true });
+    expect(during.at).toBeGreaterThan(1);
+    expect(await api.storage.get('verify:mail-1')).not.toHaveProperty('inProgress');
+  });
+
+  it('does not stay in progress when something goes wrong', async () => {
+    const { api, hooks } = plugin({ handlers: { 'jmap.fetchBlob': async () => { throw new Error('offline'); } } });
+    await expect(hooks.onRenderEmailBody(bodyOf(), encryptedMail())).resolves.toBeUndefined();
+    const status = await api.storage.get('verify:mail-1');
+    expect(status.inProgress).toBeUndefined();
+    expect(status.decryptionSuccess).toBe(false);
+  });
+
+  it('carries a time on every verdict', async () => {
+    const { api, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+    const before = Date.now();
+    await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect((await api.storage.get('verify:mail-1')).at).toBeGreaterThanOrEqual(before);
+  });
+});
+
+describe('decrypted mail without integrity protection', () => {
+  const features = { keystore: true, blockExternalContent: true };
+
+  it.each([
+    ['AES-CBC with no signature', 'cbc.p7m', true],
+    ['AES-CBC with a broken signature', 'cbc-badsig.p7m', true],
+    ['AES-CBC with a verified signature', 'cbc-signed.p7m', false],
+    ['AES-GCM', 'gcm.p7m', false],
+  ])('%s', async (_, file, blocked) => {
+    const { api, hooks } = plugin({ features, handlers: withMail(file) });
+    const result = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(result.text).toContain('ello from the S/MIME test fixture.'); // the broken one differs in its first letter
+    expect(result.blockExternalContent === true).toBe(blocked);
+    const status = await api.storage.get('verify:mail-1');
+    expect(status.noIntegrity === true).toBe(blocked);
+    const notes = bannerRows(status, { t: (key, vars) => api.i18n.t(key, vars) }).filter((row) => row.text === en['banner.noIntegrity']);
+    expect(notes).toHaveLength(blocked ? 1 : 0);
+  });
+
+  it('asks an older host too, but promises nothing there', async () => {
+    const { api, hooks } = plugin({ features: { keystore: true }, handlers: withMail('cbc.p7m') });
+    const result = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(result.blockExternalContent).toBe(true);
+    expect((await api.storage.get('verify:mail-1')).noIntegrity).toBeUndefined();
+  });
+
+  it('applies to an imported key the same way', async () => {
+    const { api, hooks } = plugin({ features: { blockExternalContent: true }, handlers: { ...withMail('cbc.p7m'), 'ui.prompt': async () => ({ pass: STORAGE_PASS }) } });
+    await saveImported();
+    await hooks.onComposeSend(sendRequest());
+    const result = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+    expect(result.text).toContain(PLAINTEXT);
+    expect(result.blockExternalContent).toBe(true);
+    expect((await api.storage.get('verify:mail-1')).noIntegrity).toBe(true);
+  }, 30_000);
 });
 
 describe('an imported key that is already unlocked', () => {

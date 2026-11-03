@@ -45,12 +45,26 @@ material ever leaves the device.
   and the list is only asked for when the settings page opens or a message
   needs a key, not at start. An OS key comes before an imported one, except that
   a key already unlocked opens mail without a question. If the OS can't do it
-  (`keystore:unsupported`, a key that's gone, a failure) the imported key takes
-  over. A No or a cancelled PIN stops the send, which keeps the draft, and shows
-  in the banner on read with a way to try again. A later try skips to an
-  imported key if there is one. RSA signs PKCS#1 v1.5, which Outlook needs, and
-  PSS only if the key has nothing else. An EC key without key agreement is
-  sign-only, and the settings page says so.
+  (`keystore:unsupported`, a key that's gone, a missing card, a failure) the
+  imported key takes over. A No or a cancelled PIN stops the send, which keeps
+  the draft, and shows in the banner on read with a way to try again. A later try
+  skips to an imported key if there is one, and says so. A valid certificate
+  comes before one outside its dates, and a toast warns when signing with one of
+  those, or when the sender's own copy will be unreadable. RSA signs PKCS#1 v1.5,
+  which Outlook needs, and PSS only if the key has nothing else. An EC key without
+  key agreement is sign-only, and the settings page says so.
+- **Rendering once.** A render that used the OS is shared for 15 seconds per
+  message, as an older webmail renders again on mark-read and two PIN cancels in a
+  row lock the key. Try again and Unlock go past that. Decrypted text is held in
+  memory for that long, and dropped at sign-out.
+- **ECDH points** are checked to be on the certificate's curve before the OS or
+  WebCrypto sees them.
+- **EFAIL.** CBC mail has no integrity protection: an attacker can reshape the
+  plaintext into something that loads a URL carrying the rest of the mail away.
+  So for decrypted AES-CBC, 3DES or DES mail without a verified signature inside,
+  the plugin tells the host to keep external content off, whatever the settings
+  or trusted senders allow, and the banner says so. Webmails before the
+  `blockExternalContent` flag ignore this, and the banner stays silent there.
 - Returned HTML still passes through the host sanitizer.
 
 ## Build

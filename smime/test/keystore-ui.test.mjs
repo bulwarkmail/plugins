@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // The settings page and the banner with OS keys, drawn with a fake api.keystore.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
@@ -27,6 +27,7 @@ function setup({ specs = [RSA], features = { keystore: true }, imported = [], on
   const osKeys = createOsKeys(api);
   const deps = {
     VERIFY_PREFIX: 'verify:',
+    FRESH_PREFIX: 'fresh:',
     DEFAULT_PREFS: { defaultSign: false, defaultEncrypt: false },
     settings: () => ({}),
     isCapable: async () => true,
@@ -162,37 +163,104 @@ describe('the banner', () => {
     expect(rows(status)).toEqual([expect.objectContaining({ text: en[key], tone: 'warning', action: 'retry' })]);
   });
 
-  it('draws Try again and renders the mail again on click, showing the new verdict', async () => {
-    const context = setup();
-    const email = { id: 'm1', headers: {} };
-    await context.api.storage.set('verify:m1', { isEncrypted: true, decryptionSuccess: false, decryptionError: 'os-cancelled', at: 1 });
+  const email = { id: 'm1', headers: {} };
+  const key = 'verify:m1';
+  const verdict = (over) => ({ isEncrypted: true, decryptionSuccess: false, decryptionError: 'os-cancelled', at: Date.now(), ...over });
+  const openBanner = async (context) => {
     await act(async () => { render(React.createElement(context.EmailBanner, { email })); });
+  };
+
+  it('Try again marks the message to run afresh, renders it again, and shows the new verdict', async () => {
+    let flagged;
+    const context = setup({
+      handlers: {
+        'ui.rerenderEmail': async () => {
+          flagged = await context.api.storage.get('fresh:m1');
+          await context.api.storage.set(key, { isEncrypted: true, decryptionSuccess: true, at: Date.now() });
+        },
+      },
+    });
+    await context.api.storage.set(key, verdict({ at: 1 }));
+    await openBanner(context);
     const button = await screen.findByRole('button', { name: en['banner.tryAgain'] });
-    context.api.storage.set('verify:m1', { isEncrypted: true, decryptionSuccess: true });
     await act(async () => { fireEvent.click(button); });
     await screen.findByText(en['banner.decrypted']);
+    expect(flagged).toBe(true);
     expect(context.api.calls('ui.rerenderEmail')).toHaveLength(1);
   });
 
-  it('notices when a retry gives the same answer again', async () => {
-    const context = setup();
-    const email = { id: 'm1', headers: {} };
-    await context.api.storage.set('verify:m1', { isEncrypted: true, decryptionSuccess: false, decryptionError: 'os-cancelled', at: 1 });
-    await act(async () => { render(React.createElement(context.EmailBanner, { email })); });
+  it('Try again ends its busy state when the same answer comes again', async () => {
+    const context = setup({
+      handlers: { 'ui.rerenderEmail': async () => { await context.api.storage.set(key, verdict()); } },
+    });
+    await context.api.storage.set(key, verdict({ at: 1 }));
+    await openBanner(context);
     const button = await screen.findByRole('button', { name: en['banner.tryAgain'] });
-    context.api.storage.set('verify:m1', { isEncrypted: true, decryptionSuccess: false, decryptionError: 'os-cancelled', at: 2 });
     await act(async () => { fireEvent.click(button); });
-    // The busy state ends: it isn't waiting out its full half minute.
-    await waitFor(() => expect(screen.getByRole('button', { name: en['banner.tryAgain'] }).disabled).toBe(false));
+    await waitFor(() => expect(screen.getByRole('button', { name: en['banner.tryAgain'] }).disabled).toBe(false), { timeout: 3000 });
   });
 
   it('keeps looking while the consent dialog is up, and picks up the verdict', async () => {
     const context = setup();
-    const email = { id: 'm1', headers: {} };
-    await context.api.storage.set('verify:m1', { isEncrypted: true, decryptionSuccess: false, decryptionError: 'os-pending', at: 1 });
-    await act(async () => { render(React.createElement(context.EmailBanner, { email })); });
+    await context.api.storage.set(key, verdict({ decryptionError: 'os-pending' }));
+    await openBanner(context);
     await screen.findByText(en['banner.osPending']);
-    await context.api.storage.set('verify:m1', { isEncrypted: true, decryptionSuccess: true });
+    await context.api.storage.set(key, { isEncrypted: true, decryptionSuccess: true, at: Date.now() });
     await screen.findByText(en['banner.decrypted'], undefined, { timeout: 3000 });
+  });
+
+  it('replaces an old verdict from an earlier opening when the new result comes', async () => {
+    const context = setup();
+    await context.api.storage.set(key, { isEncrypted: true, decryptionSuccess: true, at: Date.now() - 60_000 });
+    await openBanner(context);
+    await screen.findByText(en['banner.decrypted']);
+    await context.api.storage.set(key, verdict());
+    await screen.findByText(en['banner.osCancelled'], undefined, { timeout: 3000 });
+  });
+
+  it('shows no verdict while the message is in progress', async () => {
+    const context = setup();
+    await context.api.storage.set(key, { isEncrypted: true, inProgress: true, at: Date.now() });
+    await openBanner(context);
+    await screen.findByText(en['banner.encrypted']);
+    expect(screen.queryByText(en['banner.decrypted'])).toBeNull();
+  });
+
+  it('watches past half a minute, as a PIN can take longer', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const context = setup();
+      await context.api.storage.set(key, { isEncrypted: true, inProgress: true, at: Date.now() });
+      await openBanner(context);
+      await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+      await context.api.storage.set(key, { isEncrypted: true, decryptionSuccess: true, at: Date.now() });
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(screen.getByText(en['banner.decrypted'])).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops watching once it has a verdict from this opening', async () => {
+    const context = setup();
+    await context.api.storage.set(key, { isEncrypted: true, inProgress: true, at: Date.now() });
+    await openBanner(context);
+    const fresh = { isEncrypted: true, decryptionSuccess: true, at: Date.now() + 1000 };
+    await context.api.storage.set(key, fresh);
+    await screen.findByText(en['banner.decrypted'], undefined, { timeout: 3000 });
+    await context.api.storage.set(key, verdict({ at: Date.now() + 2000 }));
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(screen.getByText(en['banner.decrypted'])).toBeTruthy();
+  });
+
+  it('notes missing integrity protection in one line', () => {
+    const rows = bannerRows({ isEncrypted: true, decryptionSuccess: true, noIntegrity: true }, { t });
+    expect(rows.map((r) => r.text)).toEqual([en['banner.decrypted'], en['banner.noIntegrity']]);
+  });
+
+  it('has no retry for a refused store, which only a restart can undo', () => {
+    expect(bannerRows({ isEncrypted: true, decryptionSuccess: false, decryptionError: 'os-list-denied' }, { t })[0])
+      .toMatchObject({ text: en['banner.osListDenied'], tone: 'warning' });
+    expect(bannerRows({ isEncrypted: true, decryptionSuccess: false, decryptionError: 'os-list-denied' }, { t })[0].action).toBeUndefined();
   });
 });

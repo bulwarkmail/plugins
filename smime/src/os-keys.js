@@ -26,9 +26,12 @@ export function keystoreCode(err) {
   return /keystore:([a-z-]+)/.exec(err && err.message ? err.message : String(err))?.[1] ?? null;
 }
 
-/** Nothing left to try on this code: the user said no, it's busy, or it's our own bug. */
+/**
+ * No other key is tried after this code: the user said no, or it's our own bug. A
+ * locked key does move on, as that's also what a card left out of its reader looks like.
+ */
 export function keystoreStops(code) {
-  return code === 'cancelled' || code === 'locked' || code === 'invalid';
+  return code === 'cancelled' || code === 'invalid';
 }
 
 function toBuffer(bytes) {
@@ -72,35 +75,37 @@ export async function osKeyRecord(entry) {
   };
 }
 
-function isExpired(record) {
-  return new Date(record.notAfter).getTime() < Date.now();
+/** Within its dates, today. A record without dates counts as valid. */
+export function certValidNow(record) {
+  const now = Date.now();
+  return !(new Date(record.notBefore).getTime() > now) && !(new Date(record.notAfter).getTime() < now);
 }
 
 /**
- * The keys for a sender. `signing` is in the order to try them: OS keys first, then
- * imported ones. An OS key that's expired, or whose use the user just cancelled, comes
+ * The keys for a sender. `signing` is in the order to try them: valid certificates
+ * first, OS keys before imported ones. An OS key whose use the user just cancelled comes
  * after the imported ones, so a retry doesn't run into the same dialog when there's
  * another way. `encrypting` gives the certificate for the sender's own copy: it has to
- * be one that can open mail, which on a smart card is often not the signing one.
- *
- * An imported record's capabilities aren't a reason to skip it: any certificate with
- * a keyUsage extension reads as false there (certificate-utils.js gets a BitString
- * where it expects flags), and that's stored in the record.
+ * be one that can open mail, which on a smart card is often not the signing one, and
+ * `ownCopyReadable` says whether there was such a one.
  */
 export function senderKeys(email, imported, os, signCancelled = () => false) {
   const lower = (email || '').toLowerCase();
   const ownOs = os.filter((r) => r.emails.includes(lower));
   const ownImported = imported.filter((r) => r.email === lower);
   const osSigners = ownOs.filter((r) => r.capabilities.canSign);
-  const first = osSigners.filter((r) => !isExpired(r) && !signCancelled(r.id));
+  const importedSigners = ownImported.filter((r) => r.capabilities?.canSign !== false);
   const signing = [
-    ...first,
-    ...ownImported.filter((r) => r.capabilities?.canSign !== false),
+    ...osSigners.filter((r) => certValidNow(r) && !signCancelled(r.id)),
+    ...importedSigners.filter(certValidNow),
+    ...osSigners.filter((r) => certValidNow(r) && signCancelled(r.id)),
+    ...osSigners.filter((r) => !certValidNow(r)),
+    ...importedSigners.filter((r) => !certValidNow(r)),
     ...ownImported.filter((r) => r.capabilities?.canSign === false),
-    ...osSigners.filter((r) => !first.includes(r)),
   ];
-  const encrypting = ownOs.find((r) => r.capabilities.canEncrypt) ?? ownImported[0] ?? ownOs[0];
-  return { signing, encrypting };
+  const openers = [...ownOs, ...ownImported].filter((r) => r.capabilities?.canEncrypt !== false);
+  const encrypting = openers.find(certValidNow) ?? openers[0] ?? ownOs[0] ?? ownImported[0];
+  return { signing, encrypting, ownCopyReadable: openers.length > 0 };
 }
 
 /**

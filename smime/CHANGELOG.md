@@ -5,9 +5,14 @@
 ### Added
 - In the desktop app, certificates from the system store and smart cards sign and decrypt without an import. They're listed under Your keys, marked as from the system store. The PKCS#12 import stays, and takes over where the system can't do the job
 - Mail encrypted to an EC certificate (ECDH) can now be decrypted, with a system key or an imported one
+- Decrypted mail with no integrity protection and no verified signature keeps external content off, whatever the settings or trusted senders allow, and the banner says so
+- A warning when you sign with a certificate outside its dates, or when you won't be able to read your own encrypted copy
 
 ### Fixed
 - Mail whose key is wrapped with OAEP SHA-1 in EnvelopedData opens with a system key
+- A key's signing and encryption uses are read from its certificate. They used to show as off for most certificates
+- The banner no longer shows the verdict from the last time a message was open, and keeps watching for as long as a PIN takes
+- A message listing the same recipient many times costs one attempt per key
 
 ## 1.4.3 (2026-11-01)
 

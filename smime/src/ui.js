@@ -119,12 +119,15 @@ const OS_DECRYPT_BANNERS = {
   'os-busy': 'banner.osBusy',
   'os-pending': 'banner.osPending',
 };
-// The hook renders again by itself once this one is answered.
-const stillWaiting = (status) => status?.decryptionError === 'os-pending';
+// The hook is at work, or renders again by itself once the dialog is answered.
+const stillWaiting = (status) => status?.inProgress === true || status?.decryptionError === 'os-pending';
+// A verdict from this opening, so nothing newer can be on its way.
+const settled = (status, since) => !!status && !stillWaiting(status) && (status.at ?? 0) >= since;
 
-// How long the banner waits between looks for the render hook's result:
-// often at first, then less often, giving up after about 30 seconds.
-const VERIFY_WAIT_MS = [100, 150, 250, 400, 600, 1000, 1500, 2000, 2000, 2000, 2000, 3000, 3000, 3000, 3000, 3000, 3000];
+// How long the banner waits between looks for the render hook's result: often at
+// first, then less often. It doesn't give up: a PIN can take as long as it takes.
+const VERIFY_WAIT_MS = [100, 150, 250, 400, 600, 1000, 1500, 2000];
+const VERIFY_WAIT_LATER_MS = 3000;
 
 /** The info bars for a stored verify status. Exported for tests. */
 export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
@@ -134,6 +137,7 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
     if (status.decryptionSuccess) rows.push({ icon: 'lock-open', eyebrow, text: t('banner.decrypted'), tone: 'success' });
     else if (status.decryptionError === 'locked') rows.push({ icon: 'lock', eyebrow, text: t('banner.locked'), tone: 'warning', action: 'unlock' });
     else if (OS_DECRYPT_BANNERS[status.decryptionError]) rows.push({ icon: 'lock', eyebrow, text: t(OS_DECRYPT_BANNERS[status.decryptionError]), tone: 'warning', action: 'retry' });
+    else if (status.decryptionError === 'os-list-denied') rows.push({ icon: 'lock', eyebrow, text: t('banner.osListDenied'), tone: 'warning' });
     else if (status.decryptionError) {
       // As smime-decrypt.js UnsupportedAlgorithmError words it.
       const algorithm = String(status.decryptionError).match(/^Unsupported encryption algorithm (.+)$/)?.[1];
@@ -141,6 +145,7 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
       rows.push({ icon: 'lock', eyebrow, text, tone: 'destructive' });
     }
     else rows.push({ icon: 'lock', eyebrow, text: t('banner.encrypted'), tone: 'info' });
+    if (status.noIntegrity) rows.push({ icon: 'alert-triangle', eyebrow, text: t('banner.noIntegrity'), tone: 'warning' });
   }
   if (status.isSigned || status.signerCert) {
     const eyebrow = t('banner.signature');
@@ -181,6 +186,19 @@ export function makeUi(host, deps) {
     const [loaded, setLoaded] = useState(false);
     const [busy, setBusy] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
+    // Bumped to watch again. The ref holds the time a verdict has to be newer than.
+    const [watch, setWatch] = useState(0);
+    const watchSince = useRef(null);
+
+    // Past the plugin's sharing of a recent result, then the render hook again, then
+    // the watch below until it has the answer.
+    const renderAfresh = useCallback(async () => {
+      if (!email || !email.id) return;
+      await host.storage.set(deps.FRESH_PREFIX + email.id, true);
+      watchSince.current = Date.now();
+      setWatch((n) => n + 1);
+      await host.ui.rerenderEmail();
+    }, [email]);
 
     // "Unlock now" for the locked-encryption bar: unlock any locked key
     // (prompting for the storage passphrase), then ask the host to re-run the
@@ -203,48 +221,31 @@ export function makeUi(host, deps) {
         }
         if (!unlockedAny) return;
 
-        await host.ui.rerenderEmail();
-        // The re-decrypt runs in the background instance and rewrites the
-        // persisted verify status. Poll for the fresh status (until it's no
-        // longer 'locked') and update in place.
-        if (email && email.id) {
-          for (let i = 0; i < 20; i++) {
-            await new Promise((resolve) => setTimeout(resolve, 150));
-            let next = null;
-            try { next = await host.storage.get(deps.VERIFY_PREFIX + email.id); } catch { /* ignore */ }
-            if (next && next.decryptionError !== 'locked') { setStatus(next); break; }
-          }
-        }
+        await renderAfresh();
       } finally {
         setBusy(false);
       }
-    }, [email]);
+    }, [email, renderAfresh]);
 
-    // "Try again" after a No or a busy store: render again, and wait for the new verdict.
+    // "Try again" after a No or a busy store. Stays busy until the watch has the new verdict.
     const retryNow = useCallback(async () => {
       setBusy(true);
       try {
-        await host.ui.rerenderEmail();
-        if (!email || !email.id) return;
-        for (const ms of VERIFY_WAIT_MS) {
-          await new Promise((resolve) => setTimeout(resolve, ms));
-          let next = null;
-          try { next = await host.storage.get(deps.VERIFY_PREFIX + email.id); } catch { /* try again */ }
-          if (next && next.at !== status?.at) { setStatus(next); break; }
-        }
-      } finally {
+        await renderAfresh();
+      } catch {
         setBusy(false);
       }
-    }, [email, status]);
+    }, [renderAfresh]);
 
     useEffect(() => {
       let alive = true;
       (async () => {
         if (!email || !email.id) { setLoaded(true); return; }
         const key = deps.VERIFY_PREFIX + email.id;
+        const since = watchSince.current ?? Date.now();
+        watchSince.current = null;
         const stored = await host.storage.get(key);
         if (!alive) return;
-        if (stored && !stillWaiting(stored)) { setStatus(stored); setLoaded(true); return; }
         // No render-hook result yet: best-effort detect from headers.
         const ct = email.headers && (email.headers['Content-Type'] || email.headers['content-type']);
         const det = deps.detectSmime(Array.isArray(ct) ? ct[0] : ct, undefined, undefined);
@@ -254,22 +255,26 @@ export function makeUi(host, deps) {
         setStatus(stored ?? guess);
         setLoaded(true);
         if (!stored && !guess) return;
-        // The first time a message opens, the render hook is still verifying
-        // or decrypting in the background instance when this banner mounts.
-        // Wait for the result it stores, so the banner turns from "Signed
-        // message" into the verdict without opening the message again.
-        for (const ms of VERIFY_WAIT_MS) {
-          await new Promise((resolve) => setTimeout(resolve, ms));
+        // The render hook is often still at work in the background instance when this
+        // banner mounts, and what's stored may be from the last time the message was
+        // open. Keep looking until it has this opening's verdict, so the banner never
+        // sits on an old one.
+        let current = stored;
+        for (let i = 0; !settled(current, since); i++) {
+          await new Promise((resolve) => setTimeout(resolve, VERIFY_WAIT_MS[i] ?? VERIFY_WAIT_LATER_MS));
           if (!alive) return;
           let next = null;
           try { next = await host.storage.get(key); } catch { /* try again */ }
           if (!alive) return;
-          if (next) setStatus(next);
-          if (next && !stillWaiting(next)) return;
+          if (next && JSON.stringify(next) !== JSON.stringify(current)) {
+            setStatus(next);
+            current = next;
+          }
         }
+        setBusy(false);
       })();
       return () => { alive = false; };
-    }, [email && email.id]);
+    }, [email && email.id, watch]);
 
     if (!loaded || !status) return null;
     const rows = bannerRows(status, { warnSelfSigned: deps.settings().warnOnSelfSigned !== false, t });

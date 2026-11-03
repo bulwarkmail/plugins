@@ -2,7 +2,7 @@
 // api.keystore backed by Node crypto, and the plugin's code only ever sees
 // signatures and unwrapped keys. Signatures are checked by Node as well as by the
 // plugin's verifier, and the mail comes from OpenSSL (fixtures/README.md).
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { constants, createPublicKey, verify, X509Certificate } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -12,10 +12,11 @@ import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { fakeKeystore } from './helpers/fake-keystore.mjs';
 import { fakeIndexedDB } from './helpers/fake-indexeddb.mjs';
 import { buildAuthEnveloped, flipMacByte, parseCertificatePem } from './helpers/auth-enveloped.mjs';
-import { createOsKeys, keystoreCode, osKeyRecord, senderKeys } from '../src/os-keys.js';
+import { certValidNow, createOsKeys, keystoreCode, osKeyRecord, senderKeys } from '../src/os-keys.js';
 import { smimeSign, smimeSignDetached } from '../src/smime-sign.js';
 import { smimeVerify, smimeVerifyDetached } from '../src/smime-verify.js';
-import { smimeDecrypt, normalizeCmsBytes, SmimeKeyLockedError, UnsupportedAlgorithmError } from '../src/smime-decrypt.js';
+import { smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, SmimeKeyLockedError, UnsupportedAlgorithmError } from '../src/smime-decrypt.js';
+import { smimeEncrypt } from '../src/smime-encrypt.js';
 import { importPkcs12, unlockPrivateKey } from '../src/pkcs12.js';
 import { saveKeyRecord, saveSessionKeys } from '../src/key-storage.js';
 import { unlockedDecryptMaps } from '../src/session-keys.js';
@@ -32,6 +33,12 @@ const ecFixture = (curve) => ({ certificate: text(`ec-${curve}-cert.pem`), key: 
 const MESSAGE = new TextEncoder().encode('Content-Type: text/plain; charset=utf-8\r\n\r\nSigned hello.\r\n');
 const PLAINTEXT = 'Hello from the S/MIME test fixture.';
 const FROM = 'smime-test@example.com';
+
+function envelopeOf(file) {
+  const info = new pkijs.ContentInfo({ schema: asn1js.fromBER(normalizeCmsBytes(bytes(file))).result });
+  const enveloped = new pkijs.EnvelopedData({ schema: info.content });
+  return { info, enveloped, recipient: enveloped.recipientInfos[0].value };
+}
 
 async function setup(specs) {
   const ks = fakeKeystore(specs);
@@ -219,10 +226,41 @@ describe('choosing a sender key', () => {
     expect(ids(senderKeys(FROM, [imported()], [os()], (id) => id === 'os:a').signing)).toEqual(['imported', 'os:a']);
   });
 
-  it('tries an imported key whatever its stored capabilities say, before a cancelled OS key', () => {
+  it('prefers valid certificates of either kind, and respects notBefore', () => {
+    const soon = new Date(Date.now() + 3_600_000).toISOString();
+    const validImported = imported({ notAfter: future });
+    expect(ids(senderKeys(FROM, [validImported], [os({ notBefore: soon })]).signing)).toEqual(['imported', 'os:a']);
+    expect(ids(senderKeys(FROM, [imported({ notAfter: past })], [os({ notAfter: past })]).signing)).toEqual(['os:a', 'imported']);
+    expect(ids(senderKeys(FROM, [imported({ notAfter: past })], [os({ notAfter: future })]).signing)).toEqual(['os:a', 'imported']);
+    const two = [os({ id: 'os:old', notAfter: past }), os({ id: 'os:new' })];
+    expect(ids(senderKeys(FROM, [], two).signing)).toEqual(['os:new', 'os:old']);
+  });
+
+  it('takes the own copy from a valid certificate that can open it', () => {
+    const old = os({ id: 'os:old', notAfter: past });
+    const current = os({ id: 'os:new' });
+    expect(senderKeys(FROM, [], [old, current]).encrypting.id).toBe('os:new');
+    expect(senderKeys(FROM, [imported({ notAfter: future })], [old]).encrypting.id).toBe('imported');
+    expect(senderKeys(FROM, [], [old]).encrypting.id).toBe('os:old');
+  });
+
+  it('says when nothing for this address can open the own copy', () => {
+    const signOnly = os({ capabilities: { canSign: true, canEncrypt: false } });
+    expect(senderKeys(FROM, [], [signOnly]).ownCopyReadable).toBe(false);
+    expect(senderKeys(FROM, [], [os()]).ownCopyReadable).toBe(true);
+    expect(senderKeys(FROM, [imported({ notAfter: past })], [signOnly]).ownCopyReadable).toBe(true);
+  });
+
+  it('tries an imported key that says it cannot sign last of all', () => {
     const flagged = imported({ capabilities: { canSign: false, canEncrypt: false } });
-    expect(ids(senderKeys(FROM, [flagged], [os()], (id) => id === 'os:a').signing)).toEqual(['imported', 'os:a']);
-    expect(senderKeys(FROM, [flagged], [os({ capabilities: { canSign: true, canEncrypt: false } })]).encrypting.id).toBe('imported');
+    expect(ids(senderKeys(FROM, [flagged], [os()], (id) => id === 'os:a').signing)).toEqual(['os:a', 'imported']);
+  });
+
+  it('names what may not be used today', () => {
+    const soon = new Date(Date.now() + 3_600_000).toISOString();
+    expect(certValidNow({ notBefore: past, notAfter: future })).toBe(true);
+    expect(certValidNow({ notBefore: past, notAfter: past })).toBe(false);
+    expect(certValidNow({ notBefore: soon, notAfter: future })).toBe(false);
   });
 
   it('does not sign with an OS key that can only decrypt, but uses it for the own copy', () => {
@@ -320,10 +358,13 @@ describe('signing with an OS key', () => {
     expect(Array.from(embedded)).toEqual(Array.from(intermediate));
   });
 
-  it('never asks for a SHA-1 signature, which the helper refuses', async () => {
-    const { ks } = await signWith([RSA]);
-    expect(ks.calls.sign.every((c) => c.scheme.hash !== 'SHA-1')).toBe(true);
-    await expect(ks.api.sign(ks.id(), new Uint8Array(20), { scheme: 'rsa-pkcs1', hash: 'SHA-1' })).rejects.toThrow('keystore:unsupported');
+  it.each([
+    ['RSA', RSA],
+    ['PSS', { ...RSA, signSchemes: ['rsa-pss'] }],
+    ['ECDSA', ecFixture('p521')],
+  ])('asks for SHA-256 and a 32-byte digest with %s, never for SHA-1', async (_, spec) => {
+    const { ks } = await signWith([spec]);
+    expect(ks.calls.sign.map((c) => [c.scheme.hash, c.digest.length])).toEqual([['SHA-256', 32]]);
   });
 
   it('passes the code on, and remembers a cancel for the next choice', async () => {
@@ -411,7 +452,7 @@ describe('decrypting with an OS key', () => {
       expect(ks.calls.decrypt).toHaveLength(1);
     }, 30_000);
 
-    it.each(['keystore:unsupported', 'keystore:failed', 'keystore:not-found'])('offers the unlock banner after %s', async (code) => {
+    it.each(['keystore:unsupported', 'keystore:failed', 'keystore:not-found', 'keystore:invalid', 'keystore:locked'])('offers the unlock banner after %s', async (code) => {
       const { osKeys, records, ks } = await setup([RSA]);
       ks.refuse('decrypt', code);
       await expect(decrypt(osKeys, records, bytes('cbc.p7m'), await unlockedDecryptMaps())).rejects.toBeInstanceOf(SmimeKeyLockedError);
@@ -433,10 +474,11 @@ describe('decrypting with an OS key', () => {
     }
   });
 
-  it('treats keystore:invalid as a bug, not as a key to fall back from', async () => {
+  it('treats keystore:invalid on an unwrap as a failure, like a mangled message', async () => {
     const { osKeys, records, ks } = await setup([RSA]);
     ks.refuse('decrypt', 'keystore:invalid');
-    await expect(decrypt(osKeys, records, bytes('cbc.p7m'))).rejects.toThrow('keystore:invalid');
+    await expect(decrypt(osKeys, records, bytes('cbc.p7m'))).rejects.toThrow('Failed to decrypt message with any available key');
+    expect(ks.calls.decrypt).toHaveLength(1);
   });
 
   it('names what the plugin cannot read, before bothering the OS', async () => {
@@ -482,6 +524,83 @@ describe('ECDH mail', () => {
     expect(mime).toContain(PLAINTEXT);
   });
 
+  it.each([
+    ['SHA-1 KDF', 'ec-p256-kdf-sha1.p7m', '1.3.133.16.840.63.0.2'],
+    ['SHA-384 KDF', 'ec-p256-kdf-sha384.p7m', '1.3.132.1.11.2'],
+    ['SHA-512 KDF', 'ec-p256-kdf-sha512.p7m', '1.3.132.1.11.3'],
+    ['AES-128 key wrap', 'ec-p256-wrap128.p7m', '1.3.132.1.11.1'],
+    ['AES-192 key wrap', 'ec-p256-wrap192.p7m', '1.3.132.1.11.1'],
+    ['a subject key id for the recipient', 'ec-p256-keyid.p7m', '1.3.132.1.11.1'],
+  ])('opens OpenSSL mail with %s', async (_, file, schemeOid) => {
+    const { osKeys, records } = await setup([ecFixture('p256')]);
+    const { recipient } = envelopeOf(file);
+    expect(recipient.keyEncryptionAlgorithm.algorithmId).toBe(schemeOid);
+    const { text: mime } = await decrypt(osKeys, records, bytes(file));
+    expect(mime).toContain(PLAINTEXT);
+  });
+
+  it('opens mail with a UKM, which goes into the derived key', async () => {
+    const { osKeys, records, ks } = await setup([ecFixture('p256')]);
+    const blob = await smimeEncrypt(new TextEncoder().encode(PLAINTEXT), [], records[0].certificate);
+    const der = await blob.arrayBuffer();
+    const recipient = new pkijs.EnvelopedData({ schema: new pkijs.ContentInfo({ schema: asn1js.fromBER(der).result }).content }).recipientInfos[0].value;
+    expect(recipient.ukm).toBeDefined();
+    expect((await decrypt(osKeys, records, der)).text).toBe(PLAINTEXT);
+    expect(ks.calls.agree).toHaveLength(1);
+  });
+
+  it('fails on a wrapped key with a flipped byte, as AES key wrap has a check value', async () => {
+    const { osKeys, records, ks } = await setup([ecFixture('p256')]);
+    const { info, enveloped, recipient } = envelopeOf('ec-p256.p7m');
+    const encrypted = recipient.recipientEncryptedKeys.encryptedKeys[0];
+    const wrapped = new Uint8Array(encrypted.encryptedKey.valueBlock.valueHexView);
+    wrapped[3] ^= 0x01;
+    encrypted.encryptedKey = new asn1js.OctetString({ valueHex: wrapped.buffer });
+    const cms = new pkijs.ContentInfo({ contentType: info.contentType, content: enveloped.toSchema() }).toSchema().toBER(false);
+    await expect(decrypt(osKeys, records, cms)).rejects.toThrow('Failed to decrypt message with any available key');
+    expect(ks.calls.agree).toHaveLength(1);
+  });
+
+  describe('a point the OS should never see', () => {
+    function withPoint(point, params) {
+      const { info, enveloped, recipient } = envelopeOf('ec-p256.p7m');
+      recipient.originator.value.publicKey = new asn1js.BitString({ valueHex: point.buffer.slice(point.byteOffset, point.byteOffset + point.byteLength) });
+      if (params) recipient.originator.value.algorithm.algorithmParams = new asn1js.ObjectIdentifier({ value: params });
+      return new pkijs.ContentInfo({ contentType: info.contentType, content: enveloped.toSchema() }).toSchema().toBER(false);
+    }
+    const realPoint = (file) => new Uint8Array(envelopeOf(file).recipient.originator.value.publicKey.valueBlock.valueHexView);
+
+    it('leaves an off-curve point out', async () => {
+      const { osKeys, records, ks } = await setup([ecFixture('p256')]);
+      const point = realPoint('ec-p256.p7m');
+      point[point.length - 1] ^= 0x01;
+      await expect(decrypt(osKeys, records, withPoint(point))).rejects.toThrow('Failed to decrypt');
+      expect(ks.calls.agree).toHaveLength(0);
+    });
+
+    it('leaves a point from another curve out', async () => {
+      const { osKeys, records, ks } = await setup([ecFixture('p256')]);
+      await expect(decrypt(osKeys, records, withPoint(realPoint('ec-p384.p7m')))).rejects.toThrow('Failed to decrypt');
+      expect(ks.calls.agree).toHaveLength(0);
+    });
+
+    it('leaves a key that names another curve than the certificate out', async () => {
+      const { osKeys, records, ks } = await setup([ecFixture('p256')]);
+      await expect(decrypt(osKeys, records, withPoint(realPoint('ec-p256.p7m'), '1.3.132.0.34'))).rejects.toThrow('Failed to decrypt');
+      expect(ks.calls.agree).toHaveLength(0);
+    });
+
+    it('applies to imported keys too', async () => {
+      globalThis.indexedDB = fakeIndexedDB();
+      const { keyRecord } = await importPkcs12(bytes('ec-p256.p12'), 'fixture', 'storage');
+      await saveKeyRecord(keyRecord);
+      await saveSessionKeys({ id: keyRecord.id, ...(await unlockPrivateKey(keyRecord, 'storage')) });
+      const point = realPoint('ec-p256.p7m');
+      point[point.length - 1] ^= 0x01;
+      await expect(smimeDecrypt({ cmsBytes: withPoint(point), ...(await unlockedDecryptMaps()) })).rejects.toThrow('Failed to decrypt');
+    }, 30_000);
+  });
+
   it('leaves an EC key without key agreement out, and says no key fits', async () => {
     const { osKeys, records, ks } = await setup([{ ...ecFixture('p256'), canAgree: false }]);
     await expect(decrypt(osKeys, records, bytes('ec-p256.p7m'))).rejects.toThrow('No imported S/MIME key matches');
@@ -506,6 +625,77 @@ describe('ECDH mail', () => {
     const { osKeys, records, ks } = await setup([ecFixture('p256')]);
     ks.refuse('agree', () => { throw new Error('keystore:failed'); });
     await expect(decrypt(osKeys, records, bytes('ec-p256.p7m'))).rejects.toThrow('Failed to decrypt');
+  });
+});
+
+describe('a hostile recipient list', () => {
+  const COPIES = 300;
+
+  function padded(file) {
+    const { info, enveloped } = envelopeOf(file);
+    const entry = enveloped.recipientInfos[0];
+    for (let i = 0; i < COPIES; i++) enveloped.recipientInfos.push(entry);
+    return new pkijs.ContentInfo({ contentType: info.contentType, content: enveloped.toSchema() }).toSchema().toBER(false);
+  }
+
+  class CountingMap extends Map {
+    gets = 0;
+    get(key) { this.gets += 1; return super.get(key); }
+  }
+
+  it('parses each certificate once, and matches each key once', () => {
+    let reads = 0;
+    const der = new X509Certificate(RSA.certificate).raw;
+    const certificate = der.buffer.slice(der.byteOffset, der.byteOffset + der.byteLength);
+    const record = { id: 'k', get certificate() { reads += 1; return certificate; } };
+    const other = { id: 'other', get certificate() { reads += 1; return new X509Certificate(ecFixture('p256').certificate).raw; } };
+    expect(findDecryptionCandidates(padded('cbc.p7m'), [record, other])).toEqual(['k']);
+    expect(reads).toBeLessThanOrEqual(2);
+  }, 60_000);
+
+  it('tries an imported key once', async () => {
+    const unlockedKeys = new CountingMap();
+    const legacyUnlockedKeys = new CountingMap();
+    const der = new X509Certificate(RSA.certificate).raw;
+    const record = { id: 'k', certificate: der.buffer.slice(der.byteOffset, der.byteOffset + der.byteLength) };
+    const notAKey = { algorithm: { name: 'RSA-OAEP', hash: { name: 'SHA-256' } } };
+    unlockedKeys.set('k', notAKey);
+    await expect(smimeDecrypt({ cmsBytes: padded('cbc.p7m'), keyRecords: [record], unlockedKeys, legacyUnlockedKeys })).rejects.toThrow('Failed to decrypt');
+    expect(unlockedKeys.gets).toBeLessThanOrEqual(4);
+  }, 60_000);
+
+  it('tries each key once in a message with integrity too', async () => {
+    const rsaOaepKey = vi.fn(async () => undefined);
+    const der = new X509Certificate(RSA.certificate).raw;
+    const record = { id: 'k', certificate: der.buffer.slice(der.byteOffset, der.byteOffset + der.byteLength) };
+    const info = new pkijs.ContentInfo({ schema: asn1js.fromBER(normalizeCmsBytes(bytes('gcm.p7m'))).result });
+    const items = info.content.valueBlock.value;
+    const set = items.find((el) => el instanceof asn1js.Set);
+    const first = set.valueBlock.value[0];
+    for (let i = 0; i < COPIES; i++) set.valueBlock.value.push(first);
+    const cms = info.toSchema().toBER(false);
+    await expect(smimeDecrypt({ cmsBytes: cms, keyRecords: [record], unlockedKeys: new Map(), legacyUnlockedKeys: new Map(), rsaOaepKey })).rejects.toThrow();
+    expect(rsaOaepKey).toHaveBeenCalledTimes(1);
+  }, 60_000);
+});
+
+describe('integrity of what was decrypted', () => {
+  it.each([
+    ['AES-CBC EnvelopedData', 'cbc.p7m', false],
+    ['AES-GCM AuthEnvelopedData', 'gcm.p7m', true],
+  ])('%s', async (_, file, integrity) => {
+    const { osKeys, records } = await setup([RSA]);
+    const { mimeBytes } = await smimeDecrypt({ cmsBytes: normalizeCmsBytes(bytes(file)), ...osKeys.addDecryptKeys(emptyMaps(), records) });
+    expect(mimeBytes.length).toBeGreaterThan(0);
+    const result = await smimeDecrypt({ cmsBytes: normalizeCmsBytes(bytes(file)), ...osKeys.addDecryptKeys(emptyMaps(), records) });
+    expect(result.integrity).toBe(integrity);
+  });
+
+  it('counts AES-GCM in EnvelopedData, as this plugin sends it', async () => {
+    const { osKeys, records } = await setup([RSA]);
+    const blob = await smimeEncrypt(new TextEncoder().encode(PLAINTEXT), [], records[0].certificate);
+    const result = await smimeDecrypt({ cmsBytes: await blob.arrayBuffer(), ...osKeys.addDecryptKeys(emptyMaps(), records) });
+    expect(result.integrity).toBe(true);
   });
 });
 

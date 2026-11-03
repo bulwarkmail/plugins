@@ -5,12 +5,14 @@
  * helper, so it runs from repos/desktop and not with this repo's Playwright config (the
  * name keeps that config from picking it up):
  *
- *   # in repos/plugins, on this branch
+ *   # in repos/plugins, on this branch (it needs smime's dependencies: npm ci --prefix smime)
  *   node scripts/build.mjs smime
- *   mkdir <dir> && tar -xf smime/smime.zip -C <dir>
+ *   mkdir <dir> && /c/Windows/System32/tar.exe -xf smime/smime.zip -C <dir>
  *   git checkout -- smime/smime.zip
  *
- *   # in repos/desktop, with the webmail rebuilt
+ *   # in repos/desktop, with the webmail rebuilt and the helper built (npm run build:native)
+ *   unset ELECTRON_RUN_AS_NODE
+ *   node build.mjs
  *   cp <repos/plugins>/smime/e2e/os-keystore.desktop.ts test/smime-os-keystore.spec.ts
  *   BULWARK_SMIME_DIR=<dir> vw exec --env IT_ENT_PASSWORD="vault://Stalwart test – ent-* throwaway accounts/password" \
  *     -- npx playwright test test/smime-os-keystore.spec.ts
@@ -75,17 +77,22 @@ function seedPlugin(profile: string): void {
   }));
 }
 
-async function compose(page: Page, subject: string, options: string[]): Promise<void> {
-  await page.getByRole('button', { name: /^(new message|compose)/i }).first().click();
-  await page.getByRole('combobox', { name: /^to$/i }).or(page.getByLabel(/^to$/i)).first().fill(ACCOUNT);
-  await page.keyboard.press('Enter');
-  await page.getByLabel(/subject/i).first().fill(subject);
-  await page.getByRole('textbox', { name: /message|body/i }).last().fill(`Body of ${subject}`);
+async function compose(page: Page, subject: string, options: RegExp[]): Promise<void> {
+  await page.keyboard.press('c');
+  const composer = page.locator('[data-testid="email-composer"]');
+  await composer.waitFor({ state: 'visible', timeout: 15_000 });
+  const to = page.locator('[data-testid="composer-to"] input').first();
+  await to.click();
+  await to.fill(ACCOUNT);
+  await to.press('Enter');
+  await page.locator('[data-testid="composer-subject"]').fill(subject);
+  await composer.locator('[contenteditable="true"]').first().fill(`Body of ${subject}`);
   for (const name of options) {
-    await page.getByRole('button', { name: /^options$/i }).first().click();
+    await page.locator('[data-testid="composer-options-menu"]').click();
     await page.getByRole('menuitemcheckbox', { name }).click();
   }
-  await page.getByRole('button', { name: /^send$/i }).first().click();
+  await page.locator('[data-testid="composer-send"]').first().click();
+  await composer.waitFor({ state: 'hidden', timeout: 120_000 });
 }
 
 async function openMail(page: Page, subject: string): Promise<void> {
@@ -94,9 +101,15 @@ async function openMail(page: Page, subject: string): Promise<void> {
   await row.click();
 }
 
-/** The plugin's banner lives in its own frame. */
-function bannerText(page: Page, text: string | RegExp) {
-  return page.frameLocator('iframe[src*="plugin-sandbox-privileged"]').getByText(text).first();
+/** The plugin's banner lives in one of its frames, and there are several. */
+async function expectBanner(page: Page, text: RegExp): Promise<void> {
+  await expect.poll(async () => {
+    for (const frame of page.frames()) {
+      if (!frame.url().includes('plugin-sandbox-privileged')) continue;
+      if (await frame.getByText(text).first().isVisible().catch(() => false)) return true;
+    }
+    return false;
+  }, { timeout: 60_000, intervals: [500] }).toBe(true);
 }
 
 test.describe('S/MIME with a key from CurrentUser\\My', () => {
@@ -146,9 +159,11 @@ test.describe('S/MIME with a key from CurrentUser\\My', () => {
     const subject = `OS key signed ${run}`;
     await compose(page, subject, [/sign \(s\/mime\)/i]);
     await openMail(page, subject);
-    await expect(bannerText(page, /valid signature/i)).toBeVisible({ timeout: 60_000 });
+    await expectBanner(page, /valid signature/i);
+    // The shell's dialog names the certificate. The run id is the last word of its subject.
+    const runId = cert.subject.split(' ').pop()!;
     const asked = await prompts(app);
-    expect(asked.some((prompt) => prompt.detail?.includes(cert.subject.replace(/^CN=/, '')))).toBe(true);
+    expect(asked.some((prompt) => prompt.detail?.includes(runId))).toBe(true);
   });
 
   test('decrypts with the OS key', async () => {
@@ -157,7 +172,7 @@ test.describe('S/MIME with a key from CurrentUser\\My', () => {
     const subject = `OS key encrypted ${run}`;
     await compose(page, subject, [/encrypt \(s\/mime\)/i]);
     await openMail(page, subject);
-    await expect(bannerText(page, /^decrypted$/i)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText(`Body of ${subject}`).first()).toBeVisible();
+    await expectBanner(page, /^decrypted$/i);
+    await expect(page.frameLocator('iframe[title="Email content"]').getByText(`Body of ${subject}`).first()).toBeVisible({ timeout: 30_000 });
   });
 });

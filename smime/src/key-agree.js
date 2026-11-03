@@ -47,9 +47,14 @@ function concat(...parts) {
 }
 
 // The sender's one-time key as a SubjectPublicKeyInfo. Senders leave the curve out, as
-// RFC 5753 allows: it's the recipient certificate's.
+// RFC 5753 allows: it's the recipient certificate's. A key that names another one can't
+// agree with this certificate.
 function originatorSpki(kari, curveOid) {
   if (kari.originator.variant !== 3) throw new UnsupportedAlgorithmError('static ECDH');
+  const named = kari.originator.value.algorithm.algorithmParams;
+  if (named instanceof asn1js.ObjectIdentifier && named.valueBlock.toString() !== curveOid) {
+    throw new Error('ECDH key on another curve than the certificate');
+  }
   const algorithm = new pkijs.AlgorithmIdentifier({
     algorithmId: OID_EC_PUBLIC_KEY,
     algorithmParams: new asn1js.ObjectIdentifier({ value: curveOid }),
@@ -99,13 +104,12 @@ export async function unwrapKeyAgree(kari, encryptedKey, privateKey, certificate
   if (!curve) throw new UnsupportedAlgorithmError(`ECDH on curve ${curveOid}`);
 
   const spki = originatorSpki(kari, curveOid);
+  // Refuses a point off the curve. Also before an OS key: its provider is whatever the
+  // card came with, and a bad point is how a key gets leaked through its answers.
+  const peer = await crypto.subtle.importKey('spki', spki, { name: 'ECDH', namedCurve: curve.name }, false, []);
   const secret = privateKey.keystore
     ? await privateKey.keystore.agree(new Uint8Array(spki))
-    : await crypto.subtle.deriveBits(
-      { name: 'ECDH', public: await crypto.subtle.importKey('spki', spki, { name: 'ECDH', namedCurve: curve.name }, false, []) },
-      privateKey,
-      curve.bits,
-    );
+    : await crypto.subtle.deriveBits({ name: 'ECDH', public: peer }, privateKey, curve.bits);
 
   const wrapped = new Uint8Array(encryptedKey.encryptedKey.valueBlock.valueHexView);
   // RFC 5753 has no parameters here, and some senders write NULL.

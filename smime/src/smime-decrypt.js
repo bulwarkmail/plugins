@@ -27,6 +27,17 @@ const ENVELOPED_CIPHERS = new Set([
   '1.2.840.113549.3.7', '1.3.14.3.2.7', // DES-EDE3-CBC, DES-CBC
 ]);
 
+const AUTHENTICATED_CIPHERS = new Set([
+  '2.16.840.1.101.3.4.1.6', '2.16.840.1.101.3.4.1.26', '2.16.840.1.101.3.4.1.46',
+]);
+
+export class SmimeNoKeyError extends Error {
+  constructor() {
+    super('No imported S/MIME key matches any recipient in this encrypted message');
+    this.name = 'SmimeNoKeyError';
+  }
+}
+
 export class SmimeKeyLockedError extends Error {
   constructor(message, keyRecordId) {
     super(message);
@@ -42,9 +53,12 @@ export class SmimeKeyLockedError extends Error {
  *                keystoreKeys?: Map }
  *              (the keys as session-keys.js unlockedDecryptMaps returns them, and
  *              os-keys.js addDecryptKeys adds)
- * @returns { mimeBytes: Uint8Array, keyRecordId: string }
- * @throws an api.keystore error (see os-keys.js) when the user said no or the store
- *         is busy, and no imported key is left that the user could unlock instead
+ * @returns { mimeBytes: Uint8Array, keyRecordId: string, integrity: boolean }. integrity
+ *          is false for a content cipher without authentication, CBC, whose plaintext
+ *          an attacker can reshape without knowing the key (EFAIL).
+ * @throws SmimeNoKeyError when no key fits a recipient, and an api.keystore error (see
+ *         os-keys.js) when the user said no or the store is busy, and no imported key is
+ *         left that the user could unlock instead
  */
 export async function smimeDecrypt(input) {
   const { cmsBytes, keyRecords, unlockedKeys, legacyUnlockedKeys } = input;
@@ -53,24 +67,23 @@ export async function smimeDecrypt(input) {
   const envelopedData = extractEnvelopedData(contentInfo);
 
   const matchedRecords = inTryOrder(findMatchingKeyRecords(envelopedData, keyRecords), input);
-  if (matchedRecords.length === 0) {
-    throw new Error('No imported S/MIME key matches any recipient in this encrypted message');
-  }
+  if (matchedRecords.length === 0) throw new SmimeNoKeyError();
 
   if (envelopedData.mac) return decryptAuthEnveloped(envelopedData, matchedRecords, input);
 
   const contentOid = envelopedData.encryptedContentInfo.contentEncryptionAlgorithm.algorithmId;
   if (!ENVELOPED_CIPHERS.has(contentOid)) throw new UnsupportedAlgorithmError(contentOid);
 
+  const integrity = AUTHENTICATED_CIPHERS.has(contentOid);
   const os = osAttempts();
   for (const match of matchedRecords) {
     const { keyRecord } = match;
     const osKey = input.keystoreKeys?.get(keyRecord.id);
     if (osKey) {
-      if (!os.mayTry(keyRecord.id)) continue;
+      if (!os.mayTry()) continue;
       try {
         const decrypted = await decryptWithKey(envelopedData, match, osKey, keyRecord);
-        return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
+        return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id, integrity };
       } catch (err) {
         os.failed(err);
         continue;
@@ -83,7 +96,7 @@ export async function smimeDecrypt(input) {
       if (legacyKey) {
         try {
           const decrypted = await decryptWithKey(envelopedData, match, legacyKey, keyRecord);
-          return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
+          return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id, integrity };
         } catch {
           continue;
         }
@@ -93,13 +106,13 @@ export async function smimeDecrypt(input) {
 
     try {
       const decrypted = await decryptWithKey(envelopedData, match, privateKey, keyRecord);
-      return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
+      return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id, integrity };
     } catch {
       const legacyKey = legacyUnlockedKeys?.get(keyRecord.id);
       if (legacyKey) {
         try {
           const decrypted = await decryptWithKey(envelopedData, match, legacyKey, keyRecord);
-          return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
+          return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id, integrity };
         } catch {
           /* try next record */
         }
@@ -116,7 +129,7 @@ async function decryptAuthEnveloped(envelope, matchedRecords, input) {
   const os = osAttempts();
   for (const { keyRecord, recipientIndex, encryptedKey } of matchedRecords) {
     const isOs = input.keystoreKeys?.has(keyRecord.id);
-    if (isOs && !os.mayTry(keyRecord.id)) continue;
+    if (isOs && !os.mayTry()) continue;
     try {
       const recipient = envelope.recipientInfos[recipientIndex].value;
       const cek = encryptedKey
@@ -124,7 +137,7 @@ async function decryptAuthEnveloped(envelope, matchedRecords, input) {
         : await unwrapContentKey(recipient, keyRecord.id, input);
       if (!cek) continue; // locked
       const decrypted = await cipher.decrypt(cek, envelope);
-      return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
+      return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id, integrity: true };
     } catch (err) {
       if (err instanceof UnsupportedAlgorithmError) throw err;
       if (isOs) os.failed(err);
@@ -147,27 +160,23 @@ function inTryOrder(matches, { unlockedKeys, legacyUnlockedKeys, keystoreKeys })
 }
 
 /**
- * One question per OS key and message, however many recipient entries a message
- * invents for it. Once the user has said no or the store is busy, no further OS key
- * gets asked about. Other failures move on to the next key, an imported one if there
- * is one, except for keystore:invalid, which is our own bug and not a key problem.
+ * Once the user has said no, no further OS key gets asked about. Every other failure
+ * moves on to the next key, an imported one if there is one. That goes for
+ * keystore:invalid too: here the bytes come from the message, so that's a mangled
+ * message and not our bug. A busy store is remembered, to say so if nothing works.
  */
 function osAttempts() {
-  const tried = new Set();
-  let stop = null;
+  let refused = null;
+  let busy = null;
   return {
-    mayTry(id) {
-      if (stop || tried.has(id)) return false;
-      tried.add(id);
-      return true;
-    },
+    mayTry: () => !refused,
     failed(err) {
       if (err instanceof UnsupportedAlgorithmError) throw err;
       const code = keystoreCode(err);
-      if (code === 'invalid') throw err;
-      if (code === 'cancelled' || code === 'locked') stop = err;
+      if (code === 'cancelled') refused = err;
+      if (code === 'locked') busy = err;
     },
-    stopped: () => stop,
+    stopped: () => refused ?? busy,
   };
 }
 
@@ -296,10 +305,46 @@ function extractEnvelopedData(contentInfo) {
   throw new Error(`Unexpected CMS content type: ${contentInfo.contentType}`);
 }
 
+// One parse per certificate, however many entries a message has. Null for one that can't be read.
+const certificateFacts = new WeakMap();
+
+function factsOf(keyRecord) {
+  if (certificateFacts.has(keyRecord)) return certificateFacts.get(keyRecord);
+  let facts = null;
+  try {
+    const certAsn1 = asn1js.fromBER(keyRecord.certificate);
+    if (certAsn1.offset !== -1) {
+      const cert = new pkijs.Certificate({ schema: certAsn1.result });
+      const skiExt = cert.extensions?.find((ext) => ext.extnID === '2.5.29.14');
+      const skiValue = skiExt ? asn1js.fromBER(skiExt.extnValue.valueBlock.valueHexView) : null;
+      facts = {
+        cert,
+        serial: toHex(cert.serialNumber.valueBlock.valueHexView),
+        issuer: new Uint8Array(cert.issuer.toSchema().toBER(false)),
+        ski: skiValue && skiValue.offset !== -1 ? new Uint8Array(skiValue.result.valueBlock.valueHexView) : null,
+      };
+    }
+  } catch { /* not a certificate we can use */ }
+  certificateFacts.set(keyRecord, facts);
+  return facts;
+}
+
+/**
+ * Each key at most once, whatever a message repeats: every try can be a private key
+ * operation, and with an OS key a question. So the work a message can cause is
+ * bounded by the keys the user has, not by the size of its recipient list.
+ */
 function findMatchingKeyRecords(envelopedData, keyRecords) {
   const matches = [];
+  const candidates = keyRecords.map((keyRecord) => ({ keyRecord, facts: factsOf(keyRecord) })).filter((c) => c.facts);
+  const claim = (recipient, make) => {
+    const at = candidates.findIndex((c) => matchesRecipient(recipient, c.facts));
+    if (at === -1) return;
+    matches.push(make(candidates[at].keyRecord));
+    candidates.splice(at, 1);
+  };
 
-  for (let i = 0; i < envelopedData.recipientInfos.length; i++) {
+  for (let i = 0; i < envelopedData.recipientInfos.length && candidates.length > 0; i++) {
     const ri = envelopedData.recipientInfos[i];
 
     const ktri = ri instanceof pkijs.KeyTransRecipientInfo
@@ -309,10 +354,10 @@ function findMatchingKeyRecords(envelopedData, keyRecords) {
         : null;
 
     if (ktri) {
-      for (const keyRecord of keyRecords) {
-        if (matchesRecipient(ktri, keyRecord)) {
-          matches.push({ keyRecord, recipientIndex: i });
-        }
+      // A second key could hold the same certificate.
+      for (let before = -1; before !== candidates.length && candidates.length > 0;) {
+        before = candidates.length;
+        claim(ktri, (keyRecord) => ({ keyRecord, recipientIndex: i }));
       }
       continue;
     }
@@ -322,10 +367,9 @@ function findMatchingKeyRecords(envelopedData, keyRecords) {
         // KeyAgreeRecipientIdentifier: issuerAndSerialNumber, or [0] with a subject key id.
         const { variant, value } = encryptedKey.rid;
         const recipient = { rid: variant === 2 ? value.subjectKeyIdentifier : value };
-        for (const keyRecord of keyRecords) {
-          if (matchesRecipient(recipient, keyRecord)) {
-            matches.push({ keyRecord, recipientIndex: i, encryptedKey });
-          }
+        for (let before = -1; before !== candidates.length && candidates.length > 0;) {
+          before = candidates.length;
+          claim(recipient, (keyRecord) => ({ keyRecord, recipientIndex: i, encryptedKey }));
         }
       }
     }
@@ -334,52 +378,22 @@ function findMatchingKeyRecords(envelopedData, keyRecords) {
   return matches;
 }
 
-function matchesRecipient(recipientInfo, keyRecord) {
+function matchesRecipient(recipientInfo, facts) {
   const rid = recipientInfo.rid;
-
-  if (rid instanceof pkijs.IssuerAndSerialNumber) {
-    try {
-      const certAsn1 = asn1js.fromBER(keyRecord.certificate);
-      if (certAsn1.offset === -1) return false;
-      const cert = new pkijs.Certificate({ schema: certAsn1.result });
-
-      const ridSerial = toHex(rid.serialNumber.valueBlock.valueHexView);
-      const certSerial = toHex(cert.serialNumber.valueBlock.valueHexView);
-      if (ridSerial !== certSerial) return false;
-
-      const ridIssuerDer = rid.issuer.toSchema().toBER(false);
-      const certIssuerDer = cert.issuer.toSchema().toBER(false);
-      return arraysEqual(new Uint8Array(ridIssuerDer), new Uint8Array(certIssuerDer));
-    } catch {
-      return false;
+  try {
+    if (rid instanceof pkijs.IssuerAndSerialNumber) {
+      return toHex(rid.serialNumber.valueBlock.valueHexView) === facts.serial
+        && arraysEqual(new Uint8Array(rid.issuer.toSchema().toBER(false)), facts.issuer);
     }
-  }
-
-  if (rid instanceof asn1js.OctetString) {
-    try {
-      const certAsn1 = asn1js.fromBER(keyRecord.certificate);
-      if (certAsn1.offset === -1) return false;
-      const cert = new pkijs.Certificate({ schema: certAsn1.result });
-
-      const skiExt = cert.extensions?.find((ext) => ext.extnID === '2.5.29.14');
-      if (!skiExt) return false;
-
-      const skiValue = asn1js.fromBER(skiExt.extnValue.valueBlock.valueHexView);
-      if (skiValue.offset === -1) return false;
-      const ski = skiValue.result.valueBlock.valueHexView;
-
-      return arraysEqual(new Uint8Array(ski), new Uint8Array(rid.valueBlock.valueHexView));
-    } catch {
-      return false;
+    if (rid instanceof asn1js.OctetString) {
+      return !!facts.ski && arraysEqual(facts.ski, new Uint8Array(rid.valueBlock.valueHexView));
     }
-  }
-
+  } catch { /* a malformed entry fits no key */ }
   return false;
 }
 
 async function decryptWithKey(envelopedData, { recipientIndex, encryptedKey }, privateKey, keyRecord) {
-  const certAsn1 = asn1js.fromBER(keyRecord.certificate);
-  const cert = new pkijs.Certificate({ schema: certAsn1.result });
+  const { cert } = factsOf(keyRecord);
   const recipient = envelopedData.recipientInfos[recipientIndex].value;
 
   if (encryptedKey) {
@@ -406,8 +420,7 @@ async function decryptWithKey(envelopedData, { recipientIndex, encryptedKey }, p
 async function agreedContentKey(recipient, encryptedKey, keyRecord, { keystoreKeys, unlockedKeys }) {
   const privateKey = keystoreKeys?.get(keyRecord.id) ?? unlockedKeys.get(keyRecord.id);
   if (!privateKey) return undefined;
-  const cert = new pkijs.Certificate({ schema: asn1js.fromBER(keyRecord.certificate).result });
-  return unwrapKeyAgree(recipient, encryptedKey, privateKey, cert);
+  return unwrapKeyAgree(recipient, encryptedKey, privateKey, factsOf(keyRecord).cert);
 }
 
 /**
