@@ -1595,13 +1595,18 @@ the webmail offers, so a plugin can hide what isn't there:
 | `threads` | `api.email.getThread` and `api.email.getThreadCount` |
 | `listSelection` | The `listSelection` prop of `email-detail-sidebar` |
 | `sidePanel` | The `app-side-panel` slot, per plugin: `true` when this plugin may show it, `false` when it lacks `ui:side-panel` (see [The side panel in other views](#the-side-panel-in-other-views)) |
+| `answerInvitation` | `api.calendar.respond`, per plugin: `true` only once the plugin holds `calendar:respond` |
+| `filterRules` | `api.filters.list`, `create` and `undo`: the mail server has filters (Sieve) |
+| `batchMail` | `api.email.batch` and `api.email.undoBatch` |
+| `changeSettings` | `api.app.describeSettings`, `setSettings` and `undoSettings`, per plugin: `true` only once the plugin holds `settings:change` |
 
 Read each as `=== true` (older webmails don't send them) and check
 `typeof api.email.getThread === 'function'` before calling a method.
 The flags say what the webmail can do; the method's permission is still
-checked on every call.
+checked on every call. A per-plugin flag stays `false` for a plugin that
+was turned on before an update added the permission, until the user turns
+it off and on.
 
-<!-- TODO(C): flags of the More actions host calls -->
 <!-- TODO(D): flags of the Files host calls -->
 
 
@@ -1895,7 +1900,146 @@ slot gets the messages ticked in the list, with `email:read`:
 another connected login are counted but not listed. A Pro email tab's
 panel always gets `null`, and `app-side-panel` doesn't get the prop.
 
-<!-- TODO(C): the More actions host calls -->
+#### More actions (1.20)
+
+These calls also came with the AI assistant 2.2: answering invitations,
+deleting events with undo, filter rules, changing many messages at once
+and changing settings. Check their flags in `api.host.features` first
+(see [api.host](#apihost)). List `calendar:respond` and `settings:change`
+in `optionalPermissions`: both are new and high risk, and older webmails
+don't know them.
+
+```js
+await api.calendar.respond(emailId, 'accepted' | 'tentative' | 'declined')   // calendar:respond
+//   → { status, title, start, organizer }, or null when another plugin stopped it
+await api.calendar.deleteEvent(id)           // calendar:write → { undoToken } (null when it can't be undone)
+await api.calendar.undoDelete(undoToken)     // calendar:write → { id }
+
+await api.filters.list()                     // filters:read → { supported, editable, rules }
+await api.filters.create({ name, match, conditions: [{ field, op, value, headerName }],
+  actions: [{ type, mailboxId, tagId }] })   // filters:write → { id, undoToken }
+await api.filters.undo(undoToken)            // filters:write
+
+await api.email.batch({ emailIds, action, mailboxId, tagId })   // email:write → { done, failed, undoToken }
+await api.email.undoBatch(undoToken)         // email:write
+
+await api.app.describeSettings({ key: value } | [key])   // settings:read → { [key]: SettingDescription }
+await api.app.setSettings({ key: value })                // settings:change → { applied, refused, undoToken }
+await api.app.undoSettings(undoToken)                    // settings:change → { restored, refused }
+```
+
+**Undo tokens.** What an undo needs stays in the host; the plugin gets a
+random token, bound to the plugin and the signed-in account, good for 30
+minutes. A token is spent once its undo went through; when the undo
+failed it stays, so the plugin can try again, one try at a time. A
+plugin keeps at most 50 tokens, the oldest go first. Past that, or after
+30 minutes, an undo rejects with `<method>: this can't be undone any
+more`.
+
+**`calendar.respond(emailId, status)`** (flag `answerInvitation`). Answers
+the invitation in a message of the user's own account the way the
+reader's invitation banner does: the answer is written with scheduling
+on, so the server sends the reply to the organiser, and the calendar
+hooks of other plugins run. An event not yet in the calendar is added
+first. It can't be undone; answer again to change it. It refuses:
+
+- a message with no invitation, or one that asks for no answer (a reply,
+  a cancellation)
+- an event the user organises
+- an invitation whose sender doesn't match its organiser, unless the
+  server verified the sender; this check runs also when From is one of
+  the user's own addresses
+- mail of a shared or group mailbox (answer those in the reader)
+- while reading invitations is switched off in Settings > Calendar, and
+  an account without a calendar
+
+`start` is the event's start as the invitation gives it, `organizer` the
+organiser's address (both `null` when missing).
+
+**`calendar.deleteEvent(id)`** works as before (an occurrence's id
+deletes that occurrence; it never sends cancellations). From 1.20 it
+resolves to `{ undoToken }`: a token for a single event of the user's own
+calendars, `null` for repeating events, their occurrences and events of
+shared calendars. `undoDelete` creates the event again from the host's
+copy with the same uid and sends no invitations; it rejects when the
+event can't be created.
+
+**`filters.list()`, `filters.create(rule)`, `filters.undo(token)`** (flag
+`filterRules`: the server has filters). These work on the rules of
+Settings > Filters, which shows a new rule at once. `list` resolves to
+`{ supported, editable, rules }`; `editable` is false when the filter
+script was edited by hand, and each rule has `id, name, isActive,
+editable, match, conditions, actions` (`folder` is a move or copy
+target's path, `value` the address of a forwarding rule). `create` checks
+the rule the way the rule editor does and puts it at the top:
+
+- a name, `match` `all` (default) or `any`, 1 to 10 conditions and 1 to
+  10 actions, and at least one action besides `stop`
+- conditions on `from`, `to`, `cc`, `subject`, `body`, `header` (with
+  `headerName`), `size` (bytes) or `attachment`, with the operators that
+  field takes
+- actions `move`, `copy`, `mark_read`, `star`, `add_label` (`tagId`, one
+  of the user's tags) and `stop`. Forward, redirect, reject, discard and
+  keep are refused by name
+- `move` and `copy` only into folders of the filters' own account that
+  nobody else shares, never the trash
+
+It refuses a script edited by hand ("add the rule in Settings > Filters")
+and resolves to `{ id, undoToken }`. `undo` puts the script back as it
+was, and refuses when the filters changed since.
+
+**`email.batch({ emailIds, action, mailboxId, tagId })`** (flag
+`batchMail`). One change to 1 to 200 messages of the signed-in account,
+through the app's own batch functions: the plugin hooks run and the list
+updates. `action` is `archive`, `move` (with `mailboxId`), `read`,
+`unread`, `tag` or `untag` (with `tagId`, one of the user's tags).
+Archive follows the user's archive mode (one folder, by year, by month)
+and makes the Archive folder when there is none; it is refused while the
+admin switched archiving off. Move goes only into the account's own
+folders, never the trash. Archive and move count as one call against the
+move limit (20 a minute). Messages it can't find count as `failed`.
+
+The batch is one entry in the app's undo history, so Ctrl+Z takes it back
+too; `undoBatch` and Ctrl+Z run the same undo once. Undo puts every
+message back in its folders with its read state, or puts the read state
+or tag back on exactly the messages that changed.
+
+**Shared folders.** A batch move or archive, and a filter's move or copy
+target, never files mail into a folder shared with other people. The host
+asks the server for the folder's sharing (the folder and the folders
+above it; for archive the Archive and its year and month folders too). An
+answer it can't get counts as shared, so the call is refused.
+
+**`app.describeSettings`, `app.setSettings`, `app.undoSettings`** (flag
+`changeSettings`). Each call names 1 to 20 settings, by the names
+`getSettings` uses (`language` and `calendarView` included).
+`describeSettings` takes changes or just names and resolves to, per key,
+`{ key, label, page, pageLabel, current, currentLabel, next, nextLabel,
+allowed, reason, options }` in the user's language, so a plugin can show
+"Change Time format: 12-hour → 24-hour?" before it asks.
+
+`setSettings` changes only settings on an allow-list of about 150:
+appearance, language and formats, message list, reading, composing,
+notifications, calendar view, contacts view and accessibility. It never
+changes remote content, trusted senders, signature details, the push
+relay, download templates, security, identities, sync or debug settings,
+and never sets a value that deletes or sends mail or turns off a delete
+safety net (`deleteAction` permanent, `readReceiptResponse` always,
+`confirmDelete` or `confirmBulkDelete` off, `permanentlyDeleteJunk` on,
+`postExportAction` trash). `senderFavicons` and `showAvatarsInJunk` may
+only be switched off. At the moment of the change it also refuses a
+setting the admin locked or hid, a value outside the admin's restriction,
+and a setting a feature gate or no-third-party mode hides.
+
+Each key is checked and written on its own, through the same setters as
+the settings pages, so the open page shows the change and it syncs. The
+result lists `applied` (`{ old, new }` per key) and `refused` with a
+reason: `unknown`, `not_allowed`, `bad_value`, `locked`, `hidden`,
+`unavailable` or `stopped` (another plugin's `onBeforeSettingChange` said
+no). `undoSettings` writes the exact old values back, but refuses a
+setting the admin has locked or hidden since, one a gate now hides, and
+an old value the admin's restriction now rules out.
+
 <!-- TODO(D): the Files host calls -->
 
 ### api.accountData
@@ -1978,7 +2122,9 @@ await api.calendar.getEvent(id)
 await api.calendar.createEvent({ title, start, end | duration, timeZone, isAllDay,
   description, location, calendarId, participants, repeat, uid })   // the event, or null
 await api.calendar.updateEvent(id, patch)
-await api.calendar.deleteEvent(id)           // an occurrence's id deletes that occurrence
+await api.calendar.deleteEvent(id)           // an occurrence's id deletes that occurrence; 1.20: { undoToken }
+await api.calendar.undoDelete(undoToken)     // 1.20: { id } of the event created again
+await api.calendar.respond(emailId, 'accepted' | 'tentative' | 'declined')   // 1.20, calendar:respond
 
 await api.tasks.list({ includeCompleted })   // at most 1000
 await api.tasks.get(id)
@@ -1996,7 +2142,8 @@ at most 50 participants. `repeat` is `{ frequency: 'daily' | 'weekly' |
 stored as `<uid>@<plugin id>.plugin.bulwark`, so you can find the event again.
 Writes go through the calendar like the user's own edits, so other plugins'
 hooks run and may stop them (then `create` resolves to `null`). Nothing
-here sends invitations.
+here sends invitations. `respond`, `undoDelete` and the undo token of
+`deleteEvent` are described under [More actions](#more-actions-120).
 
 ### api.contacts, api.addressBooks
 
@@ -2018,7 +2165,7 @@ await api.templates.list() / get(id)
 await api.templates.create({ name, subject, body, isHTML, category })   // at most 500 templates
 await api.templates.update(id, patch) / delete(id)
 await api.identities.update(id, { name, replyTo, textSignature, htmlSignature })   // or null if stopped
-await api.vacation.get()
+await api.vacation.get()          // 1.20 adds forwardActive: true, false or null
 await api.vacation.set({ isEnabled, subject, textBody, htmlBody, fromDate, toDate })   // or null if stopped
 await api.user.getAccounts()      // [{ id, label, serverUrl, username, displayName, email, avatarColor, isConnected, isDefault, isActive }]
 await api.user.getSelf()          // { accountId, email, name }
@@ -2029,7 +2176,20 @@ await api.user.logout()
 await api.app.getInfo()           // { product: 'Bulwark Mail', name, version, edition: 'full' | 'lite', stalwartFeatures, demoMode }
 await api.app.searchSettings('undo send', { limit })   // [{ pageId, page, label, description }], in the user's language
 await api.app.getSettings()       // { mailLayout: 'focus', sendDelaySeconds: 10, markAsReadDelay: 0, theme, language, ... }
+await api.app.describeSettings({ key: value } | [key])   // 1.20, settings:read
+await api.app.setSettings({ key: value })                // 1.20, settings:change
+await api.app.undoSettings(undoToken)                    // 1.20, settings:change
 ```
+
+From 1.20 `vacation.set` refuses, for every plugin, `isEnabled: true`
+while the out-of-office forwards mail to another address (set in
+Settings > Out of office) or while that can't be read: switching it on would start
+sending the user's mail elsewhere. Switching it off and changing the text
+still work. `vacation.get` says which with `forwardActive` (`null` when
+the account has filters but they couldn't be read). The settings calls
+are described under [More actions](#more-actions-120); from 1.20
+`getSettings` also returns every setting `setSettings` may change, and
+`calendarView`.
 
 `getSelf` and `getMailAccounts` need `account:read`, `findPeople`
 `directory:read`; all three are new in Bulwark 1.19. `getSelf().accountId` is the user's own JMAP account
