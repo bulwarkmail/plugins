@@ -5,6 +5,7 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { AssistantPanel } from '../src/ui/Panel.jsx';
 import { ContextChip, chipMinWidth, rowFit } from '../src/ui/panel/ContextChips.jsx';
+import { ActionsMenu } from '../src/ui/panel/ActionsMenu.jsx';
 import { allStrings } from '../src/lib/i18n.js';
 
 // The chip row under the input: the context chip and the Actions button
@@ -109,5 +110,48 @@ describe('the chip row in the panel', () => {
     } finally {
       env.restore();
     }
+  });
+});
+
+describe('the Actions menu in a narrow panel', () => {
+  // jsdom has no layout: place the menu where the browser put it in a 279 px frame, 7 px past the left edge.
+  function renderedMenu(left, right) {
+    const rect = Object.getOwnPropertyDescriptor(Element.prototype, 'getBoundingClientRect');
+    Element.prototype.getBoundingClientRect = function box() {
+      return this.getAttribute?.('role') === 'menu' ? { left, right, top: 0, bottom: 0, width: right - left, height: 0 } : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+    };
+    const inner = window.innerWidth;
+    window.innerWidth = 279;
+    return () => {
+      Object.defineProperty(Element.prototype, 'getBoundingClientRect', rect);
+      window.innerWidth = inner;
+    };
+  }
+
+  async function openMenu() {
+    render(React.createElement(ActionsMenu, { api: { i18n: { t: (k) => k } }, actions: ['summary'], actionLabel: (a) => a, onPick: () => {} }));
+    await act(async () => { screen.getByRole('button', { name: /panel.actions/ }).click(); });
+    return screen.getByRole('menu');
+  }
+
+  it('slides back inside the frame when it would start past the left edge', async () => {
+    const restore = renderedMenu(-7, 203);
+    try {
+      expect((await openMenu()).style.transform).toBe('translateX(15px)');
+    } finally { restore(); }
+  });
+
+  it('slides back when it would run past the right edge', async () => {
+    const restore = renderedMenu(80, 290);
+    try {
+      expect((await openMenu()).style.transform).toBe('translateX(-19px)');
+    } finally { restore(); }
+  });
+
+  it('stays put when it fits', async () => {
+    const restore = renderedMenu(40, 250);
+    try {
+      expect((await openMenu()).style.transform).toBe('');
+    } finally { restore(); }
   });
 });
