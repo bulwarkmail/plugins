@@ -77,6 +77,7 @@ describe('position', () => {
     expect(slotForPosition('Left sidebar')).toBe('sidebar-section');
     expect(slotForPosition(undefined)).toBe('sidebar-section');
     expect(slotForPosition('Top banner')).toBe('app-top-banner');
+    expect(slotForPosition('Side panel')).toBe('side-panel');
   });
 });
 
@@ -235,6 +236,22 @@ describe('reading pane and top banner', () => {
     const bar = document.querySelector('.bk-infobar');
     expect(bar.textContent.startsWith('Agenda')).toBe(true);
     expect(bar.querySelectorAll('span[title]')).toHaveLength(3);
+  });
+});
+
+describe('side panel', () => {
+  it('lists events without a duplicate heading since the host draws the panel header', async () => {
+    const { Agenda } = setup('side-panel');
+    await show(Agenda);
+    expect(screen.queryByRole('heading', { name: 'Agenda' })).toBeNull();
+    const lists = screen.getAllByRole('list');
+    expect(lists.map((l) => l.getAttribute('aria-label'))).toEqual(['Today', 'Tomorrow']);
+    const items = screen.getAllByRole('listitem');
+    expect(items.map((r) => r.textContent)).toEqual([
+      `Standup${clock(new Date(2026, 9, 14, 10, 0))} · Room 1`,
+      'OffsiteAll day',
+      `Dropped${clock(new Date(2026, 9, 15, 15, 30))}`,
+    ]);
   });
 });
 
