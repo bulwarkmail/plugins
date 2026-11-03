@@ -1,6 +1,7 @@
 {
   "files.quoted": "«{name}»",
   "files.mention.label": "الإشارة إلى رسالة أو جهة اتصال أو ملف",
+  "files.mention.label_files": "الإشارة إلى ملف",
   "files.step.find": "بحث عن ملفات: {query}",
   "files.step.find_any": "تصفّح ملفاتك",
   "files.step.list": "نظر في «{name}»",
@@ -21,7 +22,7 @@
   "files.action.rename": "إعادة تسمية «{name}» إلى «{next}»؟",
   "files.chip.file_name": "الملف {name} في {path}",
   "files.chip.folder_name": "المجلد {name} في {path}",
-  "files.privacy": "عندما يبحث في ملفاتك من أجلك، يرسل أسماء الملفات التي يعرضها ومسارات مجلداتها، ومحتوى الملفات التي يقرأها.",
+  "files.privacy": "عندما يبحث في ملفاتك من أجلك، يرسل أسماء الملفات التي يجدها ومسارات مجلداتها وأحجامها وتواريخها، ومن شارك ملفًا معك، ومحتوى الملفات التي يقرأها. تُرسل أيضًا الملفات التي تشير إليها بـ @.",
   "files.settings.title": "الملفات",
   "files.settings.hint": "ما يمكن للمساعد فعله في الملفات. لا يحذف ملفًا ولا يشاركه أبدًا.",
   "files.settings.read": "البحث عن الملفات وقراءتها",

@@ -1,6 +1,7 @@
 {
   "files.quoted": "„{name}“",
   "files.mention.label": "Zmínit zprávu, kontakt nebo soubor",
+  "files.mention.label_files": "Zmínit soubor",
   "files.step.find": "Hledal soubory: {query}",
   "files.step.find_any": "Prošel vaše soubory",
   "files.step.list": "Podíval se do „{name}“",
@@ -21,7 +22,7 @@
   "files.action.rename": "Přejmenovat „{name}“ na „{next}“?",
   "files.chip.file_name": "Soubor {name} v {path}",
   "files.chip.folder_name": "Složka {name} v {path}",
-  "files.privacy": "Když pro vás hledá ve vašich souborech, posílá názvy a cesty souborů, které vypíše, a obsah souborů, které přečte.",
+  "files.privacy": "Když pro vás hledá ve vašich souborech, posílá názvy, cesty, velikosti a data nalezených souborů, kdo s vámi soubor sdílel, a obsah souborů, které přečte. Soubory, které zmíníte pomocí @, jdou také.",
   "files.settings.title": "Soubory",
   "files.settings.hint": "Co smí asistent dělat v Souborech. Nikdy soubor nesmaže ani nesdílí.",
   "files.settings.read": "Hledat a číst soubory",

@@ -23,13 +23,16 @@ export const MAX_LISTED = 30;
 /**
  * What of the files area is on: the admin's switch, the user's switches
  * (prefs filesRead, filesWrite; on unless switched off) and whether this
- * webmail offers api.files. Pictures go to the model only when it can see
- * them and the user left "Look at images" on.
+ * webmail offers api.files. Pictures go to the model on the same terms the
+ * settings show for attachments' pictures: the admin left More context on,
+ * the user left "Read attachments" and "Look at images" on, and the model
+ * can see them.
  */
 export function filesFlags(api, { config = {}, prefs = {}, endpoint = null } = {}) {
   const on = areaAllowed(config, 'files') && has(api, 'files', 'files.find');
   const read = on && prefs.filesRead !== false;
-  const images = read && prefs.ctxImages !== false && typeof api?.files?.getImage === 'function' && canSeeImages(config, endpoint, prefs);
+  const images = read && areaAllowed(config, 'context') && prefs.ctxAttachments !== false && prefs.ctxImages !== false
+    && typeof api?.files?.getImage === 'function' && canSeeImages(config, endpoint, prefs);
   return {
     on,
     read,
@@ -78,12 +81,17 @@ function listText(list, head) {
 
 const isPicture = (f) => /^image\//i.test(f?.mimeType ?? '') || /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif|tiff?)$/i.test(f?.name ?? '');
 
-/** A file the model names by id: one the assistant has seen, else looked up again. */
-async function fileFor(api, id, what = 'file') {
+/**
+ * A file the model names by id. Actions take only ids a lookup returned or
+ * the user picked with @ in this chat (`seen`): Stalwart's ids are short
+ * and easy to guess. A read may look the id up again.
+ */
+async function fileFor(api, id, what = 'file', { lookUp = false } = {}) {
   const wanted = String(id ?? '').trim();
   if (!wanted) throw new Error(`give the ${what}'s id`);
   const hit = known(wanted);
   if (hit) return hit;
+  if (!lookUp) throw new Error(`no ${what} with id "${wanted}" was found in this chat: find it with find_file or list_folder first`);
   // Not seen in this chat: the newest files and the folders, once.
   const [recent, folders] = await Promise.all([
     Promise.resolve(api.files.find({ limit: 50 })).catch(() => []),
@@ -171,7 +179,7 @@ const tools = [
     },
     available: (ctx) => !!ctx.files?.flags?.read,
     run: async (api, args, ctx) => {
-      const file = await fileFor(api, args.id);
+      const file = await fileFor(api, args.id, 'file', { lookUp: true });
       if (file.kind === 'folder') throw new Error(`"${file.name}" is a folder: use list_folder`);
       const budget = budgetOf(ctx);
       if (isPicture(file)) return readPicture(api, file, args, ctx, budget);
@@ -245,14 +253,16 @@ function ownFile(file) {
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 const canAct = (ctx) => !!ctx.actions && ctx.actions !== 'off';
 
-/** Recipients of the open draft, as the user sees them; [] when they can't be read. */
+/** Recipients of the open draft, as the user sees them. Throws when they can't be read: the card must not claim there are none. */
 async function draftRecipients(api, composerId) {
+  let snap;
   try {
-    const snap = await api.composer.getSnapshot(composerId);
-    return [...(snap?.to ?? []), ...(snap?.cc ?? []), ...(snap?.bcc ?? [])].map(String).filter(Boolean);
+    snap = await api.composer.getSnapshot(composerId);
   } catch {
-    return [];
+    throw new Error('couldn\'t read the draft\'s recipients, so nothing was attached; try again');
   }
+  if (!snap) throw new Error('couldn\'t read the draft\'s recipients, so nothing was attached; try again');
+  return [...(snap.to ?? []), ...(snap.cc ?? []), ...(snap.bcc ?? [])].map(String).filter(Boolean);
 }
 
 const NAME_FORMATS = { markdown: { type: 'text/markdown', ext: '.md' }, text: { type: 'text/plain', ext: '.txt' } };

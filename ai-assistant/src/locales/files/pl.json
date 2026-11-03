@@ -1,6 +1,7 @@
 {
   "files.quoted": "„{name}”",
   "files.mention.label": "Wspomnij wiadomość, kontakt lub plik",
+  "files.mention.label_files": "Wspomnij plik",
   "files.step.find": "Szukano plików: {query}",
   "files.step.find_any": "Przejrzano Twoje pliki",
   "files.step.list": "Zajrzano do „{name}”",
@@ -21,7 +22,7 @@
   "files.action.rename": "Zmienić nazwę „{name}” na „{next}”?",
   "files.chip.file_name": "Plik {name} w {path}",
   "files.chip.folder_name": "Folder {name} w {path}",
-  "files.privacy": "Gdy przegląda dla Ciebie Twoje pliki, wysyła nazwy i ścieżki plików, które wymienia, oraz zawartość plików, które czyta.",
+  "files.privacy": "Gdy przegląda dla Ciebie Twoje pliki, wysyła nazwy, ścieżki, rozmiary i daty znalezionych plików, informację, kto udostępnił Ci plik, oraz zawartość plików, które czyta. Pliki wspomniane przez @ też są wysyłane.",
   "files.settings.title": "Pliki",
   "files.settings.hint": "Co asystent może robić w Plikach. Nigdy nie usuwa ani nie udostępnia pliku.",
   "files.settings.read": "Wyszukiwanie i czytanie plików",

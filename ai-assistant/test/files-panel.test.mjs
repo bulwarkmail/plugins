@@ -97,7 +97,7 @@ describe('files in the chat', () => {
     await type('hi');
     await key('Enter');
     const notice = (await screen.findByText(/sends your request to Anthropic/)).textContent;
-    expect(notice).toContain('the names and folder paths of the files it lists and the contents of the files it reads');
+    expect(notice).toContain('the names, folder paths, sizes and dates of the files it finds, who shared a file with you, and the contents of the files it reads');
   });
 });
 
@@ -124,5 +124,40 @@ describe('the Files settings', () => {
     cleanup();
     await show({ ...CONFIG, allowFiles: false });
     expect(screen.queryByRole('switch', { name: 'Find and read files' })).toBeNull();
+  });
+});
+
+
+describe('the review fixes in the panel', () => {
+  // Without More context there is no @ menu to join: Files offers its own.
+  it('has an @ menu of its own when the admin switched More context off', async () => {
+    const api = makeApi({ config: { ...CONFIG, allowContext: false } });
+    await mount(api);
+    await type('@quarter');
+    const list = await screen.findByRole('listbox', { name: 'Mention a file' });
+    expect(list).toBeTruthy();
+    expect(screen.getByRole('option').textContent).toBe('Quarter notes.md/Documents');
+    await key('Enter');
+    expect(screen.getByRole('group', { name: 'File Quarter notes.md in /Documents' })).toBeTruthy();
+    expect(api.calls('email.search')).toHaveLength(0);
+  });
+
+  it('names pictures in the notice once, and not when reading attachments is off', async () => {
+    const api = makeApi({ consent: false, hostFeatures: { files: true, attachmentImages: true, attachmentText: true } });
+    await mount(api);
+    await type('hi');
+    await key('Enter');
+    const notice = (await screen.findByText(/sends your request to Anthropic/)).textContent;
+    expect(notice).toContain('who shared a file with you');
+    expect(notice).toContain('Files you mention with @ go along too.');
+    expect(notice.split('Pictures it looks at go along as images.').length - 1).toBe(1);
+    cleanup();
+    const off = makeApi({ consent: false, hostFeatures: { files: true } });
+    await off.storage.set('prefs', { ctxAttachments: false });
+    await mount(off);
+    await type('hi');
+    await key('Enter');
+    const quiet = (await screen.findByText(/sends your request to Anthropic/)).textContent;
+    expect(quiet).not.toContain('Pictures it looks at');
   });
 });

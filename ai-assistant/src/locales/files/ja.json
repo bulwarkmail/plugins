@@ -1,6 +1,7 @@
 {
   "files.quoted": "「{name}」",
   "files.mention.label": "メッセージ、連絡先、ファイルを挙げる",
+  "files.mention.label_files": "ファイルを挙げる",
   "files.step.find": "ファイルを検索: {query}",
   "files.step.find_any": "ファイルを確認しました",
   "files.step.list": "「{name}」の中を確認しました",
@@ -21,7 +22,7 @@
   "files.action.rename": "「{name}」の名前を「{next}」に変更しますか？",
   "files.chip.file_name": "{path} のファイル {name}",
   "files.chip.folder_name": "{path} のフォルダー {name}",
-  "files.privacy": "あなたの代わりにファイルを探すとき、一覧にしたファイルの名前とフォルダーの場所、読んだファイルの内容を送信します。",
+  "files.privacy": "あなたの代わりにファイルを探すとき、見つけたファイルの名前、フォルダーの場所、サイズ、日付、ファイルを共有した人、読んだファイルの内容を送信します。@ で挙げたファイルも送信されます。",
   "files.settings.title": "ファイル",
   "files.settings.hint": "アシスタントがファイルでできること。ファイルを削除したり共有したりすることはありません。",
   "files.settings.read": "ファイルを探して読む",

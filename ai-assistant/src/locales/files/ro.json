@@ -1,6 +1,7 @@
 {
   "files.quoted": "„{name}”",
   "files.mention.label": "Menționează un mesaj, un contact sau un fișier",
+  "files.mention.label_files": "Menționează un fișier",
   "files.step.find": "A căutat fișiere: {query}",
   "files.step.find_any": "A răsfoit fișierele dvs.",
   "files.step.list": "S-a uitat în „{name}”",
@@ -21,7 +22,7 @@
   "files.action.rename": "Redenumiți „{name}” în „{next}”?",
   "files.chip.file_name": "Fișierul {name} în {path}",
   "files.chip.folder_name": "Dosarul {name} în {path}",
-  "files.privacy": "Când caută în fișierele dvs. pentru dvs., trimite numele și căile fișierelor pe care le listează și conținutul fișierelor pe care le citește.",
+  "files.privacy": "Când caută în fișierele dvs. pentru dvs., trimite numele, căile, dimensiunile și datele fișierelor găsite, cine v-a partajat un fișier și conținutul fișierelor pe care le citește. Fișierele pe care le menționați cu @ sunt trimise și ele.",
   "files.settings.title": "Fișiere",
   "files.settings.hint": "Ce poate face asistentul în Fișiere. Nu șterge și nu partajează niciodată un fișier.",
   "files.settings.read": "Găsește și citește fișiere",

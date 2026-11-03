@@ -1,6 +1,7 @@
 {
   "files.quoted": "“{name}”",
   "files.mention.label": "提及邮件、联系人或文件",
+  "files.mention.label_files": "提及文件",
   "files.step.find": "查找文件：{query}",
   "files.step.find_any": "浏览了你的文件",
   "files.step.list": "查看了“{name}”",
@@ -21,7 +22,7 @@
   "files.action.rename": "把“{name}”重命名为“{next}”？",
   "files.chip.file_name": "{path} 中的文件 {name}",
   "files.chip.folder_name": "{path} 中的文件夹 {name}",
-  "files.privacy": "当它替你查看文件时，会发送它列出的文件的名称和文件夹路径，以及它读取的文件的内容。",
+  "files.privacy": "当它替你查看文件时，会发送它找到的文件的名称、文件夹路径、大小和日期，谁与你共享了文件，以及它读取的文件的内容。你用 @ 提及的文件也会一并发送。",
   "files.settings.title": "文件",
   "files.settings.hint": "助手在文件中可以做的事。它绝不会删除或共享文件。",
   "files.settings.read": "查找和读取文件",

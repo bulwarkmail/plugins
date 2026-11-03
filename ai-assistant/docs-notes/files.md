@@ -21,7 +21,8 @@ file from being deleted."
 There is no call that deletes a file, shares it, makes a public link or
 moves it to another account. Writes go only into the user's own drive
 and never into, out of or inside a folder that is shared with others
-(`shareWith` on it or a folder above it); files in drives others shared
+(`shareWith` on it or a folder above it, and refused as well when a
+folder above it is missing from the listing); files in drives others shared
 with the user can be found, read and attached, never changed. The Files
 trash (`.Trash`) is never listed and can't be written into.
 
@@ -29,7 +30,9 @@ Writes run the same plugin hooks as the Files app: `onBeforeFileUpload`
 (create, replace, saveAttachments), `onBeforeFileMove`,
 `onBeforeFileRename` can stop them ("files.x: another plugin stopped
 this"); `onAfterFileUpload`, `onDirectoryCreate`, `onFileMove`,
-`onFileRename` report them. An open Files view refreshes after a change.
+`onFileRename` report them (`onFileMove` with the item as it was and
+its old path, as the Files app does). Every write counts against the 20 a
+minute, refused ones too. An open Files view refreshes after a change.
 
 ### FileInfo
 
@@ -64,7 +67,8 @@ this"); `onAfterFileUpload`, `onDirectoryCreate`, `onFileMove`,
 
 ### api.files.getText(fileId, { maxChars? })
 
-- `files:read`, 30 a minute. Same answer and limits as
+- `files:read`, 30 a minute. The download stops past 20 MB (the listed
+  size may be wrong): `too_big`. Same answer and limits as
   `email.getAttachmentText`: `{ name, type, size, format, status, text, truncated, pages?, sheets? }`.
   Files of others' drives are read from their owner's account.
 
@@ -80,8 +84,11 @@ this"); `onAfterFileUpload`, `onDirectoryCreate`, `onFileMove`,
   `{ newDraft: { to?, subject?, body? } }` (goes through `compose.open`:
   its address checks, 5 a minute, and it asks before replacing an open
   draft). At most 20 files; folders are refused.
-- Attaches by blob: no download, no upload. The composer's own checks
-  run (the size limit, `onBeforeAttachmentUpload`). A file of the user's
+- Attaches by blob: no download, no upload. Each file passes
+  `onBeforeAttachmentUpload` and the server's limit for all attachments
+  of a message (the open composer checks them; for a new draft the host
+  checks them before `compose.open`); refused files are listed in
+  `refused`, and with none left no draft opens. A file of the user's
   Files keeps the login that holds it, so a draft sent from another login
   copies it over first.
 - Returns `{ attached: string[], refused: string[] }` (file names).
@@ -110,7 +117,8 @@ this"); `onAfterFileUpload`, `onDirectoryCreate`, `onFileMove`,
   user's own drive. The old version goes into the Files trash first (a
   copy pointing at the old content, in a trash folder of its own), where
   Restore in Files brings it back next to the new one. Other kinds of
-  files are refused.
+  files are refused. When the server refuses the new content, the copy
+  is taken out of the trash again.
 - Returns `{ file: FileInfo, kept?: { trashFolder, name } }`.
 
 ### api.files.createFolder({ parentId?, name })
@@ -144,7 +152,8 @@ question needs it: find files and folders by name, kind or date, list a
 folder, and read a file (PDF, Word, Excel, PowerPoint, OpenDocument,
 text) or look at a picture. It sees your own files and the ones others
 shared with you, never the Files trash. Type `@` and part of a name to
-add a file to the chat.
+add a file to the chat (also when the administrator switched More
+context off).
 
 With actions on it can also attach files to the message you write or to
 a new one (always asks first and lists the files and recipients), save
@@ -156,9 +165,13 @@ changes your own files, never a shared folder, and it can't delete or
 share a file.
 
 What goes to the AI service: the names, folder paths, kinds, sizes and
-dates of the files and folders a search or folder list finds, and the
-contents of the files it reads (pictures as images when the model can see
-them, else only the name). Names of files it saves, creates, moves or
+dates of the files and folders a search or folder list finds, whose
+drive a shared file is in, the same for files mentioned with @, and the
+contents of the files it reads. Pictures go as images only when the model
+can see them and Read attachments and Look at images are on (else only
+the name); a photo's date and place only with Send a photo's date and
+place. The assistant acts only on files it found or you mentioned in the
+same chat. Names of files it saves, creates, moves or
 renames. Everything one request reads shares the 60,000-character and
 8-picture limit with attachments.
 

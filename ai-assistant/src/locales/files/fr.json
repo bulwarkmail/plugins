@@ -1,6 +1,7 @@
 {
   "files.quoted": "« {name} »",
   "files.mention.label": "Mentionner un message, un contact ou un fichier",
+  "files.mention.label_files": "Mentionner un fichier",
   "files.step.find": "Fichiers cherchés : {query}",
   "files.step.find_any": "Vos fichiers parcourus",
   "files.step.list": "Contenu de « {name} » regardé",
@@ -21,7 +22,7 @@
   "files.action.rename": "Renommer « {name} » en « {next} » ?",
   "files.chip.file_name": "Fichier {name} dans {path}",
   "files.chip.folder_name": "Dossier {name} dans {path}",
-  "files.privacy": "Quand il regarde dans vos fichiers pour vous, il envoie les noms et chemins des fichiers qu'il liste et le contenu des fichiers qu'il lit.",
+  "files.privacy": "Quand il regarde dans vos fichiers pour vous, il envoie les noms, chemins, tailles et dates des fichiers trouvés, qui a partagé un fichier avec vous, et le contenu des fichiers qu'il lit. Les fichiers que vous mentionnez avec @ sont aussi envoyés.",
   "files.settings.title": "Fichiers",
   "files.settings.hint": "Ce que l'assistant peut faire dans Fichiers. Il ne supprime ni ne partage jamais un fichier.",
   "files.settings.read": "Trouver et lire des fichiers",

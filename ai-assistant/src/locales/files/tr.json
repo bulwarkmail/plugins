@@ -1,6 +1,7 @@
 {
   "files.quoted": "“{name}”",
   "files.mention.label": "Bir ileti, kişi veya dosya anın",
+  "files.mention.label_files": "Bir dosya anın",
   "files.step.find": "Dosya arandı: {query}",
   "files.step.find_any": "Dosyalarınıza bakıldı",
   "files.step.list": "“{name}” içine bakıldı",
@@ -21,7 +22,7 @@
   "files.action.rename": "“{name}” adı “{next}” olarak değiştirilsin mi?",
   "files.chip.file_name": "{path} içindeki {name} dosyası",
   "files.chip.folder_name": "{path} içindeki {name} klasörü",
-  "files.privacy": "Sizin için dosyalarınıza baktığında, listelediği dosyaların adlarını ve klasör yollarını ve okuduğu dosyaların içeriğini gönderir.",
+  "files.privacy": "Sizin için dosyalarınıza baktığında bulduğu dosyaların adlarını, klasör yollarını, boyutlarını ve tarihlerini, bir dosyayı sizinle kimin paylaştığını ve okuduğu dosyaların içeriğini gönderir. @ ile andığınız dosyalar da gönderilir.",
   "files.settings.title": "Dosyalar",
   "files.settings.hint": "Asistanın Dosyalar'da neler yapabileceği. Hiçbir zaman dosya silmez veya paylaşmaz.",
   "files.settings.read": "Dosya bulma ve okuma",

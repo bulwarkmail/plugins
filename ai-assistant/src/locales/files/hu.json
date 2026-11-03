@@ -1,6 +1,7 @@
 {
   "files.quoted": "„{name}”",
   "files.mention.label": "Üzenet, névjegy vagy fájl említése",
+  "files.mention.label_files": "Fájl említése",
   "files.step.find": "Fájlok keresése: {query}",
   "files.step.find_any": "Átnézte a fájljaidat",
   "files.step.list": "Belenézett ebbe: „{name}”",
@@ -21,7 +22,7 @@
   "files.action.rename": "Átnevezed: „{name}” → „{next}”?",
   "files.chip.file_name": "Fájl: {name}, helye: {path}",
   "files.chip.folder_name": "Mappa: {name}, helye: {path}",
-  "files.privacy": "Amikor a fájljaid között keres neked, elküldi a felsorolt fájlok nevét és mappaútvonalát, és az elolvasott fájlok tartalmát.",
+  "files.privacy": "Amikor a fájljaid között keres neked, elküldi a talált fájlok nevét, mappaútvonalát, méretét és dátumát, azt, hogy ki osztott meg veled egy fájlt, és az elolvasott fájlok tartalmát. A @-tal említett fájlok is mennek.",
   "files.settings.title": "Fájlok",
   "files.settings.hint": "Mit tehet az asszisztens a Fájlokban. Soha nem töröl és nem oszt meg fájlt.",
   "files.settings.read": "Fájlok keresése és olvasása",

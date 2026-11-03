@@ -1,6 +1,7 @@
 {
   "files.quoted": "«{name}»",
   "files.mention.label": "Mencionar uma mensagem, um contacto ou um ficheiro",
+  "files.mention.label_files": "Mencionar um ficheiro",
   "files.step.find": "Ficheiros procurados: {query}",
   "files.step.find_any": "Os seus ficheiros percorridos",
   "files.step.list": "Visto o conteúdo de «{name}»",
@@ -21,7 +22,7 @@
   "files.action.rename": "Mudar o nome de «{name}» para «{next}»?",
   "files.chip.file_name": "Ficheiro {name} em {path}",
   "files.chip.folder_name": "Pasta {name} em {path}",
-  "files.privacy": "Quando procura nos seus ficheiros por si, envia os nomes e caminhos dos ficheiros que lista e o conteúdo dos ficheiros que lê.",
+  "files.privacy": "Quando procura nos seus ficheiros por si, envia os nomes, caminhos, tamanhos e datas dos ficheiros que encontra, quem partilhou um ficheiro consigo e o conteúdo dos ficheiros que lê. Os ficheiros que menciona com @ também vão.",
   "files.settings.title": "Ficheiros",
   "files.settings.hint": "O que o assistente pode fazer em Ficheiros. Nunca elimina nem partilha um ficheiro.",
   "files.settings.read": "Encontrar e ler ficheiros",

@@ -1,6 +1,7 @@
 {
   "files.quoted": "«{name}»",
   "files.mention.label": "Menziona un messaggio, un contatto o un file",
+  "files.mention.label_files": "Menziona un file",
   "files.step.find": "File cercati: {query}",
   "files.step.find_any": "Esaminati i tuoi file",
   "files.step.list": "Guardato in «{name}»",
@@ -21,7 +22,7 @@
   "files.action.rename": "Rinominare «{name}» in «{next}»?",
   "files.chip.file_name": "File {name} in {path}",
   "files.chip.folder_name": "Cartella {name} in {path}",
-  "files.privacy": "Quando cerca nei tuoi file per te, invia i nomi e i percorsi dei file che elenca e il contenuto dei file che legge.",
+  "files.privacy": "Quando cerca nei tuoi file per te, invia nomi, percorsi, dimensioni e date dei file che trova, chi ha condiviso un file con te e il contenuto dei file che legge. Anche i file che menzioni con @ vengono inviati.",
   "files.settings.title": "File",
   "files.settings.hint": "Cosa può fare l'assistente in File. Non elimina né condivide mai un file.",
   "files.settings.read": "Trovare e leggere file",

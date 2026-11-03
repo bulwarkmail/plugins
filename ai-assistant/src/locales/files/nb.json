@@ -1,6 +1,7 @@
 {
   "files.quoted": "«{name}»",
   "files.mention.label": "Nevn en melding, en kontakt eller en fil",
+  "files.mention.label_files": "Nevn en fil",
   "files.step.find": "Søkte etter filer: {query}",
   "files.step.find_any": "Gikk gjennom filene dine",
   "files.step.list": "Så i «{name}»",
@@ -21,7 +22,7 @@
   "files.action.rename": "Gi «{name}» det nye navnet «{next}»?",
   "files.chip.file_name": "Filen {name} i {path}",
   "files.chip.folder_name": "Mappen {name} i {path}",
-  "files.privacy": "Når den ser i filene dine for deg, sender den navn og mappestier for filene den viser, og innholdet i filene den leser.",
+  "files.privacy": "Når den ser i filene dine for deg, sender den navn, mappestier, størrelser og datoer for filene den finner, hvem som har delt en fil med deg, og innholdet i filene den leser. Filer du nevner med @, blir også sendt.",
   "files.settings.title": "Filer",
   "files.settings.hint": "Hva assistenten kan gjøre i Filer. Den sletter og deler aldri en fil.",
   "files.settings.read": "Finne og lese filer",

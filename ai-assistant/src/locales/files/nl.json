@@ -1,6 +1,7 @@
 {
   "files.quoted": "‘{name}’",
   "files.mention.label": "Een bericht, contact of bestand noemen",
+  "files.mention.label_files": "Een bestand noemen",
   "files.step.find": "Bestanden gezocht: {query}",
   "files.step.find_any": "Je bestanden doorzocht",
   "files.step.list": "In ‘{name}’ gekeken",
@@ -21,7 +22,7 @@
   "files.action.rename": "‘{name}’ hernoemen naar ‘{next}’?",
   "files.chip.file_name": "Bestand {name} in {path}",
   "files.chip.folder_name": "Map {name} in {path}",
-  "files.privacy": "Als hij voor je in je bestanden kijkt, stuurt hij de namen en mappaden van de bestanden die hij opsomt en de inhoud van de bestanden die hij leest mee.",
+  "files.privacy": "Als hij voor je in je bestanden kijkt, stuurt hij de namen, mappaden, groottes en datums van de gevonden bestanden mee, wie een bestand met je heeft gedeeld en de inhoud van de bestanden die hij leest. Bestanden die je met @ noemt, gaan ook mee.",
   "files.settings.title": "Bestanden",
   "files.settings.hint": "Wat de assistent in Bestanden mag doen. Hij verwijdert of deelt nooit een bestand.",
   "files.settings.read": "Bestanden zoeken en lezen",

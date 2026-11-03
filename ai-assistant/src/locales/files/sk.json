@@ -1,6 +1,7 @@
 {
   "files.quoted": "„{name}“",
   "files.mention.label": "Spomenúť správu, kontakt alebo súbor",
+  "files.mention.label_files": "Spomenúť súbor",
   "files.step.find": "Hľadal súbory: {query}",
   "files.step.find_any": "Prezrel vaše súbory",
   "files.step.list": "Pozrel sa do „{name}“",
@@ -21,7 +22,7 @@
   "files.action.rename": "Premenovať „{name}“ na „{next}“?",
   "files.chip.file_name": "Súbor {name} v {path}",
   "files.chip.folder_name": "Priečinok {name} v {path}",
-  "files.privacy": "Keď pre vás hľadá vo vašich súboroch, posiela názvy a cesty súborov, ktoré vypíše, a obsah súborov, ktoré prečíta.",
+  "files.privacy": "Keď pre vás hľadá vo vašich súboroch, posiela názvy, cesty, veľkosti a dátumy nájdených súborov, kto s vami súbor zdieľal, a obsah súborov, ktoré prečíta. Súbory, ktoré spomeniete pomocou @, idú tiež.",
   "files.settings.title": "Súbory",
   "files.settings.hint": "Čo smie asistent robiť v Súboroch. Nikdy súbor neodstráni ani nezdieľa.",
   "files.settings.read": "Hľadať a čítať súbory",

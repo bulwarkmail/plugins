@@ -1,16 +1,18 @@
 // Area "files" of the 2.2 work: what it adds to the panel (shapes in README.md).
 //
-// Files the user mentioned with @ (the context area's menu lists them next
-// to messages and contacts) become chips; the model gets their ids and
-// reads them with read_file. The lookups and actions are in
-// src/lib/areas/files.js; this hook tells them what is on and where the
-// open draft is, and adds the privacy sentence.
+// Files the user mentioned with @ become chips; the model gets their ids
+// and reads them with read_file. The context area's @ menu lists files
+// next to messages and contacts; when the administrator switched that area
+// off, this hook offers an @ menu of its own for files. The lookups and
+// actions are in src/lib/areas/files.js; this hook tells them what is on
+// and where the open draft is, and adds the privacy sentences.
 
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { filesFlags, fileLine, remember } from '../../../lib/areas/files.js';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { filesFlags, fileLine, forgetSeen, remember } from '../../../lib/areas/files.js';
+import { areaAllowed } from '../../../lib/config.js';
 import { excerpt } from '../model.js';
 
-// ─── The files mentioned in this chat (picked in the context area's @ menu) ───
+// ─── The files mentioned in this chat (picked in an @ menu) ───
 
 let mentioned = [];
 const listeners = new Set();
@@ -60,10 +62,30 @@ export async function fileMentionItems(api, query, { config = {}, prefs = {} } =
 
 export function useArea(chat, props = {}) {
   const { api, t, mode, setup, prefs, key } = chat;
-  const flags = useMemo(() => filesFlags(api, { config: setup?.config ?? {}, prefs, endpoint: setup?.endpoint ?? null }), [api, setup, prefs]);
+  const config = setup?.config ?? {};
+  const flags = useMemo(() => filesFlags(api, { config, prefs, endpoint: setup?.endpoint ?? null }), [api, config, setup, prefs]);
   const files = useSyncExternalStore(subscribe, snapshot, snapshot);
-  useEffect(() => { clearFileMentions(); }, [key]);
+  // A new chat starts with no file ids the actions accept: another chat (key) also drops the mentions;
+  // "New chat" (the turns emptied) keeps the files mentioned for the next request.
+  useEffect(() => { clearFileMentions(); forgetSeen(); }, [key]);
+  const hasTurns = (chat.turns?.length ?? 0) > 0;
+  const hadTurns = useRef(hasTurns);
+  useEffect(() => {
+    if (hadTurns.current && !hasTurns) {
+      forgetSeen();
+      remember(mentioned);
+    }
+    hadTurns.current = hasTurns;
+  }, [hasTurns]);
   const remove = useCallback((id) => dropFileMention(id), []);
+  // Without the context area there is no @ menu to join: files get one of their own.
+  const ownMenu = flags.read && !areaAllowed(config, 'context');
+  const menus = useMemo(() => (ownMenu ? [{
+    trigger: '@',
+    label: t('files.mention.label_files'),
+    items: (query) => fileMentionItems(api, query, { config, prefs }),
+    onPick: (item) => { if (item.file) pickFileMention(item.file); },
+  }] : []), [ownMenu, api, t, config, prefs]);
 
   if (!flags.on) return { privacyParts: [] };
 
@@ -92,8 +114,11 @@ export function useArea(chat, props = {}) {
     },
   };
 
+  // The notice names what can go along; the picture sentences are the context area's (the same switches).
   const privacyParts = [];
   if (flags.read || flags.write) privacyParts.push('files.privacy');
+  if (flags.images) privacyParts.push('ctx.privacy.images');
+  if (flags.photoDetails) privacyParts.push('ctx.privacy.photo_details');
 
-  return { chips, promptBlocks, toolsCtx, privacyParts };
+  return { chips, promptBlocks, toolsCtx, menus, privacyParts };
 }

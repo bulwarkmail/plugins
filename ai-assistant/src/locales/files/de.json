@@ -1,6 +1,7 @@
 {
   "files.quoted": "„{name}“",
   "files.mention.label": "Nachricht, Kontakt oder Datei erwähnen",
+  "files.mention.label_files": "Datei erwähnen",
   "files.step.find": "Dateien gesucht: {query}",
   "files.step.find_any": "Ihre Dateien durchsucht",
   "files.step.list": "In „{name}“ nachgesehen",
@@ -21,7 +22,7 @@
   "files.action.rename": "„{name}“ in „{next}“ umbenennen?",
   "files.chip.file_name": "Datei {name} in {path}",
   "files.chip.folder_name": "Ordner {name} in {path}",
-  "files.privacy": "Wenn er für Sie in Ihren Dateien nachsieht, sendet er Namen und Ordnerpfade der Dateien, die er auflistet, und den Inhalt der Dateien, die er liest.",
+  "files.privacy": "Wenn er für Sie in Ihren Dateien nachsieht, sendet er Namen, Ordnerpfade, Größen und Daten der gefundenen Dateien, wer eine Datei mit Ihnen geteilt hat, und den Inhalt der Dateien, die er liest. Dateien, die Sie mit @ erwähnen, gehen ebenfalls mit.",
   "files.settings.title": "Dateien",
   "files.settings.hint": "Was der Assistent in Dateien tun darf. Er löscht und teilt nie eine Datei.",
   "files.settings.read": "Dateien finden und lesen",

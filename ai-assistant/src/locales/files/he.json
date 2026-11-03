@@ -1,6 +1,7 @@
 {
   "files.quoted": "\"{name}\"",
   "files.mention.label": "אזכור הודעה, איש קשר או קובץ",
+  "files.mention.label_files": "אזכור קובץ",
   "files.step.find": "חיפש קבצים: {query}",
   "files.step.find_any": "עבר על הקבצים שלך",
   "files.step.list": "הסתכל ב-\"{name}\"",
@@ -21,7 +22,7 @@
   "files.action.rename": "לשנות את השם של \"{name}\" ל-\"{next}\"?",
   "files.chip.file_name": "הקובץ {name} ב-{path}",
   "files.chip.folder_name": "התיקייה {name} ב-{path}",
-  "files.privacy": "כשהוא מחפש בקבצים שלך עבורך, הוא שולח את השמות ונתיבי התיקיות של הקבצים שהוא מציג ואת התוכן של הקבצים שהוא קורא.",
+  "files.privacy": "כשהוא מחפש בקבצים שלך עבורך, הוא שולח את השמות, נתיבי התיקיות, הגדלים והתאריכים של הקבצים שהוא מוצא, מי שיתף איתך קובץ, ואת התוכן של הקבצים שהוא קורא. גם קבצים שתזכיר עם @ נשלחים.",
   "files.settings.title": "קבצים",
   "files.settings.hint": "מה העוזר רשאי לעשות בקבצים. הוא אף פעם לא מוחק או משתף קובץ.",
   "files.settings.read": "מציאה וקריאה של קבצים",

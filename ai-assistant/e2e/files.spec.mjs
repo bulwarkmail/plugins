@@ -99,7 +99,7 @@ test('a file found in Files is read, attached to a reply, and a note is created 
       { text: 'Attached the budget and wrote the minutes.' },
     ]);
     await ask(frame, `[[mock:files-attach-${RUN}]] Find my budget file, attach it and note it in my notes folder.`);
-    await acceptPrivacy(page, { frame, expectText: 'the names and folder paths of the files it lists' });
+    await acceptPrivacy(page, { frame, expectText: 'the names, folder paths, sizes and dates of the files it finds' });
 
     // Attaching always asks, naming the file and who gets it.
     const attach = card(frame, `Attach “${BUDGET}” to your message to`);

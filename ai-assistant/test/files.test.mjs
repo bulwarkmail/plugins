@@ -199,3 +199,40 @@ describe('the actions', () => {
     expect(api.calls('files.saveAttachments').at(-1).args).toEqual(['M1', ['b1'], 'docs', undefined]);
   });
 });
+
+
+describe('the review fixes', () => {
+  const endpoint = { provider: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'm' };
+
+  // The settings show pictures and the photo's date and place off when
+  // reading attachments is off or the admin switched More context off.
+  it('sends pictures and photo details only on the terms the settings show', () => {
+    const on = { ctxPhotoDetails: true };
+    expect(filesFlags(makeApi(), { endpoint, prefs: on })).toMatchObject({ images: true, photoDetails: true });
+    expect(filesFlags(makeApi(), { endpoint, prefs: { ...on, ctxAttachments: false } })).toMatchObject({ read: true, images: false, photoDetails: false });
+    expect(filesFlags(makeApi(), { endpoint, prefs: on, config: { allowContext: false } })).toMatchObject({ read: true, images: false, photoDetails: false });
+  });
+
+  it('won\'t attach to the open draft when its recipients can\'t be read', async () => {
+    const api = makeApi({ 'composer.getSnapshot': async () => { throw new Error('gone'); } });
+    await runTool(api, 'find_file', {}, ctxWith());
+    const ctx = ctxWith({ mode: 'composer', files: { flags: ON, composerId: 'C1', mentioned: [] } });
+    await expect(describeAction(api, 'attach_file', { ids: ['n1'] }, ctx)).rejects.toThrow(/couldn't read the draft's recipients/);
+    expect(api.calls('files.attach')).toHaveLength(0);
+  });
+
+  // Stalwart's ids are short: an action takes only ids this chat found or the user picked.
+  it('acts only on files a lookup returned in this chat, while a read may look the id up', async () => {
+    const api = makeApi({ 'files.attach': async () => ({ attached: ['notes.md'], refused: [] }) });
+    await expect(describeAction(api, 'attach_file', { ids: ['n1'], to: ['bob@example.org'] }, ctxWith())).rejects.toThrow(/find it with find_file/);
+    await expect(describeAction(api, 'move_file', { id: 'n1' }, ctxWith())).rejects.toThrow(/find it with find_file/);
+    await expect(describeAction(api, 'create_file', { replaceId: 'n1', content: 'x' }, ctxWith())).rejects.toThrow(/find it with find_file/);
+    expect(api.calls('files.find')).toHaveLength(0);
+    // A read may look it up again.
+    expect(await runTool(api, 'read_file', { id: 'n1' }, ctxWith())).toContain('<file name="notes.md"');
+    // Now it was found in this chat; a new chat forgets it again.
+    await expect(describeAction(api, 'move_file', { id: 'n1' }, ctxWith())).resolves.toBeTruthy();
+    forgetSeen();
+    await expect(describeAction(api, 'move_file', { id: 'n1' }, ctxWith())).rejects.toThrow(/find it with find_file/);
+  });
+});

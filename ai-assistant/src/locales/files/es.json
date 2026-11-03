@@ -1,6 +1,7 @@
 {
   "files.quoted": "«{name}»",
   "files.mention.label": "Mencionar un mensaje, un contacto o un archivo",
+  "files.mention.label_files": "Mencionar un archivo",
   "files.step.find": "Archivos buscados: {query}",
   "files.step.find_any": "Tus archivos revisados",
   "files.step.list": "Contenido de «{name}» revisado",
@@ -21,7 +22,7 @@
   "files.action.rename": "¿Cambiar el nombre de «{name}» a «{next}»?",
   "files.chip.file_name": "Archivo {name} en {path}",
   "files.chip.folder_name": "Carpeta {name} en {path}",
-  "files.privacy": "Cuando busca en tus archivos por ti, envía los nombres y rutas de los archivos que lista y el contenido de los archivos que lee.",
+  "files.privacy": "Cuando busca en tus archivos por ti, envía los nombres, rutas, tamaños y fechas de los archivos que encuentra, quién compartió un archivo contigo y el contenido de los archivos que lee. Los archivos que mencionas con @ también se envían.",
   "files.settings.title": "Archivos",
   "files.settings.hint": "Lo que el asistente puede hacer en Archivos. Nunca elimina ni comparte un archivo.",
   "files.settings.read": "Buscar y leer archivos",

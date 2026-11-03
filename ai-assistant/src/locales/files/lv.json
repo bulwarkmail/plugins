@@ -1,6 +1,7 @@
 {
   "files.quoted": "“{name}”",
   "files.mention.label": "Pieminēt ziņojumu, kontaktu vai failu",
+  "files.mention.label_files": "Pieminēt failu",
   "files.step.find": "Meklēja failus: {query}",
   "files.step.find_any": "Pārskatīja jūsu failus",
   "files.step.list": "Ieskatījās “{name}”",
@@ -21,7 +22,7 @@
   "files.action.rename": "Pārdēvēt “{name}” par “{next}”?",
   "files.chip.file_name": "Fails {name} vietā {path}",
   "files.chip.folder_name": "Mape {name} vietā {path}",
-  "files.privacy": "Kad tas jūsu vietā meklē jūsu failos, tas nosūta uzskaitīto failu nosaukumus un mapju ceļus un izlasīto failu saturu.",
+  "files.privacy": "Kad tas jūsu vietā meklē jūsu failos, tas nosūta atrasto failu nosaukumus, mapju ceļus, izmērus un datumus, kas ar jums kopīgoja failu, un izlasīto failu saturu. Arī faili, ko pieminat ar @, tiek nosūtīti.",
   "files.settings.title": "Faili",
   "files.settings.hint": "Ko asistents drīkst darīt sadaļā Faili. Tas nekad nedzēš un nekopīgo failus.",
   "files.settings.read": "Atrast un lasīt failus",

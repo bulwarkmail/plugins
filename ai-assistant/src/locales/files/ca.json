@@ -1,6 +1,7 @@
 {
   "files.quoted": "«{name}»",
   "files.mention.label": "Esmentar un missatge, un contacte o un fitxer",
+  "files.mention.label_files": "Esmentar un fitxer",
   "files.step.find": "Fitxers cercats: {query}",
   "files.step.find_any": "Ha revisat els vostres fitxers",
   "files.step.list": "Ha mirat a «{name}»",
@@ -21,7 +22,7 @@
   "files.action.rename": "Voleu canviar el nom de «{name}» a «{next}»?",
   "files.chip.file_name": "Fitxer {name} a {path}",
   "files.chip.folder_name": "Carpeta {name} a {path}",
-  "files.privacy": "Quan mira els vostres fitxers per vosaltres, envia els noms i camins dels fitxers que llista i el contingut dels fitxers que llegeix.",
+  "files.privacy": "Quan mira els vostres fitxers per vosaltres, envia els noms, camins, mides i dates dels fitxers que troba, qui us ha compartit un fitxer i el contingut dels fitxers que llegeix. Els fitxers que esmenteu amb @ també hi van.",
   "files.settings.title": "Fitxers",
   "files.settings.hint": "Què pot fer l'assistent a Fitxers. Mai no suprimeix ni comparteix cap fitxer.",
   "files.settings.read": "Trobar i llegir fitxers",

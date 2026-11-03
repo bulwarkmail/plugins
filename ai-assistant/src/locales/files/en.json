@@ -1,6 +1,7 @@
 {
   "files.quoted": "“{name}”",
   "files.mention.label": "Mention a message, contact or file",
+  "files.mention.label_files": "Mention a file",
   "files.step.find": "Looked for files: {query}",
   "files.step.find_any": "Looked through your files",
   "files.step.list": "Looked in “{name}”",
@@ -21,7 +22,7 @@
   "files.action.rename": "Rename “{name}” to “{next}”?",
   "files.chip.file_name": "File {name} in {path}",
   "files.chip.folder_name": "Folder {name} in {path}",
-  "files.privacy": "When it looks in your files for you, it sends the names and folder paths of the files it lists and the contents of the files it reads.",
+  "files.privacy": "When it looks in your files for you, it sends the names, folder paths, sizes and dates of the files it finds, who shared a file with you, and the contents of the files it reads. Files you mention with @ go along too.",
   "files.settings.title": "Files",
   "files.settings.hint": "What the assistant may do in Files. It never deletes or shares a file.",
   "files.settings.read": "Find and read files",
