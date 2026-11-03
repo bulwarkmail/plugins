@@ -9,7 +9,7 @@ A sidebar section that shows an agenda of your **upcoming calendar events**, eac
 - **Shared calendars** — Events from calendars shared with you and group calendars are included.
 - **Live updates** — Refreshes on a timer, on focus, and immediately whenever you create/update/delete an event.
 - **Looks like the app** — Drawn with the app's UI kit (sidebar rows, list rows, info bar), so it follows light, dark and custom themes.
-- **Read-only** — Needs only `calendar:read`; it never changes your calendar.
+- **Read-only** — Needs only `calendar:read` and `contacts:read` (to show contact birthdays); it never changes your calendar.
 
 ## How it works
 

@@ -102,6 +102,7 @@ describe('reading events', () => {
     expect(api.calls('http.post')).toHaveLength(0);
     expect(manifest.permissions).not.toContain('http:post');
     expect(manifest.permissions).toContain('calendar:read');
+    expect(manifest.permissions).toContain('contacts:read');
     expect(manifest.apiPostPaths).toBeUndefined();
   });
 
@@ -171,6 +172,23 @@ describe('sidebar section', () => {
     });
     await show(Agenda);
     expect(rows().map((r) => r.querySelector('[data-color]')?.getAttribute('data-color'))).toEqual(['#ef4444', '#22c55e', '#3b82f6']);
+  });
+
+  it('displays contact birthdays with the birthday calendar colour', async () => {
+    const birthdayEvent = allDay('birthday-c1-b1-2026', '🎂 Alice Smith (36)', '2026-10-15', {
+      calendarId: '__birthday-calendar__',
+    });
+    const { Agenda } = setup('sidebar-section', {
+      getEvents: async () => [events[0], birthdayEvent],
+      listCalendars: async () => [
+        { id: 'cal', name: 'Work', color: '#3b82f6' },
+        { id: '__birthday-calendar__', name: 'Birthdays', color: '#eab308' },
+      ],
+    });
+    await show(Agenda);
+    expect(rowTitles()).toContain('🎂 Alice Smith (36)');
+    const birthdayRow = rows().find((r) => r.getAttribute('title')?.startsWith('🎂 Alice Smith'));
+    expect(birthdayRow?.querySelector('[data-color]')?.getAttribute('data-color')).toBe('#eab308');
   });
 
   it('still lists events, all blue, when the calendars cannot be read', async () => {

@@ -6,6 +6,7 @@
 
 ### Added
 - Add `"Side panel"` position setting to display the agenda in the side panel beside the mail (`side-panel` slot, `api.ui.setSidePanel`)
+- Request `contacts:read` permission to display contact birthdays from the virtual birthday calendar
 
 ## 1.4.5 (2026-10-31)
 
