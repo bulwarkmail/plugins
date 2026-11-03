@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "已讀取你的設定",
   "panel.steps.kind.find_setting": "設定",
   "panel.steps.kind.read_my_settings": "設定",
-  "shortcut.toggle": "開啟或關閉 AI 助理"
+  "shortcut.toggle": "開啟或關閉 AI 助理",
+  "panel.menu.count": "{count} 個建議",
+  "panel.menu.none": "沒有相符項目"
 }

@@ -7,7 +7,7 @@
 // prompt and the privacy notice what is in the chat.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { attachmentLines, contextFlags, isImage } from '../../../lib/areas/context.js';
+import { attachmentLines, contextFlags, isImage, oneLine } from '../../../lib/areas/context.js';
 import { contactParts } from '../../../lib/widgets.js';
 import { effectiveActionMode } from '../../../lib/actions.js';
 import { excerpt } from '../model.js';
@@ -64,25 +64,31 @@ export function useArea(chat, props = {}) {
   const [mentions, setMentions] = useState([]);
   useEffect(() => { setMentions([]); }, [key]);
 
-  // ─── The conversation: how many messages it has, asked once per message ───
-  const [thread, setThread] = useState(null); // { id, emails }
+  // ─── The conversation: only how many messages it has, asked once per message ───
+  // getThreadCount reads no message (and has its own rate limit); without it
+  // there is no chip, and read_thread is still offered.
+  // A message of a login this webmail can't read (blobsReadable false) gets
+  // no attachment chips and no conversation: those reads would fail.
+  const readableBlobs = email?.blobsReadable !== false;
+  const [thread, setThread] = useState(null); // { id, count }
   useEffect(() => {
-    if (!flags.thread || mode !== 'reader' || !emailId) return undefined;
+    if (!flags.threadCount || mode !== 'reader' || !emailId || !readableBlobs) return undefined;
     let live = true;
     const timer = setTimeout(() => {
-      void Promise.resolve(api.email.getThread(emailId, email?.accountId ? { accountId: email.accountId } : {})).then(
-        (emails) => { if (live) setThread({ id: emailId, emails: Array.isArray(emails) ? emails : [] }); },
-        () => { if (live) setThread({ id: emailId, emails: [] }); },
+      void Promise.resolve(api.email.getThreadCount(emailId, email?.accountId ? { accountId: email.accountId } : {})).then(
+        (count) => { if (live) setThread({ id: emailId, count: Number.isInteger(count) ? count : 0 }); },
+        () => { if (live) setThread({ id: emailId, count: 0 }); },
       );
     }, THREAD_DELAY);
     return () => { live = false; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flags.thread, mode, emailId]);
-  const threadCount = thread?.id === emailId ? thread.emails.length : 0;
-  const threadOn = flags.thread && inChat && threadCount > 1 && !threadOut;
+  }, [flags.threadCount, mode, emailId, readableBlobs]);
+  const threadCount = thread?.id === emailId ? thread.count : 0;
+  const threadReadable = flags.thread && inChat && readableBlobs && !threadOut && (!flags.threadCount || threadCount > 1);
+  const threadOn = threadReadable && threadCount > 1;
 
   // ─── Attachments ───
-  const allAttachments = useMemo(() => (flags.attachments && inChat ? contextAttachments(email) : []), [flags.attachments, inChat, email]);
+  const allAttachments = useMemo(() => (flags.attachments && inChat && readableBlobs ? contextAttachments(email) : []), [flags.attachments, inChat, readableBlobs, email]);
   const attachments = allAttachments.filter((a) => !removedAtt.has(a.blobId));
 
   const removeAttachments = useCallback((ids) => setRemovedAtt((prev) => new Set([...prev, ...ids])), []);
@@ -104,7 +110,7 @@ export function useArea(chat, props = {}) {
         const label = name || emails[0] || '';
         return {
           id: `contact:${c.id}`, icon: 'user', label, detail: emails[0] ?? company,
-          mention: { kind: 'contact', id: String(c.id), label, detail: emails[0] ?? '', line: `- ${label}${emails.length ? ` <${emails.join('>, <')}>` : ''}${company ? ` (${company})` : ''}` },
+          mention: { kind: 'contact', id: String(c.id), label, detail: emails[0] ?? '', line: `- ${oneLine(label)}${emails.length ? ` <${emails.map((e) => oneLine(e)).join('>, <')}>` : ''}${company ? ` (${oneLine(company)})` : ''}` },
         };
       }).filter((p) => p.label);
       const messages = (mails ?? []).map((m) => {
@@ -112,7 +118,7 @@ export function useArea(chat, props = {}) {
         const from = person(m.from?.[0]);
         return {
           id: `message:${m.accountId ?? ''}:${m.id}`, icon: 'mail', label, detail: from,
-          mention: { kind: 'message', id: m.id, ...(m.accountId ? { accountId: m.accountId } : {}), label, detail: from, line: `- id ${m.id} | from ${from || '?'} | ${m.receivedAt ?? ''} | ${m.subject ?? ''}` },
+          mention: { kind: 'message', id: m.id, ...(m.accountId ? { accountId: m.accountId } : {}), label, detail: from, line: `- id ${oneLine(m.id, 80)} | from ${oneLine(from) || '?'} | ${oneLine(m.receivedAt ?? '', 40)} | ${oneLine(m.subject ?? '')}` },
         };
       });
       // The menu shows 8: files go before the messages so a full list of messages can't hide them.
@@ -156,7 +162,7 @@ export function useArea(chat, props = {}) {
     const first = selection.total > selection.emails.length ? t('ctx.chip.selection_first', { count: selection.emails.length }) : '';
     chips.push({
       key: 'ctx-selection', icon: 'list-check', label, ...(first ? { detail: first } : {}),
-      name: first ? `${t('ctx.chip.selection_name', { count: selection.total })} ${first}` : t('ctx.chip.selection_name', { count: selection.total }),
+      name: first ? t('ctx.chip.selection_name_first', { count: selection.total, read: selection.emails.length }) : t('ctx.chip.selection_name', { count: selection.total }),
       onRemove: () => setSelectionOut(selectionKey), removeLabel: t('ctx.chip.remove', { name: label }),
     });
   }
@@ -192,12 +198,14 @@ export function useArea(chat, props = {}) {
     context: {
       flags,
       email: inChat ? { id: email.id, ...(email.accountId ? { accountId: email.accountId } : {}), subject: email.subject ?? '', attachments } : null,
-      thread: threadOn,
+      thread: threadReadable,
       selection: selectionOn ? selection : null,
       mentioned: mentionedMessages.map(({ id, accountId, label }) => ({ id, ...(accountId ? { accountId } : {}), subject: label })),
     },
     endpoint: setup?.endpoint ?? null,
     ownEmails: me?.emails ?? [],
+    // The chat sends images only when this says the model can see them.
+    images: flags.images === true,
   };
 
   // ─── Quick actions for the selection ───
@@ -219,6 +227,7 @@ export function useArea(chat, props = {}) {
   const privacyParts = [];
   if (flags.attachments) privacyParts.push('ctx.privacy.attachments');
   if (flags.images) privacyParts.push('ctx.privacy.images');
+  if (flags.photoDetails) privacyParts.push('ctx.privacy.photo_details');
   if (flags.thread) privacyParts.push('ctx.privacy.thread');
   if (flags.selection) privacyParts.push('ctx.privacy.selection');
   if (flags.mentions) privacyParts.push('ctx.privacy.mentions');

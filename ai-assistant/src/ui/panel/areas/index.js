@@ -9,7 +9,7 @@ import { useArea as useEverywhereArea } from './everywhere.js';
 
 /** Everything the areas add, as one object with every field present. */
 export function mergeAreas(parts) {
-  const out = { chips: [], promptBlocks: [], toolsCtx: {}, quick: [], menus: [], header: [], overlay: null, privacyParts: [] };
+  const out = { chips: [], promptBlocks: [], toolsCtx: {}, quick: [], menus: [], header: [], overlay: null, empty: null, privacyParts: [] };
   for (const part of parts) {
     if (!part) continue;
     for (const list of ['chips', 'promptBlocks', 'quick', 'menus', 'header', 'privacyParts']) {
@@ -17,6 +17,7 @@ export function mergeAreas(parts) {
     }
     if (part.toolsCtx && typeof part.toolsCtx === 'object') Object.assign(out.toolsCtx, part.toolsCtx);
     if (part.overlay && !out.overlay) out.overlay = part.overlay;
+    if (part.empty && !out.empty) out.empty = part.empty;
   }
   return out;
 }

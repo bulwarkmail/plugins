@@ -122,8 +122,15 @@ export async function importMessages(messages, { user = USER, role = 'inbox' } =
   const box = await mailboxId(client, role);
   const ids = [];
   for (const msg of messages) {
-    const [[, found]] = await client.call([['Email/query', { accountId: client.accountId, filter: { header: ['Message-ID', `<${msg.messageId}>`] } }]]);
-    if (found.ids.length) { ids.push(found.ids[0]); continue; }
+    // Already there? Match on the Message-ID itself: the header filter
+    // doesn't find it on every server (0.16 imported the same mail again).
+    const [[, bySubject]] = await client.call([['Email/query', { accountId: client.accountId, filter: { subject: msg.subject }, limit: 50 }]]);
+    let existing = null;
+    if (bySubject.ids.length) {
+      const [[, got]] = await client.call([['Email/get', { accountId: client.accountId, ids: bySubject.ids, properties: ['id', 'messageId'] }]]);
+      existing = got.list.find((e) => (e.messageId ?? []).includes(msg.messageId))?.id ?? null;
+    }
+    if (existing) { ids.push(existing); continue; }
     const blobId = await client.upload(Buffer.from(rawMessage(msg)), 'message/rfc822');
     const [[, res]] = await client.call([['Email/import', { accountId: client.accountId, emails: { m: { blobId, mailboxIds: { [box]: true }, keywords: msg.seen ? { $seen: true } : {}, receivedAt: new Date(msg.date ?? Date.now()).toISOString() } } }]]);
     if (!res.created?.m) throw new Error(`import of "${msg.subject}" failed: ${JSON.stringify(res.notCreated)}`);

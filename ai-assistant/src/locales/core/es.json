@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Leídos tus ajustes",
   "panel.steps.kind.find_setting": "Ajustes",
   "panel.steps.kind.read_my_settings": "Ajustes",
-  "shortcut.toggle": "Abrir o cerrar el asistente de IA"
+  "shortcut.toggle": "Abrir o cerrar el asistente de IA",
+  "panel.menu.count": "{count} sugerencias",
+  "panel.menu.none": "Sin coincidencias"
 }

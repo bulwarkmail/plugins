@@ -138,3 +138,38 @@ describe('images from lookups in the chat', () => {
     expect(sent).toHaveLength(2);
   });
 });
+
+describe('after the service refused images', () => {
+  it('sends no image in any later request of that chat, and tells the lookups', async () => {
+    const sent = [];
+    const api = modelApi([
+      toolTurn('openai'),
+      { status: 400, body: { error: { message: 'image input is not supported' } } },
+      toolTurn('openai'),
+      openaiSse(['Only names.']),
+    ], sent);
+    const metas = [];
+    const out = await runChat(api, OPENAI_EP, {
+      system: 's', messages: [{ role: 'user', content: 'what is on it?' }], tools: TOOLS,
+      runTool: async (_name, _args, meta) => { metas.push(meta); return { text: 'The picture is attached.', images: [{ mediaType: 'image/png', data: 'iVBORw0KGgo=', name: 'whiteboard.png' }] }; },
+    });
+    expect(out.text).toBe('Only names.');
+    expect(sent).toHaveLength(4);
+    // The second lookup round ran after the refusal: no image goes out again.
+    expect(JSON.stringify(sent[3])).not.toContain('iVBORw0KGgo=');
+    expect(metas.map((m) => m.imagesRefused === true)).toEqual([false, true]);
+  });
+});
+
+describe('a model that can\'t see images', () => {
+  it('gets an image a lookup returned as its name only (images: false)', async () => {
+    const sent = [];
+    const api = modelApi([toolTurn('anthropic'), anthropicSse(['A name.'])], sent);
+    await runChat(api, ANTHROPIC_EP, {
+      system: 's', messages: [{ role: 'user', content: 'x' }], tools: TOOLS, images: false,
+      runTool: async () => ({ text: 'Attached.', images: [{ mediaType: 'image/png', data: 'iVBORw0KGgo=', name: 'whiteboard.png' }] }),
+    });
+    expect(JSON.stringify(sent[1])).not.toContain('iVBORw0KGgo=');
+    expect(JSON.stringify(sent[1])).toContain("[Image: whiteboard.png. This model can't see images.]");
+  });
+});

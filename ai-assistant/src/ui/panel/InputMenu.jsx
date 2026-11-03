@@ -2,7 +2,8 @@
 // `/` at the start (commands, saved prompts) or `@` (a message, contact or
 // file to add). The 2.2 areas give the menus (chat.areas.menus): their
 // trigger, a label, `items(query)` and `onPick(item, { rest })`. Arrow keys
-// move, Enter or Tab pick, Escape closes; the text field keeps the focus and
+// move, Enter or Tab pick, Escape closes; a menu with `complete(item)` (the
+// text the entry stands for) completes on Tab instead. The text field keeps the focus and
 // points at the active entry (aria-activedescendant), so screen readers read it.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -29,11 +30,13 @@ export function activeMenu(menus, before) {
  * The menu's state for the input. Returns { open, list, onKeyDown, ariaProps }:
  * onKeyDown handles the keys while it is open (true when it took the key).
  */
-export function useInputMenu({ menus, input, setInput, inputRef, idBase = 'assistant-menu' }) {
+export function useInputMenu({ menus, input, setInput, inputRef, idBase = 'assistant-menu', t = null }) {
   const [state, setState] = useState(null); // { menu, query, start, end }
   const [items, setItems] = useState([]);
   const [index, setIndex] = useState(0);
   const [closedFor, setClosedFor] = useState(null);
+  // The entries for the current query arrived (so "no matches" can be said).
+  const [settled, setSettled] = useState(false);
   const seq = useRef(0);
 
   // Look at the text before the caret whenever the input changes.
@@ -48,12 +51,13 @@ export function useInputMenu({ menus, input, setInput, inputRef, idBase = 'assis
 
   // Ask the menu for its entries (newest answer wins).
   useEffect(() => {
+    setSettled(false);
     if (!state) { setItems([]); return undefined; }
     const mine = ++seq.current;
     const timer = setTimeout(() => {
       void Promise.resolve(state.menu.items(state.query)).then(
-        (found) => { if (seq.current === mine) { setItems((found ?? []).slice(0, MAX_ITEMS)); setIndex(0); } },
-        () => { if (seq.current === mine) setItems([]); },
+        (found) => { if (seq.current === mine) { setItems((found ?? []).slice(0, MAX_ITEMS)); setIndex(0); setSettled(true); } },
+        () => { if (seq.current === mine) { setItems([]); setSettled(true); } },
       );
     }, state.menu.trigger === '/' ? 0 : 150);
     return () => clearTimeout(timer);
@@ -78,6 +82,14 @@ export function useInputMenu({ menus, input, setInput, inputRef, idBase = 'assis
       setIndex((i) => (i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length);
       return true;
     }
+    if (e.key === 'Tab' && !e.shiftKey && typeof state.menu.complete === 'function') {
+      e.preventDefault();
+      const text = state.menu.complete(items[index]);
+      setInput(input.slice(0, state.start) + text + input.slice(state.end));
+      const caret = state.start + text.length;
+      requestAnimationFrame(() => inputRef.current?.setSelectionRange?.(caret, caret));
+      return true;
+    }
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
       pick(items[index]);
@@ -89,12 +101,14 @@ export function useInputMenu({ menus, input, setInput, inputRef, idBase = 'assis
       return true;
     }
     return false;
-  }, [open, items, index, pick, input, state]);
+  }, [open, items, index, pick, input, state, setInput, inputRef]);
 
   const listId = `${idBase}-list`;
   const optionId = (i) => `${idBase}-opt-${i}`;
   const ariaProps = {
     'aria-autocomplete': 'list',
+    // The text field stays a text field; it says it can open a list.
+    'aria-haspopup': menus.length ? 'listbox' : undefined,
     'aria-controls': open ? listId : undefined,
     'aria-activedescendant': open ? optionId(index) : undefined,
   };
@@ -133,5 +147,9 @@ export function useInputMenu({ menus, input, setInput, inputRef, idBase = 'assis
     </div>
   ) : null;
 
-  return { open, list, onKeyDown, ariaProps };
+  // Screen readers hear how many entries the list has, or that there are none.
+  const announce = !t || !state ? '' : open ? t('panel.menu.count', { count: items.length }) : settled ? t('panel.menu.none') : '';
+  const status = <span role="status" aria-live="polite" data-input-menu-status style={{ position: 'absolute', width: 1, height: 1, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>{announce}</span>;
+
+  return { open, list: <>{list}{status}</>, onKeyDown, ariaProps };
 }

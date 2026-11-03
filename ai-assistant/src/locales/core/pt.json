@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "Lidas as suas definições",
   "panel.steps.kind.find_setting": "Definições",
   "panel.steps.kind.read_my_settings": "Definições",
-  "shortcut.toggle": "Abrir ou fechar o assistente de IA"
+  "shortcut.toggle": "Abrir ou fechar o assistente de IA",
+  "panel.menu.count": "{count} sugestões",
+  "panel.menu.none": "Sem resultados"
 }

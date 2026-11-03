@@ -34,9 +34,11 @@ export function ContextMarker({ api, turn }) {
   );
 }
 
-export function UserTurn({ turn }) {
+/** The user's request. `onEdit` (the last typed one): a button that puts it back into the input. */
+export function UserTurn({ turn, onEdit, editLabel }) {
   return (
-    <Row justify="end">
+    <Row justify="end" wrap={false} align="center">
+      {onEdit && <Button variant="ghost" size="icon" icon="pencil" className="h-7 w-7 shrink-0" title={editLabel} aria-label={editLabel} data-edit-turn onClick={onEdit} />}
       <div style={{ maxWidth: '85%', background: 'var(--color-muted)', color: 'var(--color-foreground)', borderRadius: 12, padding: '6px 10px' }} data-turn="user">
         <Text size="sm">{turn.label ?? turn.content}</Text>
       </div>
@@ -45,7 +47,7 @@ export function UserTurn({ turn }) {
 }
 
 /** The model's answer: what it says, what it proposes, what it looked up. */
-export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply, onReply, onRetry, onReview, onSend, onInsert, onAnswerAction, onUndo }) {
+export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply, onReply, onRetry, onReview, onSend, onInsert, onAnswerAction, onUndo, onRegenerate }) {
   const t = api.i18n.t;
   const running = turn.status === 'running';
   const parts = useMemo(() => partsOf(turn), [turn]);
@@ -91,6 +93,8 @@ export function AssistantTurn({ api, mode, turn, email, waiting = false, onApply
       {turn.status === 'stopped' && <Text tone="muted" size="xs">{t('common.stopped')}</Text>}
       {turn.status === 'error' && <ErrorMessage api={api} error={Object.assign(new AiError(turn.error?.code ?? 'unreachable', turn.error ?? {}), {})} onRetry={() => onRetry(turn)} />}
       {turn.applyFailed && <Alert tone="danger">{t(mode === 'reader' ? 'panel.open_failed' : 'assistant.apply_failed')}</Alert>}
+      {/* The last answer can be asked for again (chat tools). */}
+      {onRegenerate && <Row><LinkButton icon="refresh" data-regenerate onClick={onRegenerate}>{t('chat.regenerate')}</LinkButton></Row>}
     </Stack>
     </div>
   );

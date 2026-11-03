@@ -39,7 +39,10 @@ webmails don't send it) and check `typeof api.email.x === 'function'`.
 - Returns `{ name, type, width, height, data, status, alt?, exif? }`.
   - `status`: `ok`, `tracker` (1-2 px), `tiny` (a side under 64 px or
     less than 128×128 in area), `too_big`, `unsupported` (not a picture the
-    browser can show: HEIC, TIFF, SVG, not an image), `failed`.
+    browser can show: HEIC, TIFF, AVIF, SVG, not an image; the size is
+    read from the file's header before decoding), `failed`. A picture
+    that declares more than 50 megapixels answers `too_big` without being
+    decoded.
   - When ok: `data` is base64 (no `data:` prefix), `type` image/jpeg
     (quality 0.85, on white) or image/png for pictures with see-through
     parts, at most 1.5 MB; `width`/`height` the size of `data`.
@@ -56,8 +59,26 @@ webmails don't send it) and check `typeof api.email.x === 'function'`.
 
 - Permission `email:read`. Flag `threads`. 60 calls a minute.
 - Returns `EmailReadView[]`, oldest first, at most 50 (the newest 50 of a
-  longer conversation), each with `accountId`. A message the server lists
-  in no thread comes back alone.
+  longer conversation; only those are fetched, with Thread/get first),
+  each with `accountId`. A message the server lists in no thread comes
+  back alone.
+
+### api.email.getThreadCount(emailId, { accountId? })
+
+- Permission `email:read`. Flag `threads`. Its own limit of 120 calls a
+  minute, apart from getThread's.
+- Returns how many messages the conversation has (a number; 1 for a
+  message in no thread). Reads no message bodies.
+- Refuses a message it can't find or an account this login doesn't show
+  ("email.getThreadCount: no message with id …").
+
+### EmailReadView.blobsReadable?
+
+`false` on the slot props (email-detail-sidebar and the other viewer
+slots) when this login can't read the open message's attachments, text or
+conversation through the host: a message of another connected login in a
+unified view or a Pro tab. Left out otherwise; views returned by host
+calls never carry it.
 
 ### EmailReadView.attachments: `cid?`, `alt?`
 
@@ -67,6 +88,7 @@ Inline images now carry `cid` (the Content-ID without angle brackets) and
 ### Reader panel prop `listSelection`
 
 `email-detail-sidebar` gets `listSelection: { emails: [{ id, accountId }], total } | null`
+(not in a Pro email tab)
 (gated by `email:read`): the messages ticked in the list when two or more
 are, at most 50 in `emails`, `total` the real count. Rows of another
 connected login are counted but not listed. Flag `listSelection`. The
@@ -97,7 +119,8 @@ what it may read; the x takes one out.
   as images when it can see them; they are made smaller first. Tracking
   pixels and tiny images are left out; remote images are never loaded.
   Without image support the model only hears the file name and the
-  picture's description. The date and place of a photo only when you ask.
+  picture's description. The date and place of a photo only when you ask
+  and have switched on "Send a photo's date and place" (off by default).
 - This conversation: every message of the open conversation, quotes cut.
 - Messages selected in the list: "3 messages" chip; Actions offers
   Summarize these, What do I have to do?, and One reply to all (always
@@ -106,25 +129,31 @@ what it may read; the x takes one out.
 - One request reads at most 60,000 characters and 8 pictures (4 per
   message).
 - User settings (Settings > AI Assistant > More context): Read
-  attachments, Look at images, Read the whole conversation; with their own
-  key also "My model can see images".
+  attachments, Look at images, Send a photo's date and place (off by
+  default), Read the whole conversation; with their own key also "My model
+  can see images", which their own model follows instead of the
+  administrator's image setting.
 
 What is sent to the AI service:
 
 | When you | What is sent |
 | --- | --- |
+| Anything, with a message open | The names, types and sizes of its attachments, the descriptions of its pictures, and how many messages its conversation has; with messages ticked in the list, how many |
 | Ask about an attachment | Its text (20,000 characters, more when the model asks, at most 60,000 per request in all), or the picture, made smaller, when the model can see images; otherwise its name and description |
-| Ask when or where a photo was taken | The date and place stored in the photo |
+| Ask when or where a photo was taken (switch on) | The date and place stored in the photo |
 | Ask about the conversation | Sender, recipients, date, subject and text (without quotes) of every message, up to 50 |
 | Ask about selected messages | The same for up to 50 of them, and how many you selected |
 | Mention a message or contact with @ | The message's sender, date and subject (its text when read), or the contact's name, addresses and company |
 
-The privacy notice adds, for what is on: "When it reads an attachment for
-you, it sends the attachment's text." "Pictures it looks at go along as
-images. The date and place a photo was taken go only when you ask for
-them." "When it reads the whole conversation, it sends every message in
-it." "When you ask about the messages you selected in the list, it sends
-them." "Messages and contacts you mention with @ go along too."
+The privacy notice adds, for what is on: "With an open message it also
+sends the names of its attachments and the descriptions of its pictures;
+when it reads one, the attachment's text." "Pictures it looks at go along
+as images." (with the photo switch on: "You allowed the date and place a
+photo was taken: they go along when you ask for them.") "With an open
+message it also says how many messages its conversation has; when it
+reads the whole conversation, it sends every message in it." "When you
+select messages in the list, it says how many; when you ask about them,
+it sends them." "Messages and contacts you mention with @ go along too."
 
 ## For administrators
 

@@ -270,5 +270,7 @@
   "panel.step.read_my_settings": "ההגדרות שלך נקראו",
   "panel.steps.kind.find_setting": "הגדרות",
   "panel.steps.kind.read_my_settings": "הגדרות",
-  "shortcut.toggle": "פתיחה או סגירה של עוזר ה-AI"
+  "shortcut.toggle": "פתיחה או סגירה של עוזר ה-AI",
+  "panel.menu.count": "הצעות: {count}",
+  "panel.menu.none": "אין התאמות"
 }

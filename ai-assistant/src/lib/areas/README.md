@@ -52,9 +52,10 @@ account (no forwarding, no sharing, no public links).
 
 A React hook, called on every render in a fixed order. `chat` has `api`,
 `t`, `mode`, `email`, `source`, `turns`, `setTurns`, `key`, `setup`,
-`prefs`, `person`, `locale`, `setInput`, `inputRef` and `bridge` (a ref:
-`bridge.current.send(…)`, `sendText(text)`, `quick(action)`, once the chat
-is ready). It returns any of:
+`prefs`, `person`, `locale`, `setInput`, `inputRef`, `editing` and
+`cancelEdit` (Edit of the last message) and `bridge` (a ref:
+`bridge.current.send(…)`, `sendText(text)`, `quick(action)`, `areas()` (what
+all areas returned), once the chat is ready). It returns any of:
 
 ```js
 {
@@ -62,9 +63,10 @@ is ready). It returns any of:
   promptBlocks: ['…'],         // added to the system prompt (data the model may use)
   toolsCtx: { … },             // merged into the context lookups and actions get
   quick: [{ id, label, icon, run }],   // more entries in the Actions menu
-  menus: [{ trigger: '@' | '/', atStart?: boolean, label, items: async (query) => [{ id, label, detail?, icon? }], onPick: (item) => void }],
+  menus: [{ trigger: '@' | '/', atStart?: boolean, label, items: async (query) => [{ id, label, detail?, icon? }], onPick: (item) => void, complete?: (item) => string }],  // complete: Tab puts this text in place of the trigger and query
   header: [{ key, icon, label, onClick, pressed? }],  // buttons in the panel header
   overlay: ReactNode | null,   // shown instead of the transcript (a history list)
+  empty: { text?, actions: [{ id, label, icon, run, busy? }] } | null,  // the empty transcript: its text, and buttons to start (Catch me up)
   privacyParts: ['ctx.privacy'],  // locale keys of sentences the privacy notice adds
 }
 ```
