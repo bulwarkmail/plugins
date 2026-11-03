@@ -908,7 +908,8 @@ export const slots = {
   so use `padding`. Inline slots are measured at their natural width, up to
   480 px.
 - **Filling a panel.** A panel slot (`composer-sidebar`,
-  `composer-sidebar-right`, `email-detail-sidebar`) may declare `fill: true`
+  `composer-sidebar-right`, `email-detail-sidebar`, and from 1.20
+  `app-side-panel`) may declare `fill: true`
   instead: the frame is then as tall as the panel and your root element gets
   `height: 100%`, so you can pin controls at the bottom (a chat input) and
   scroll a part of your own. Nothing is measured; the user drags the
@@ -921,13 +922,19 @@ export const slots = {
   They resolve to the panel's state afterwards, or `null` when no such
   panel is on screen (no composer or message open, or a phone), so you can
   fall back to a dialog. A panel opened this way gets a new `focusRequest`
-  number in its props: focus your input when it changes.
+  number in its props: focus your input when it changes. For
+  `app-side-panel` see [The side panel in other views](#the-side-panel-in-other-views).
 - **The api in a slot.** `const api = require('@plugin-host')` gives the
   same `api` as in the background frame.
-- **Dialogs.** `api.ui.openDialog({ title, slot: 'plugin-dialog', extraProps, width })`
+- **Dialogs.** `api.ui.openDialog({ title, slot: 'plugin-dialog', extraProps, width, fill })`
   opens one of the plugin's own slots in a real dialog. The component gets
   `extraProps` plus `onResult`; `openDialog` resolves to the value passed to
-  `onResult(value)`, or `null` when the user closes the dialog.
+  `onResult(value)`, or `null` when the user closes the dialog. With
+  `fill: true` (1.20 and later; older versions ignore it) the dialog is as
+  tall as the visible window allows (90 % of it, at most 640 px, and it
+  follows a phone's keyboard) and the frame fills it, instead of growing
+  with its content. Your root element is then as tall as the frame, as in
+  a filled panel: for a chat whose input stays at the bottom.
 
   The host draws the title, the plugin's name under it, a close button and
   the footer. Declare the footer's buttons with `DialogButtons` (Cancel
@@ -953,6 +960,79 @@ export const slots = { 'plugin-dialog': { component: ConfirmUpload } };
 // in a hook or an action:
 const name = await api.ui.openDialog({ title: 'Upload', slot: 'plugin-dialog', extraProps: { fileName } });
 ```
+
+### The side panel in other views
+
+From 1.20 a plugin can show a side panel next to Calendar, Contacts, Files
+and Settings: the `app-side-panel` slot, permission `ui:side-panel`. Mail
+keeps `email-detail-sidebar` next to the open message. List the permission
+in `optionalPermissions`, so older webmails, which don't know it, still
+install the plugin.
+
+```js
+// manifest.json
+"optionalPermissions": ["ui:side-panel"]
+
+// index.js
+export const slots = {
+  'app-side-panel': { component: Panel, fill: true, startFolded: true, shouldShow },
+};
+
+await api.ui.openPanel('app-side-panel')    // true: open; false: no room here (see below); null: no such panel on screen
+await api.ui.closePanel('app-side-panel')
+await api.ui.togglePanel('app-side-panel')
+```
+
+- **Where.** A button at the end of each view's toolbar row shows and hides
+  the panel, at the same place as the reader's panel button. In Calendar it
+  comes after the view menu; in Files right after the details button (the
+  two panels take turns: opening one folds the other); in Contacts on a row
+  over the open contact; in Settings (1024 px and wider) on a row over the
+  page. The Pro shell's panes have none.
+- **Which plugins.** Only plugins whose `shouldShow` for the slot says yes,
+  or that have none. `shouldShow` gets `{ view, context }`; until it
+  answers, there is no button.
+- **The button and the panel.** The button is named "Plugin panel" and has
+  `aria-pressed`. A plugin keyboard shortcut with the id `toggle-panel` is
+  named in its title and `aria-keyshortcuts`. The open panel is a
+  `complementary` landmark named after its plugin. When it closes with the
+  focus inside, the focus goes back to the button.
+- **Size.** 200 to 500 px wide, 280 by default. The width and whether it is
+  folded are the same in all four views (localStorage `appSidePanelWidth`
+  and `appSidePanelCollapsed`). Dragging stops where the view keeps 480 px.
+  When the view would get narrower than that, the panel folds, and opened
+  anyway it lies over the view. `startFolded` holds until the user chooses.
+  In Files, while the details panel is open the plugin panel steps aside
+  there only.
+- **Props.** `{ view, context, focusRequest }`. `view` is `'calendar'`,
+  `'contacts'`, `'files'` or `'settings'`. `focusRequest` counts up when the
+  panel opens on request (its button, a shortcut, `api.ui.openPanel`).
+  `context` is what the view shows; each field reaches the plugin only with
+  its permission, and fields not listed here never do:
+
+  | Field | Permission | What |
+  | --- | --- | --- |
+  | `event` | `calendar:read` | `CalendarEventView`: the event open in the details or the editor |
+  | `contact` | `contacts:read` | `ContactView`: the contact open in the details |
+  | `selectedCount` | `contacts:read` | How many contacts are ticked in the list |
+  | `files` | `files:read` | `FileResourceView[]`: the selected files, at most 20 |
+  | `fileCount` | `files:read` | How many files are selected, also past those 20 |
+  | `folder` | `files:read` | `{ id, path }` of the open folder (`id` is null in the top folder) |
+  | `page` | none | `{ id, label }`: the open settings page, its name in the user's language |
+
+- **Phones, and Settings below 1024 px.** There is no panel. The phone
+  header shows a panel button instead (in Contacts also over an open
+  contact), and a click sends the plugin `onAction({ surface: 'app-side-panel', actionId: 'open', context: { view, context } })`,
+  with `context` cut to the plugin's permissions as above. Open your
+  dialog there, for example
+  `api.ui.openDialog({ slot: 'plugin-dialog', fill: true, extraProps: { view, context } })`.
+  `openPanel` and `togglePanel` answer `false` there and send the same
+  `onAction` to the plugin that asked; `closePanel` answers `false`.
+- **Is it there?** `api.host.features.sidePanel` is `true` when this plugin
+  may show the panel, `false` when the webmail has the panel but the plugin
+  lacks `ui:side-panel` (it was enabled before an update added the
+  permission: the user turns it off and on), and missing on older webmails.
+  There `openPanel('app-side-panel')` throws "is not a panel".
 
 ### The app's controls: `@plugin-host/ui`
 
@@ -1499,6 +1579,26 @@ api.host.features.noThirdPartyTraffic       // 1.20 and later: true while "No th
 api.host.onFeaturesChange(fn)               // fn(features); returns an unsubscribe function
 ```
 
+From 1.20 `api.host.features` also says which newer host calls and props
+the webmail offers, so a plugin can hide what isn't there:
+
+| Flag | What the webmail offers |
+| --- | --- |
+| `attachmentText` | `api.email.getAttachmentText` |
+| `attachmentImages` | `api.email.getAttachmentImage` |
+| `threads` | `api.email.getThread` and `api.email.getThreadCount` |
+| `listSelection` | The `listSelection` prop of `email-detail-sidebar` |
+| `sidePanel` | The `app-side-panel` slot, per plugin: `true` when this plugin may show it, `false` when it lacks `ui:side-panel` (see [The side panel in other views](#the-side-panel-in-other-views)) |
+
+Read each as `=== true` (older webmails don't send them) and check
+`typeof api.email.getThread === 'function'` before calling a method.
+The flags say what the webmail can do; the method's permission is still
+checked on every call.
+
+<!-- TODO(C): flags of the More actions host calls -->
+<!-- TODO(D): flags of the Files host calls -->
+
+
 `api.host.features` is updated in place, like `api.plugin.settings`, so
 `shouldShow` and hooks can read it directly; slot components render again
 when it changes. It changes when the admin's policy changes or the user
@@ -1564,7 +1664,7 @@ await api.ui.confirm({ title, message, confirmLabel, cancelLabel, danger })   //
 await api.ui.alert({ title, message, confirmLabel })
 await api.ui.prompt({ title, message, confirmLabel, cancelLabel,
   fields: [{ name, label, type: 'text' | 'password', placeholder, required }] })  // { name: value } or null
-await api.ui.openDialog({ title, slot, extraProps, width })   // the value given to onResult, or null
+await api.ui.openDialog({ title, slot, extraProps, width, fill })   // the value given to onResult, or null
 await api.ui.openExternalUrl(url)       // http(s) only, always a new tab
 await api.ui.print({ title, html })     // the browser's print dialog for a page the plugin made
 await api.ui.downloadFile({ content, filename, contentType })
@@ -1572,7 +1672,7 @@ await api.ui.setActions(surface, actions)
 await api.ui.setDayLabels(labels)
 await api.ui.setPages(pages)
 await api.ui.setSectionTitle(title)     // the header of the plugin's sidebar-section; null for its name
-await api.ui.openPanel(slot, { composerId })   // composer-sidebar(-right) or email-detail-sidebar: true, false or null (no panel on screen)
+await api.ui.openPanel(slot, { composerId })   // composer-sidebar(-right), email-detail-sidebar or app-side-panel: true, false or null (no panel on screen)
 await api.ui.closePanel(slot, { composerId })
 await api.ui.togglePanel(slot, { composerId })
 await api.ui.refreshRowBadges()
@@ -1626,7 +1726,7 @@ await api.composer.attach(composerId, { blobId, name, type, size })             
 ```js
 await api.email.get(emailId)                 // EmailReadView or null; any message of the account
 await api.email.list({ mailboxId, limit, position })   // EmailSummary[]; limit 1-100, default 50
-await api.email.search({ text, from, to, subject, after, before, hasAttachment, mailboxId, limit })   // EmailSummary[], newest first; limit 1-50
+await api.email.search({ text, from, to, subject, after, before, hasAttachment, mailboxId, limit, position })   // EmailSummary[], newest first; limit 1-50
 await api.email.move(emailIds, mailboxId)    // at most 100 ids; 20 moves a minute
 await api.email.archive(emailIds)
 await api.email.getAttachment(emailId, blobId)   // { name, type, size, data: ArrayBuffer }, at most 25 MB
@@ -1639,6 +1739,10 @@ await api.drafts.create({ to, cc, bcc, subject, body, isHtml, attachments })   /
 await api.compose.open({ to, cc, bcc, subject, body, isHtml, attachments })    // 'opened' or 'navigating'
 await api.compose.reply(emailId, { text, all })   // reply to the open message, starting with text; true
 await api.email.forward(emailId, { to, text, attachments, accountId })   // forward it, no composer
+await api.email.getAttachmentText(emailId, blobId, { maxChars, accountId })          // 1.20: AttachmentTextView
+await api.email.getAttachmentImage(emailId, blobId, { maxSide, exif, accountId })    // 1.20: AttachmentImageView
+await api.email.getThread(emailId, { accountId })        // 1.20: EmailReadView[], oldest first, at most 50
+await api.email.getThreadCount(emailId, { accountId })   // 1.20: how many messages the conversation has
 ```
 
 `email.forward` (permission `email:forward`, Bulwark 1.19.1 and later) sends
@@ -1663,10 +1767,23 @@ receivedAt, isRead, isFlagged, hasAttachment, attachments, preview,
 keywords, text, headers, source, auth`. `EmailSummary` is the list view
 without body, headers or source.
 
+From 1.20 an inline image in `attachments` also has `cid` (its
+Content-ID, without angle brackets) and `alt` (the alt text of the
+`<img src="cid:…">` that shows it, else its title, when the sender wrote
+one). The `email` prop of the reader slots (`email-detail-sidebar` and
+the others) carries `blobsReadable: false` when this login can't read the
+open message's attachments, text or conversation through the host: a
+message of another connected login in a unified view or a Pro tab. Then
+`getAttachment`, `getAttachmentText`, `getAttachmentImage` and `getThread`
+fail for it, so offer none. The field is left out otherwise, and views a
+host call returns never carry it.
+
 `search` runs a JMAP filter over all mail (or one folder with `mailboxId`):
 `text` matches whole words in sender, recipients, subject and body, `from`,
 `to` and `subject` their fields, `after` and `before` take dates; give at
-least one. The plugin gets summaries and reads one with `get`.
+least one. The plugin gets summaries and reads one with `get`. From 1.20
+`position` (0 to 1,000,000) skips that many results, to page past the
+first `limit`.
 `getAttachment` only accepts a `blobId` that is an attachment of that
 message. Keywords are JMAP keywords such as `$flagged` or `$label:work`
 (letters, digits and `$ _ . : -`, up to 128 characters). `setKeyword`,
@@ -1685,6 +1802,95 @@ context of message actions carries it for team and shared mailboxes.
 In a team mailbox (a Stalwart group account) keywords are the same for
 every member, `$seen` included: whoever opens a message marks it read for
 the whole team. Don't use read state for team status.
+
+#### Attachment text and images, conversations (1.20)
+
+These four calls came with the AI assistant 2.2. Check their flags in
+`api.host.features` first (see [api.host](#apihost)). Each finds the
+message the way `get` does: give `accountId` for shared and group mail
+(rows of an open shared folder are found without it). A message it can't
+find rejects with `<method>: no message with id "…"`. Past the rate limit
+they reject with `<method>: too many reads, try again in a minute`.
+
+**`getAttachmentText(emailId, blobId, { maxChars, accountId })`**
+(`email:blob-read`, flag `attachmentText`, 30 a minute). The text of one
+attachment, read in the webmail: the plugin never gets the file's bytes
+from this call. Like `getAttachment`, it refuses a `blobId` that isn't an
+attachment of that message. It resolves to:
+
+```js
+{ name, type, size, format, status, text, truncated, pages, sheets }
+```
+
+- `format`: `text`, `csv`, `html`, `ics`, `vcf`, `pdf`, `docx`, `xlsx`,
+  `pptx`, `odt`, `ods`, `odp` or `other`.
+- `status`: `ok`; `too_big` (over 20 MB, or an Office file that unpacks to
+  more than 50 MB); `unsupported` (images, archives, the old .doc, .xls
+  and .ppt); `no_text` (a scanned PDF, an empty file); `encrypted`;
+  `failed`.
+- `text` is `''` unless `status` is `ok`. `maxChars` is 1 to 100,000,
+  20,000 by default. `truncated` is true when the text was cut there, or
+  when a PDF or a spreadsheet had more than was read.
+- PDFs: at most 50 pages are read, and `pages` is the page count of the
+  file; in a PDF of more than one page each page starts with "Page n". Spreadsheets:
+  at most 5 sheets of 2,000 rows each, `sheets` names those read, and each
+  starts with "Sheet: <name>" followed by CSV rows. Presentations: "Slide
+  n" and its text. Calendar files: one line per event or task (title,
+  start, end, location, organiser). Contact files: name, addresses, phones,
+  company.
+
+**`getAttachmentImage(emailId, blobId, { maxSide, exif, accountId })`**
+(`email:blob-read`, flag `attachmentImages`, 30 a minute). An image
+attachment or an inline (`cid:`) image of the message, made smaller in the
+webmail. Images the message's HTML loads from the web are never fetched.
+It resolves to:
+
+```js
+{ name, type, width, height, data, status, alt, exif }
+```
+
+- `status`: `ok`; `tracker` (1 or 2 px); `tiny` (a side under 64 px, or
+  less than 128 × 128 in area); `too_big` (over 20 MB, more than 50
+  megapixels, or still over 1.5 MB at 64 px); `unsupported` (SVG, HEIC,
+  TIFF, AVIF, a broken file, not an image); `failed`. The size is read
+  from the file's header before anything is decoded, so trackers, tiny and
+  too large images are never decoded. Only JPEG, PNG, GIF, WebP and BMP
+  headers are read.
+- When `ok`: `data` is base64 without a `data:` prefix, at most 1.5 MB.
+  `type` is `image/jpeg` (quality 0.85, see-through parts on white) or
+  `image/png` for a picture with see-through parts. `width` and `height`
+  are the size of `data`. Otherwise `data` is `''` and `type` is the
+  attachment's own.
+- `maxSide` is the long edge, 64 to 2,576 px, 1,568 by default; images are
+  never made larger. EXIF orientation is applied, and an animated image
+  gives its first frame.
+- `alt` is the alt text the message's HTML gives this inline image.
+- `exif: true` adds `exif: { taken, lat, lon }` when the photo has them
+  (`taken` like `2026-10-31T14:05:30`, with the offset when the camera
+  wrote one). Off unless asked: only ask when the user wants the date or
+  place.
+
+**`getThread(emailId, { accountId })`** (`email:read`, flag `threads`, 60
+a minute). Every message of the conversation the message belongs to, as
+`EmailReadView`s with `accountId`, oldest first. A conversation longer
+than 50 gives its newest 50; only those are fetched. A message the server
+lists in no conversation comes back alone.
+
+**`getThreadCount(emailId, { accountId })`** (`email:read`, flag
+`threads`, 120 a minute, a limit apart from `getThread`'s). How many
+messages the conversation has, 1 for a message in none. It reads no
+message bodies, so a panel can call it to decide whether to offer a
+conversation read.
+
+**`listSelection`** (flag `listSelection`). The `email-detail-sidebar`
+slot gets the messages ticked in the list, with `email:read`:
+`{ emails: [{ id, accountId }], total }` when two or more are ticked, else
+`null`. `emails` names at most 50, `total` counts them all. Rows of
+another connected login are counted but not listed. A Pro email tab's
+panel always gets `null`, and `app-side-panel` doesn't get the prop.
+
+<!-- TODO(C): the More actions host calls -->
+<!-- TODO(D): the Files host calls -->
 
 ### api.accountData
 
