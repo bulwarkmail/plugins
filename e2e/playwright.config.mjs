@@ -6,6 +6,8 @@ export default defineConfig({
   testDir: '..',
   testMatch: ['*/e2e/**/*.spec.mjs', 'e2e/**/*.spec.mjs'],
   testIgnore: ['**/node_modules/**'],
+  // With BULWARK_JMAP_URL: check once that the run's accounts exist.
+  globalSetup: './global-setup.mjs',
   fullyParallel: false,
   workers: 1,
   timeout: 180_000,

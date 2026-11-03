@@ -5,8 +5,9 @@ import { installPlugin, uninstallPlugin, preparePage, setPluginConfig, signIn, w
 // Settings: which service is used, and connecting the user's own key
 // through the host's dialog (the key goes to the server, never the plugin).
 
+import { MOCK, MOCK_HOST } from './common.mjs';
+
 const ID = 'ai-assistant';
-const MOCK = 'http://localhost:18099';
 
 async function configure(api, extra = {}) {
   const values = {
@@ -27,7 +28,7 @@ function settingsFrame(page) {
 async function openSettings(page) {
   // In-app navigation: plugins start with the mail view.
   await page.getByRole('link', { name: 'Settings' }).first().click();
-  await page.getByRole('button', { name: 'AI Writing Assistant' }).click();
+  await page.getByRole('button', { name: 'AI Assistant' }).click();
   await expect(settingsFrame(page).getByTestId('ai-status')).toBeVisible({ timeout: 30_000 });
 }
 
@@ -41,7 +42,7 @@ for (const theme of ['light', 'dark']) {
       await waitForPlugin(page, ID);
       await openSettings(page);
       const frame = settingsFrame(page);
-      await expect(frame.getByTestId('ai-status')).toHaveText('Uses Anthropic at localhost:18099, model mock-claude, set up by your administrator.');
+      await expect(frame.getByTestId('ai-status')).toHaveText(`Uses Anthropic at ${MOCK_HOST}, model mock-claude, set up by your administrator.`);
       // The lookups (calendar, contacts, the original message) are on by default and can be turned off.
       const lookups = frame.getByRole('switch', { name: 'Let the assistant look things up' });
       await expect(lookups).toBeChecked();
@@ -61,7 +62,7 @@ for (const theme of ['light', 'dark']) {
       await expect(dialog.getByLabel('Server address')).toHaveValue(`${MOCK}/openai/v1`);
       await dialog.getByLabel('Password or key').fill('test-openai-key');
       await dialog.getByRole('button', { name: 'Connect', exact: true }).click();
-      await expect(frame.getByTestId('ai-status')).toHaveText('Uses OpenAI-compatible at localhost:18099, model mock-gpt-small, with your own key.');
+      await expect(frame.getByTestId('ai-status')).toHaveText(`Uses OpenAI-compatible at ${MOCK_HOST}, model mock-gpt-small, with your own key.`);
       await shoot(page, ID, 'settings-own-key', theme);
 
       await frame.getByRole('button', { name: 'Stop using my key' }).click();

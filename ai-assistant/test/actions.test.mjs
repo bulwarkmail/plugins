@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 import {
   actionToolsFor, describeAction, effectiveActionMode, findFolder, performAction, undoAction,
 } from '../src/lib/actions.js';
@@ -17,7 +17,7 @@ const FOLDERS = [
 ];
 
 const apiWith = (handlers = {}) => fakeApi({
-  translations: manifest.locales,
+  translations: allStrings(),
   handlers: {
     'email.get': async (id) => (id === 'M1' ? MESSAGE : null),
     'mailboxes.list': async () => FOLDERS,
@@ -161,6 +161,21 @@ describe('carrying out and taking back', () => {
     await performAction(api, mail.plan);
     expect(api.calls('compose.open')[0].args).toEqual([{ to: ['anna@example.org', 'ben@example.org'], subject: 'Slides', body: 'Here they are.' }]);
     expect(api.calls().some((c) => /send|submit|destroy|delete/i.test(c.method) && !c.method.startsWith('calendar') && !c.method.startsWith('tasks'))).toBe(false);
+  });
+
+  it('asks first for a new message to anyone the user didn\'t name, whatever the mode', async () => {
+    const api = apiWith({});
+    // Typed by the user in the chat, or taking part in the open message: the user's choice.
+    const typed = await describeAction(api, 'draft_email', { to: ['anna@example.org'], subject: 's', body: 'b' }, { userTyped: 'write to anna@example.org about Friday' });
+    expect(typed.alwaysAsk).toBe(false);
+    const participant = await describeAction(api, 'draft_email', { to: ['Bob@Example.org'], subject: 's', body: 'b' }, { participants: ['bob@example.org'] });
+    expect(participant.alwaysAsk).toBe(false);
+    // Found only in data (a mail, a lookup): ask.
+    const chosen = await describeAction(api, 'draft_email', { to: ['anna@example.org', 'x@example.com'], subject: 's', body: 'b' }, { userTyped: 'reply to anna@example.org', participants: [] });
+    expect(chosen.alwaysAsk).toBe(true);
+    expect(chosen.summary).toContain('x@example.com');
+    const none = await describeAction(api, 'draft_email', { to: ['x@example.com'], subject: 's', body: 'b' }, {});
+    expect(none.alwaysAsk).toBe(true);
   });
 
   it('fails when the composer did not open', async () => {

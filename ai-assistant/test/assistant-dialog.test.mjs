@@ -5,13 +5,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { anthropicSse, streamResponse } from './helpers.mjs';
 import { AssistantDialog, keepEdges, taskFor } from '../src/ui/AssistantDialog.jsx';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(cleanup);
 
 const CONFIG = { anthropicBaseUrl: 'http://localhost:18099/anthropic/v1' };
-const CONSENT = 'consent:anthropic:http://localhost:18099';
+const CONSENT = 'consent:v2:anthropic:http://localhost:18099';
 
 /**
  * A composer with this body and selection, and a model that answers
@@ -21,7 +21,7 @@ const CONSENT = 'consent:anthropic:http://localhost:18099';
 async function makeApi({ body = '', selection = '', answer = 'Answer.', consent = true, hold = false, replaceResult = true } = {}) {
   let release = () => {};
   const api = fakeApi({
-    translations: manifest.locales,
+    translations: allStrings(),
     handlers: {
       'admin.getAllConfig': async () => CONFIG,
       'composer.getSelection': async () => ({ html: selection ? `<p>${selection}</p>` : '', text: selection, empty: !selection }),

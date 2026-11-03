@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { runTask, loadSetup, ensureConsent, consentKey } from '../src/lib/assistant.js';
 import { anthropicSse, streamResponse } from './helpers.mjs';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
 const config = { anthropicBaseUrl: 'http://localhost:18099/anthropic/v1', anthropicModel: 'mock' };
 
 function apiWith({ cfg = config, confirm = true, accounts = [] } = {}) {
   return fakeApi({
-    translations: manifest.locales,
+    translations: allStrings(),
     handlers: {
       'admin.getAllConfig': async () => cfg,
       'proxy.accounts': async () => accounts,

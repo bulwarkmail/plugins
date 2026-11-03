@@ -11,9 +11,10 @@
 // in, so the preview grows word by word.
 
 import { streamTurn } from './client.js';
-import { AiError } from './errors.js';
+import { AiError, failureReason } from './errors.js';
 import { clip } from './prompts.js';
 import { parseWidgetJson } from './widgets.js';
+import { withoutImages } from './providers.js';
 
 /** How many turns of the conversation go back to the model. */
 export const HISTORY_TURNS = 12;
@@ -22,7 +23,26 @@ export const HISTORY_CHARS = 6000;
 /** How often the model may call tools before it has to answer. */
 export const MAX_TOOL_ROUNDS = 4;
 
-const TAGS = { text: /<text>\s*/i, widget: /<widget>\s*/i };
+// A new email (no message to reply to) names its recipients and subject:
+// <text to="anna@example.org, bo@example.org" subject="Our call">.
+const TAGS = { text: /<text((?:\s+[a-z]+\s*=\s*"[^"]*")*)\s*>\s*/i, widget: /<widget>\s*/i };
+const ADDRESS = /^[^\s@<>",]+@[^\s@<>",]+\.[^\s@<>",]+$/;
+
+/** The to and subject of a <text> tag; addresses only, at most 20. */
+function draftHeaders(attrs) {
+  const out = {};
+  for (const [, name, value] of String(attrs ?? '').matchAll(/([a-z]+)\s*=\s*"([^"]*)"/gi)) {
+    const key = name.toLowerCase();
+    if (key === 'to') {
+      // "Anna <anna@example.org>" is taken as its address.
+      const to = value.split(/[,;]/).map((a) => (/<([^<>]+)>/.exec(a)?.[1] ?? a).trim()).filter((a) => ADDRESS.test(a)).slice(0, 20);
+      if (to.length) out.to = to;
+    } else if (key === 'subject' && value.trim()) {
+      out.subject = value.trim().slice(0, 200);
+    }
+  }
+  return out;
+}
 const CLOSE = { text: /\s*<\/text>/i, widget: /\s*<\/widget>/i };
 
 function stripFence(text) {
@@ -35,7 +55,7 @@ function nextTag(rest) {
   let best = null;
   for (const kind of Object.keys(TAGS)) {
     const m = TAGS[kind].exec(rest);
-    if (m && (!best || m.index < best.index)) best = { kind, index: m.index, length: m[0].length };
+    if (m && (!best || m.index < best.index)) best = { kind, index: m.index, length: m[0].length, attrs: m[1] };
   }
   return best;
 }
@@ -53,21 +73,23 @@ export function parseAnswer(answer) {
   for (;;) {
     const open = nextTag(rest);
     if (!open) {
-      say(rest);
+      // An opening tag still coming in (its attributes take a while) is not talk.
+      say(rest.replace(/<text\s[^>]*$/i, ''));
       break;
     }
     say(rest.slice(0, open.index));
     const after = rest.slice(open.index + open.length);
     const close = CLOSE[open.kind].exec(after);
+    const headers = open.kind === 'text' ? draftHeaders(open.attrs) : {};
     if (!close) {
       // Still streaming, or the model forgot the closing tag.
       const body = after.replace(/<\/?(?:te?x?t?|wi?d?g?e?t?)$/i, '');
-      if (open.kind === 'text') out.push({ kind: 'proposal', text: stripFence(body).replace(/^\n+/, ''), open: true });
+      if (open.kind === 'text') out.push({ kind: 'proposal', text: stripFence(body).replace(/^\n+/, ''), open: true, ...headers });
       else out.push({ kind: 'widget', widget: null, open: true });
       break;
     }
     const body = after.slice(0, close.index);
-    if (open.kind === 'text') out.push({ kind: 'proposal', text: stripFence(body).trim(), open: false });
+    if (open.kind === 'text') out.push({ kind: 'proposal', text: stripFence(body).trim(), open: false, ...headers });
     else {
       const widget = parseWidgetJson(stripFence(body));
       if (widget) out.push({ kind: 'widget', widget, open: false });
@@ -104,10 +126,13 @@ export function historyMessages(turns, { limit = HISTORY_TURNS, chars = HISTORY_
  * onStep({ id, name, args, status, result, widget }): a tool call starting
  * ('running') and finishing ('done' | 'failed'). `runTool` resolves to the
  * text for the model, or { text, widget, action } with a card for the panel
- * or the state of an action; it gets the call's { id } as third argument.
- * Resolves to { text, steps }. Rejects with AiError like streamTurn.
+ * or the state of an action; it gets the call's { id, imagesRefused } as
+ * third argument (imagesRefused: the service refused images in this chat,
+ * so hand over names only). `images: false`: the model can't see images, so
+ * every image goes as its name. Resolves to { text, steps }. Rejects with
+ * AiError like streamTurn.
  */
-export async function runChat(api, endpoint, { system, messages, tools = [], runTool, maxTokens = 2500 }, {
+export async function runChat(api, endpoint, { system, messages, tools = [], runTool, maxTokens = 2500, images = true }, {
   onText = () => {},
   onStep = () => {},
   signal,
@@ -116,19 +141,35 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
   const history = [...messages];
   const steps = [];
   let lastSaid = '';
+  let imagesRefused = false;
   for (let round = 0; ; round++) {
-    const allowTools = tools.length > 0 && typeof runTool === 'function' && round < MAX_TOOL_ROUNDS;
-    const turn = await streamTurn(api, endpoint, {
+    const canUseTools = tools.length > 0 && typeof runTool === 'function';
+    const allowTools = canUseTools && round < MAX_TOOL_ROUNDS;
+    // After the last round the tools stay in the request (the history holds
+    // tool calls, and Anthropic refuses those without tools), but the model
+    // may not call them any more: it has to answer.
+    const ask = () => streamTurn(api, endpoint, {
       system,
-      messages: history,
+      // Once refused, every later request of this chat goes without images too.
+      messages: imagesRefused ? withoutImages(history, IMAGE_REFUSED) : history,
       maxTokens,
-      ...(allowTools ? { tools } : {}),
+      ...(images === false ? { images: false } : {}),
+      ...(canUseTools ? { tools, ...(allowTools ? {} : { toolChoice: 'none' }) } : {}),
     }, {
       signal,
       ...timeouts,
       onText: (full) => onText(full),
     });
-    if (!turn.toolCalls.length) {
+    let turn;
+    try {
+      turn = await ask();
+    } catch (err) {
+      // A model that can't see images: once more with their names only, and the model says so.
+      if (imagesRefused || !isImageRefusal(err) || !history.some((m) => Array.isArray(m.content))) throw err;
+      imagesRefused = true;
+      turn = await ask();
+    }
+    if (!turn.toolCalls.length || !allowTools) {
       // The answer. A model that only narrated before its last lookup and
       // then fell silent keeps that narration rather than nothing.
       const text = turn.text.trim() ? turn.text : lastSaid;
@@ -145,12 +186,15 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
       steps.push(step);
       onStep({ ...step });
       let result;
+      // Images a lookup returned go to the model with its text, never into the step (it is stored).
+      let images = [];
       try {
-        const out = await runTool(call.name, call.args ?? {}, { id: call.id });
+        const out = await runTool(call.name, call.args ?? {}, { id: call.id, ...(imagesRefused ? { imagesRefused: true } : {}) });
         if (out && typeof out === 'object') {
           result = String(out.text ?? '');
           step.widget = out.widget ?? null;
           if (out.action) step.action = out.action;
+          if (Array.isArray(out.images)) images = out.images.filter((img) => img && img.data);
         } else {
           result = String(out);
         }
@@ -158,10 +202,24 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
       } catch (err) {
         result = `The tool failed: ${err?.message ?? 'unknown error'}`;
         step.status = 'failed';
+        step.reason = failureReason(err);
       }
       step.result = result;
       onStep({ ...step });
-      history.push({ role: 'tool', toolCallId: call.id, name: call.name, content: result });
+      history.push({
+        role: 'tool', toolCallId: call.id, name: call.name,
+        content: images.length ? [{ type: 'text', text: result }, ...images.map((img) => ({ type: 'image', ...img }))] : result,
+      });
     }
   }
 }
+
+/** Whether the service refused a request because of its images (a model that can't see them). */
+export function isImageRefusal(err) {
+  if (!(err instanceof AiError) || !['bad_request', 'server', 'not_found'].includes(err.code)) return false;
+  const text = String(err.detail ?? '');
+  return /image|vision|multimodal/i.test(text) && /not support|unsupported|invalid|does not|doesn't|cannot|can't/i.test(text);
+}
+
+/** Why the model only hears an image's name after the service refused it. */
+export const IMAGE_REFUSED = 'The AI service refused the image, so you only have its name: tell the user so.';

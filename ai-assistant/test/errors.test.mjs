@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { AiError, errorFromResponse, errorFromStream, messageFor, parseRetryAfter } from '../src/lib/errors.js';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
-const en = manifest.locales.en;
+const en = allStrings().en;
 const t = (key, vars = {}) => (en[key] ?? key).replace(/\{(\w+)\}/g, (m, n) => (n in vars ? String(vars[n]) : m));
 
 describe('parseRetryAfter', () => {
@@ -29,6 +29,9 @@ describe('errorFromResponse', () => {
 
   it('maps the proxy\'s own refusals', () => {
     expect(errorFromResponse({ status: 404, proxyError: 'no_credential', headers: {} }).code).toBe('not_configured');
+    // A plain-http address the server may not reach: blocked, not "not set up".
+    expect(errorFromResponse({ status: 404, proxyError: 'no_credential', headers: {} }, { baseUrl: 'http://10.0.0.5:11434/v1' }).code).toBe('blocked');
+    expect(errorFromResponse({ status: 404, proxyError: 'no_credential', headers: {} }, { baseUrl: 'https://api.openai.com/v1' }).code).toBe('not_configured');
     expect(errorFromResponse({ status: 504, proxyError: 'timeout', headers: {} }).code).toBe('timeout');
     expect(errorFromResponse({ status: 429, proxyError: 'rate_limited', headers: { 'retry-after': '3' } })).toMatchObject({ code: 'rate_limit', retryAfter: 3 });
     expect(errorFromResponse({ status: 403, proxyError: 'blocked_address', headers: {} }).code).toBe('blocked');
@@ -55,5 +58,15 @@ describe('messageFor', () => {
     for (const code of ['not_configured', 'declined', 'bad_key', 'forbidden', 'not_found', 'rate_limit', 'quota', 'busy', 'timeout', 'too_long', 'bad_request', 'blocked', 'unreachable', 'server', 'empty', 'cancelled']) {
       expect(en[`error.${code}`], code).toBeTruthy();
     }
+  });
+});
+
+describe('why an action failed', () => {
+  it('names a missing folder, also one with a name', async () => {
+    const { failureReason } = await import('../src/lib/errors.js');
+    expect(failureReason(new Error('email.archive: this account has no Archive folder'))).toBe('folder');
+    expect(failureReason(new Error('no folder "Projects"; the folders are: Inbox'))).toBe('folder');
+    expect(failureReason(new Error('no message with that id'))).toBe('gone');
+    expect(failureReason(new Error('boom'))).toBe('other');
   });
 });

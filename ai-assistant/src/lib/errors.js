@@ -1,5 +1,19 @@
 // Turn whatever went wrong into one of a few cases the user can act on.
 
+/**
+ * Why a lookup or an action failed, in words the user can be shown (the
+ * error's own message is for the model): gone, folder, calendar, denied or other.
+ */
+export function failureReason(err) {
+  if (err && typeof err.reason === 'string') return err.reason;
+  const text = String(err?.message ?? err ?? '');
+  if (/no message with that id|not ?found|no longer exists|doesn't exist any more|was deleted/i.test(text)) return 'gone';
+  if (/\bno (?:\w+ )?folder|mailbox/i.test(text)) return 'folder';
+  if (/calendar|event/i.test(text) && /refus|reject|invalid|fail/i.test(text)) return 'calendar';
+  if (/permission|not allowed|forbidden|denied|refused/i.test(text)) return 'denied';
+  return 'other';
+}
+
 export class AiError extends Error {
   /**
    * code: not_configured | declined | bad_key | forbidden | not_found |
@@ -67,10 +81,18 @@ const PROXY_ERRORS = {
   too_large: 'too_long',
 };
 
-/** An AiError for a response that is not ok: { status, headers, body, proxyError }. */
-export function errorFromResponse(res) {
+/**
+ * An AiError for a response that is not ok: { status, headers, body, proxyError }.
+ * `endpoint`: where it went. The proxy finds no credential for a plain-http
+ * address it may not reach (one the server's admin didn't allow), which is a
+ * blocked address, not a missing setup.
+ */
+export function errorFromResponse(res, endpoint) {
   const status = res?.status ?? 0;
   const retryAfter = parseRetryAfter(header(res?.headers, 'retry-after'));
+  if (res?.proxyError === 'no_credential' && /^http:\/\//i.test(String(endpoint?.baseUrl ?? ''))) {
+    return new AiError('blocked', { status });
+  }
   if (res?.proxyError) {
     return new AiError(PROXY_ERRORS[res.proxyError] ?? 'unreachable', { status, retryAfter });
   }

@@ -9,6 +9,19 @@
 // user's language; performAction() carries the plan out and returns the text
 // for the model and, where it can be taken back, how to undo it.
 
+import { areaAction, areaActions, offered } from './areas/index.js';
+
+const ADDRESS_IN_TEXT = /[^\s@<>"',;()]+@[^\s@<>"',;()]+\.[^\s@<>"',;().]+/g;
+
+/** Whether the user named `address`: typed in the chat (ctx.userTyped) or a participant of the open message (ctx.participants). */
+export function knownRecipient(address, ctx = {}) {
+  const wanted = String(address ?? '').trim().toLowerCase();
+  if (!wanted) return false;
+  const typed = (String(ctx.userTyped ?? '').match(ADDRESS_IN_TEXT) ?? []).map((a) => a.toLowerCase());
+  const people = (ctx.participants ?? []).map((a) => String(a).toLowerCase());
+  return typed.includes(wanted) || people.includes(wanted);
+}
+
 /** Most actions one answer may take without asking, in automatic mode. */
 export const MAX_AUTO_ACTIONS = 5;
 
@@ -111,7 +124,7 @@ export const ACTION_DEFINITIONS = {
 };
 
 export const ACTION_TOOLS = new Set(Object.keys(ACTION_DEFINITIONS));
-export const isActionTool = (name) => ACTION_TOOLS.has(name);
+export const isActionTool = (name) => ACTION_TOOLS.has(name) || !!areaAction(name);
 
 /**
  * The action tools for a chat. `ctx.actions` is the mode ('off' offers
@@ -120,9 +133,12 @@ export const isActionTool = (name) => ACTION_TOOLS.has(name);
  */
 export function actionToolsFor(ctx = {}) {
   if (!ctx.actions || ctx.actions === 'off') return [];
-  return Object.entries(ACTION_DEFINITIONS)
+  const core = Object.entries(ACTION_DEFINITIONS)
     .filter(([name]) => (name === 'draft_reply' ? !!ctx.openEmailId : name === 'draft_email' ? ctx.mode !== 'composer' : true))
     .map(([name, def]) => ({ name, ...def }));
+  // The 2.2 areas' actions (src/lib/areas), where they are offered.
+  const extra = areaActions().filter((action) => offered(action, ctx)).map(({ name, description, parameters }) => ({ name, description, parameters }));
+  return [...core, ...extra];
 }
 
 /** The mode in effect: the user's choice, at most what the administrator allows. */
@@ -180,7 +196,18 @@ function nextDay(date) {
  * throws with a message for the model when the arguments are wrong.
  */
 export async function describeAction(api, name, args = {}, ctx = {}) {
+  const area = areaAction(name);
+  if (area) {
+    if (!offered(area, ctx)) throw new Error(`${name} is not available here`);
+    const described = await area.describe(api, args, ctx);
+    const { summary, plan } = described;
+    // An action may also ask first for this one call (described.alwaysAsk).
+    const alwaysAsk = (typeof area.alwaysAsk === 'function' ? area.alwaysAsk(args, ctx) === true : area.alwaysAsk === true)
+      || described.alwaysAsk === true;
+    return { summary, plan: { ...plan, name, area: area.area }, alwaysAsk };
+  }
   const t = api.i18n.t;
+  // (draft_email sets alwaysAsk itself; the other core actions follow the mode.)
   const locale = api.i18n?.getLocale?.() ?? 'en';
   switch (name) {
     case 'archive_message': {
@@ -276,7 +303,11 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
       if (bad) throw new Error(`"${bad}" is not an address; find_contact gives addresses`);
       const subject = text(args.subject, 300);
       const body = text(args.body, 20000);
-      return { summary: t('action.draft_email', { to: to.join(', '), subject: subject || '…' }), plan: { name, message: { to, subject, body } } };
+      // Recipients the model chose ask first, whatever the mode: an address
+      // counts as the user's only when they typed it in the chat or it is a
+      // participant of the open message (never one found only in data).
+      const alwaysAsk = to.some((a) => !knownRecipient(a, ctx));
+      return { summary: t('action.draft_email', { to: to.join(', '), subject: subject || '…' }), plan: { name, message: { to, subject, body } }, alwaysAsk };
     }
     default:
       throw new Error(`unknown action ${name}`);
@@ -288,6 +319,11 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
  * can't be taken back); throws when the webmail refused.
  */
 export async function performAction(api, plan) {
+  const area = plan?.area ? areaAction(plan.name) : null;
+  if (area) {
+    const done = await area.perform(api, plan);
+    return { text: done?.text ?? 'Done.', undo: done?.undo ? { ...done.undo, action: plan.name } : null };
+  }
   switch (plan.name) {
     case 'archive_message':
     case 'move_message': {
@@ -335,6 +371,8 @@ export async function performAction(api, plan) {
 
 /** Take an action back. */
 export async function undoAction(api, undo) {
+  const area = undo?.action ? areaAction(undo.action) : null;
+  if (area) return area.undo(api, undo);
   switch (undo?.kind) {
     case 'move': return api.email.move([undo.id], undo.mailboxId);
     case 'keywords':

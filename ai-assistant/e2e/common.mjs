@@ -4,7 +4,10 @@ import { expect } from '@playwright/test';
 import { setPluginConfig } from '../../e2e/helpers.mjs';
 
 export const ID = 'ai-assistant';
-export const MOCK = 'http://localhost:18099';
+/** The mock AI services (test-env/mocks/server.py); BULWARK_MOCK_URL when it runs elsewhere. */
+export const MOCK = (process.env.BULWARK_MOCK_URL || 'http://localhost:18099').replace(/\/+$/, '');
+/** host:port of the mock, as the privacy notice names it. */
+export const MOCK_HOST = new URL(MOCK).host;
 const SLOT_FRAME = `iframe[title="plugin-${ID}-slot"]`;
 
 /** Admin config: Anthropic mock by default; pass overrides (null clears a key). */
@@ -72,15 +75,12 @@ export function composerPanel(page) {
 
 /**
  * The assistant panel next to an open message. It starts folded: the
- * Assistant button in the message's toolbar opens it (the host's strip
- * button when the toolbar put it behind More).
+ * host's panel button at the end of the reader's toolbar opens it.
  */
 export async function readerPanel(page) {
   const host = page.locator('[data-plugin-detail-panel]');
   if (!(await host.isVisible().catch(() => false))) {
-    const button = page.locator(`[data-plugin-actions="reader-actions"] [aria-label="Assistant"]`).first();
-    if (await button.isVisible().catch(() => false)) await button.click();
-    else await page.getByRole('button', { name: 'Show plugin panel' }).click();
+    await page.locator('[data-plugin-panel-toggle]').first().click({ timeout: 60_000 });
   }
   const frame = page.frameLocator(`[data-plugin-detail-panel] ${SLOT_FRAME}`);
   await expect(frame.getByRole('textbox', { name: 'Message to the assistant' })).toBeVisible({ timeout: 60_000 });
@@ -89,7 +89,7 @@ export async function readerPanel(page) {
 
 /** The assistant dialog (phones): the host's box (title, footer buttons) and the plugin's frame inside it. */
 export function assistantDialog(page) {
-  const box = page.getByRole('dialog').filter({ hasText: 'Writing assistant' });
+  const box = page.getByRole('dialog').filter({ hasText: 'AI assistant' });
   return { box, frame: box.frameLocator(SLOT_FRAME) };
 }
 
@@ -177,4 +177,29 @@ export async function selectLastLine(page) {
   await box.click();
   await box.press('Control+End');
   await box.press('Shift+Home');
+}
+
+/** A scripted answer of the mock (test-env/mocks/README.md): name it in a message with [[mock:<name>]]. */
+export async function mockScript(name, steps) {
+  const res = await fetch(`${MOCK}/__ai/scripts`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, steps }) });
+  if (!res.ok) throw new Error(`mock script ${name}: HTTP ${res.status}`);
+}
+
+/** The AI requests the mock got for a script, oldest first: [{ provider, step, tools, body }]. */
+export async function mockRequests(name) {
+  const res = await fetch(`${MOCK}/__ai/requests?marker=${encodeURIComponent(name)}`);
+  if (!res.ok) throw new Error(`mock requests: HTTP ${res.status}`);
+  return res.json();
+}
+
+/** Search for a message by its subject and open it (other suites add mail to the same inbox). */
+export async function openMessage(page, subject, target = page.getByText(subject, { exact: true }).first()) {
+  const opener = page.getByRole('button', { name: /Search mail/ });
+  if (await opener.isVisible().catch(() => false)) await opener.click();
+  const search = page.getByRole('combobox', { name: /Search mail/ });
+  await search.click();
+  await search.fill(subject.replace(/^Re: /, ''));
+  await search.press('Enter');
+  await target.waitFor({ timeout: 60_000 });
+  await target.click({ force: true });
 }

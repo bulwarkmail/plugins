@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { anthropicSse, streamResponse } from './helpers.mjs';
 import { AssistantPanel, sourceFor, taskForAction } from '../src/ui/Panel.jsx';
+import { undoHint } from '../src/ui/panel/Turns.jsx';
 import { chatKey, pendingKey, COMPOSER_CONTEXT_KEY } from '../src/lib/background.js';
-import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
 // The chat panel next to the composer and next to an open message.
 
@@ -14,14 +15,15 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(cleanup);
 
 const CONFIG = { anthropicBaseUrl: 'http://localhost:18099/anthropic/v1' };
-const CONSENT = 'consent:anthropic:http://localhost:18099';
+const CONSENT = 'consent:v2:anthropic:http://localhost:18099';
 const EMAIL = { id: 'M1', subject: 'Thursday', receivedAt: '2026-10-12T09:00:00Z', from: [{ name: 'Carol', email: 'carol@example.org' }], text: 'Can we meet on Thursday at 3?' };
 
 /** A model that answers each request in turn; the last answer repeats. */
-function makeApi({ answers = ['Answer.'], body = 'Hello Bob, can we meet tuesday? Thanks', consent = true, handlers = {} } = {}) {
+function makeApi({ answers = ['Answer.'], body = 'Hello Bob, can we meet tuesday? Thanks', consent = true, handlers = {}, timeZone } = {}) {
   let i = 0;
   const api = fakeApi({
-    translations: manifest.locales,
+    translations: allStrings(),
+    ...(timeZone ? { timeZone } : {}),
     handlers: {
       'admin.getAllConfig': async () => CONFIG,
       'composer.getBody': async () => ({ html: `<p>${body}</p>`, text: body }),
@@ -110,7 +112,7 @@ describe('the composer panel', () => {
     expect(prompt.system).toContain('<draft>\nHello Bob, can we meet tuesday? Thanks\n</draft>');
     expect(prompt.system).toContain('writing a reply to "Lunch"');
     expect(prompt.system).toContain('<text></text>');
-    expect(prompt.tools.map((t) => t.name)).toEqual(['read_original_message', 'check_calendar', 'find_contact', 'search_mail', 'read_message', 'read_my_settings', 'find_setting']);
+    expect(prompt.tools.map((t) => t.name)).toEqual(['read_original_message', 'check_calendar', 'find_contact', 'search_mail', 'read_message', 'read_my_settings', 'find_setting', 'list_templates']);
     expect(prompt.messages.at(-1)).toEqual({ role: 'user', content: 'add that I am away on Friday' });
     expect(screen.getByText('Here it is:')).toBeTruthy();
     expect([...document.querySelectorAll('ins')].map((x) => x.textContent).join(' ')).toContain('away on Friday');
@@ -386,7 +388,8 @@ describe('taking context out', () => {
     const view = await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
     await click(removeButton());
     expect(screen.queryByText('This message')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull();
+    // Actions stays, with ways to start instead of the message's actions.
+    expect(screen.getByRole('button', { name: 'Actions' })).toBeTruthy();
     await type('write a haiku about autumn');
     await pressEnter();
     await settled();
@@ -394,7 +397,7 @@ describe('taking context out', () => {
     expect(system).not.toContain('Can we meet on Thursday');
     expect(system).toContain('(not available)');
     // Brought back by hand...
-    await click(screen.getByRole('button', { name: 'Add this message' }));
+    await click(screen.getByRole('button', { name: 'Add “Thursday”' }));
     expect(screen.getByText('This message')).toBeTruthy();
     // ...or by opening another message.
     await click(removeButton());
@@ -468,12 +471,41 @@ describe('the reader panel across messages', () => {
     await waitFor(async () => expect((await api.storage.get('chat:reader'))?.turns.filter((turn) => turn.role === 'context')).toHaveLength(1));
   });
 
-  it('works with no message open: chat yes, actions no', async () => {
+  it('says in the transcript when the message leaves the conversation, and names it on the chip that brings it back', async () => {
+    const api = makeApi({ answers: ['On Thursday.', 'Sure.', 'Again.', 'Back.'] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('when?');
+    await pressEnter();
+    await settled();
+    await click(screen.getByRole('button', { name: 'Remove from context' }));
+    // The chip names the message it brings back.
+    expect(screen.getByRole('button', { name: 'Add “Thursday”' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Add this message' })).toBeNull();
+    await type('write a haiku');
+    await pressEnter();
+    await settled();
+    const markers = () => [...document.querySelectorAll('[data-turn="context"]')].map((el) => el.textContent);
+    expect(markers()).toEqual(['No longer about: Thursday']);
+    expect(sentPrompt(api).messages.at(-1).content).toContain('took the message out');
+    // Only once.
+    await type('another');
+    await pressEnter();
+    await settled();
+    expect(markers()).toEqual(['No longer about: Thursday']);
+    // Back to the message: the switch is marked again.
+    await click(screen.getByRole('button', { name: 'Add “Thursday”' }));
+    await type('and now?');
+    await pressEnter();
+    await settled();
+    expect(markers()).toEqual(['No longer about: Thursday', 'Now about: Thursday']);
+  });
+
+  it('works with no message open: chat yes, actions to start with', async () => {
     const api = makeApi();
     await mount(api, { email: null, selection: null, focusRequest: 0 });
     expect(screen.queryByText('No message open')).toBeNull();
     expect(document.querySelector('[data-context-chip]')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Actions' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Message to the assistant' }).getAttribute('placeholder')).toBe('Ask anything, or search your mail…');
   });
 
@@ -531,6 +563,51 @@ describe('the reader panel', () => {
     expect(screen.getByText('Reply opened')).toBeTruthy();
   });
 
+  it('with no message open, opens a draft as a new message to the recipients the model named', async () => {
+    const api = makeApi({
+      answers: ['Here is a draft.\n<text to="info@it-media-hof.de" subject="Kurzes Gespräch">Hallo Jannis,\nhast du Zeit?</text>'],
+      handlers: { 'compose.open': async () => 'opened' },
+    });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    await type('Schreib Jannis eine Mail');
+    await pressEnter();
+    await settled();
+    expect(screen.queryByRole('button', { name: 'Open as reply' })).toBeNull();
+    expect(screen.getByText('To: info@it-media-hof.de')).toBeTruthy();
+    expect(screen.getByText('Subject: Kurzes Gespräch')).toBeTruthy();
+    await click(button('Open as new message'));
+    await waitFor(() => expect(api.calls('compose.open').map((c) => c.args)).toEqual([[{ to: ['info@it-media-hof.de'], subject: 'Kurzes Gespräch', body: 'Hallo Jannis,\nhast du Zeit?' }]]));
+    expect(api.calls('compose.reply')).toEqual([]);
+    expect(screen.getByText('New message opened')).toBeTruthy();
+    expect(screen.queryByText(/couldn't change your message/)).toBeNull();
+  });
+
+  it('with no message open, offers a time for a new email, not a reply', async () => {
+    const api = makeApi({ answers: ['Free then:\n<widget>{"type":"times","items":[{"start":"2026-10-30T15:00:00","end":"2026-10-30T16:00:00"}]}</widget>'] });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    await type('when am I free?');
+    await pressEnter();
+    await settled();
+    expect(screen.queryByRole('button', { name: 'Reply with this time' })).toBeNull();
+    await click(button('Propose this time'));
+    await settled();
+    expect(sentPrompt(api).messages.at(-1).content).toMatch(/^Draft an email proposing .+\.$/);
+  });
+
+  it('opens a drafted reply to the message it was written for, after another one was opened', async () => {
+    const OTHER = { id: 'M2', subject: 'Invoice 42', receivedAt: '2026-10-13T09:00:00Z', from: [{ name: 'Dan', email: 'dan@example.org' }], text: 'Please pay invoice 42.' };
+    const api = makeApi({ answers: ['<text>Hi Carol, Thursday works.</text>'], handlers: { 'ui.openEmail': async () => true } });
+    const view = await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('draft a reply');
+    await pressEnter();
+    await settled();
+    await act(async () => { view.rerender(React.createElement(AssistantPanel, { api, email: OTHER, selection: { text: '' }, focusRequest: 0 })); });
+    await click(button('Open as reply'));
+    // The host replies only to the open message: the panel opens M1 first.
+    await waitFor(() => expect(api.calls('compose.reply').map((c) => c.args)).toEqual([['M1', { text: 'Hi Carol, Thursday works.' }]]));
+    expect(api.calls('ui.openEmail').map((c) => c.args[0])).toEqual(['M1']);
+  });
+
   it('shows the model\'s lookups as steps', async () => {
     const ev = (event, data) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     const toolTurn = ev('message_start', { type: 'message_start' })
@@ -578,7 +655,7 @@ describe('the reader panel', () => {
     expect(system).toContain('Email addresses: anna@example.org');
     expect(system).toContain('Signs emails with:\nKind regards,\nAnna');
     expect(system).toContain('Time zone: Europe/Zurich');
-    expect(system).toMatch(/Local date and time now: \w+/);
+    expect(system).toMatch(/Now it is \w+day, \d{4}-\d{2}-\d{2}, \d\d:\d\d in the user's time zone/);
     expect(system).toContain('Standing instructions from the administrator:\nWrite in British English.');
     expect(system).toContain('Standing instructions from the user (these win over the administrator\'s):\nKeep it short.');
     expect(system.indexOf('administrator')).toBeLessThan(system.indexOf('Keep it short.'));
@@ -586,6 +663,45 @@ describe('the reader panel', () => {
     await quickAction('Summarize');
     await settled();
     expect(sentPrompt(api).system).toContain('Keep it short.');
+  });
+
+  it('gives the model the user\'s own date at 00:30 in Berlin, not the UTC date', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-30T23:30:00Z'));
+    try {
+      const api = makeApi({ answers: ['Done.'], timeZone: 'Europe/Berlin', handlers: { 'user.getTimeZone': async () => 'Europe/Berlin' } });
+      await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+      await type('Was habe ich morgen?');
+      await pressEnter();
+      await settled();
+      const system = sentPrompt(api).system;
+      expect(system).toContain('Now it is Saturday, 2026-10-31, 00:30');
+      expect(system).toContain('Tomorrow is Sunday, 2026-11-01');
+      expect(system).not.toMatch(/Today is 2026-10-30/);
+      // The quick action for to-dos gets the same date.
+      await quickAction('To-dos and dates');
+      await settled();
+      expect(sentPrompt(api).system).toContain('Now it is Saturday, 2026-10-31, 00:30');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives the model the user\'s own date at 23:30 in Los Angeles', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-01T06:30:00Z'));
+    try {
+      const api = makeApi({ answers: ['Done.'], timeZone: 'America/Los_Angeles', handlers: { 'user.getTimeZone': async () => 'America/Los_Angeles' } });
+      await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+      await type('What do I have tomorrow?');
+      await pressEnter();
+      await settled();
+      const system = sentPrompt(api).system;
+      expect(system).toContain('Now it is Saturday, 2026-10-31, 23:30');
+      expect(system).toContain('Tomorrow is Sunday, 2026-11-01');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('draws the widgets the model adds and sends a chip as the next request', async () => {
@@ -639,5 +755,290 @@ describe('the reader panel', () => {
     await pressEnter();
     await settled();
     expect(sentPrompt(api).tools.map((t) => t.name)).toEqual(['find_setting']);
+  });
+});
+
+describe('quick action names', () => {
+  const userBubble = () => [...document.querySelectorAll('[data-turn="user"]')].at(-1)?.textContent;
+
+  it('name only the action when it works on the whole message or draft', async () => {
+    const reader = makeApi({ answers: ['- a point'] });
+    await mount(reader, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await quickAction('Summarize');
+    await settled();
+    expect(userBubble()).toBe('Summarize');
+    cleanup();
+
+    const composer = makeApi({ answers: ['Hello Bob, can we meet on Tuesday?'] });
+    await mount(composer, { composerId: 'c1', selection: { text: '', empty: true }, focusRequest: 0 });
+    await quickAction('Improve');
+    await settled();
+    expect(userBubble()).toBe('Improve');
+  });
+
+  it('keep the scope when it works on part of the text', async () => {
+    const api = makeApi({ answers: ['It means Thursday afternoon.'] });
+    await mount(api, { email: EMAIL, selection: { text: 'Thursday at 3' }, focusRequest: 0 });
+    await quickAction('Explain');
+    await settled();
+    expect(userBubble()).toBe('Explain · highlighted text');
+  });
+
+  it('ask for the language when Translate… comes from the right-click menu', async () => {
+    const api = makeApi({ answers: ['Donnerstag um 3'] });
+    await api.storage.set(pendingKey('reader', 'M1'), { action: 'translate', text: 'Thursday at 3', at: Date.now() });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 1 });
+    const picker = await screen.findByRole('combobox', { name: 'Translate into' });
+    expect(document.activeElement).toBe(picker);
+    // Nothing goes out before the language is chosen.
+    expect(api.calls('proxy.fetch')).toHaveLength(0);
+    await act(async () => { fireEvent.change(picker, { target: { value: 'de' } }); });
+    await settled();
+    expect(userBubble()).toBe('Translate to German · highlighted text');
+    expect(JSON.stringify(sentPrompt(api).messages)).toContain('Thursday at 3');
+    expect(screen.queryByRole('combobox', { name: 'Translate into' })).toBeNull();
+  });
+});
+
+describe('words for every platform and lookup', () => {
+  it('names the undo key of a Mac on a Mac', () => {
+    const t = (key) => allStrings().de[key];
+    expect(undoHint(t, 'Win32')).toBe('Strg+Z macht es rückgängig');
+    expect(undoHint(t, 'MacIntel')).toBe('⌘Z macht es rückgängig');
+    expect(undoHint((key) => allStrings().ja[key], 'macOS')).toBe('⌘Zで元に戻せます');
+  });
+
+  it('never shows the code name of a lookup it has no words for', async () => {
+    const api = makeApi();
+    // A saved answer with a lookup this version has no words for.
+    await api.storage.set('chat:reader', { turns: [
+      { id: 'u1', role: 'user', content: 'what is in the file?', label: 'what is in the file?', emailId: 'M1' },
+      { id: 'a1', role: 'assistant', content: 'A list.', status: 'done', task: 'chat', show: 'chat', steps: [{ id: 's1', name: 'read_punch_card', args: { name: 'list.txt' }, status: 'done', result: 'milk, eggs' }] },
+    ] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const box = await waitFor(() => { const el = document.querySelector('[data-steps]'); if (!el) throw new Error('no steps'); return el; });
+    expect(box.textContent).not.toContain('read_punch_card');
+    expect(box.textContent).toContain('Other');
+    await click(within(box).getByRole('button'));
+    expect(box.textContent).toContain('Looked something up');
+  });
+});
+
+describe('the saved chat', () => {
+  it('keeps only the start of a long message with each reader turn', async () => {
+    const long = { ...EMAIL, text: 'x'.repeat(9000) };
+    const api = makeApi({ answers: ['- point'] });
+    await mount(api, { email: long, selection: { text: '' }, focusRequest: 0 });
+    await quickAction('Summarize');
+    await settled();
+    // The model got all of it...
+    expect(sentPrompt(api).messages[0].content.length).toBeGreaterThan(9000);
+    // ...the storage keeps 2,000 characters.
+    await waitFor(async () => expect((await api.storage.get('chat:reader'))?.turns).toHaveLength(2));
+    const saved = (await api.storage.get('chat:reader')).turns[1];
+    expect(saved.source.length).toBe(2000);
+    expect(JSON.stringify(saved).length).toBeLessThan(5000);
+  });
+
+  it('says once when the storage is full', async () => {
+    const api = makeApi({ answers: ['One.', 'Two.'] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    api.storage.set = async () => { throw new Error('Plugin storage is full (1024 KB per account)'); };
+    await type('first');
+    await pressEnter();
+    await settled();
+    await waitFor(() => expect(api.calls('toast.error')).toHaveLength(1));
+    expect(api.calls('toast.error')[0].args[0]).toBe("The assistant's storage is full. Start a new chat to free space.");
+    await type('second');
+    await pressEnter();
+    await settled();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(api.calls('toast.error')).toHaveLength(1);
+  });
+});
+
+describe('a failed action', () => {
+  it('says why in the user\'s words, and keeps the model\'s text for the model', async () => {
+    const ev = (event, data) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    const call = ev('message_start', { type: 'message_start' })
+      + ev('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'tu1', name: 'archive_message' } })
+      + ev('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"id":"M1"}' } })
+      + ev('content_block_stop', { type: 'content_block_stop', index: 0 })
+      + ev('message_delta', { type: 'message_delta', delta: { stop_reason: 'tool_use' } })
+      + ev('message_stop', { type: 'message_stop' });
+    let n = 0;
+    const api = makeApi({ handlers: {
+      'proxy.fetch': async () => streamResponse(n++ === 0 ? [call] : anthropicSse(['It is gone.'])),
+      'email.get': async () => EMAIL,
+      'email.archive': async () => { throw new Error('email.archive: The tool failed: notFound'); },
+    } });
+    await api.storage.set('prefs', { actions: 'auto' });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('archive it');
+    await pressEnter();
+    await settled();
+    const card = document.querySelector('[data-action="archive_message"]');
+    expect(card.dataset.actionState).toBe('failed');
+    expect(card.textContent).toContain("The message isn't there any more.");
+    expect(card.textContent).not.toContain('notFound');
+    // The model still hears what went wrong.
+    expect(JSON.stringify(sentPrompt(api).messages)).toContain('notFound');
+  });
+});
+
+describe('Escape', () => {
+  const escape = async (el) => { await act(async () => { fireEvent.keyDown(el, { key: 'Escape' }); }); };
+
+  it('closes the reader panel from an empty input, like the composer one', async () => {
+    const api = makeApi({ handlers: { 'ui.closePanel': async () => true } });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const box = screen.getByRole('textbox', { name: 'Message to the assistant' });
+    await type('half a question');
+    await escape(box);
+    expect(api.calls('ui.closePanel')).toHaveLength(0);
+    await type('');
+    await escape(box);
+    expect(api.calls('ui.closePanel').map((c) => c.args)).toEqual([['email-detail-sidebar']]);
+  });
+
+  it('closes the language picker and goes back to the input', async () => {
+    const api = makeApi();
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await quickAction('Translate');
+    const picker = screen.getByRole('combobox', { name: 'Translate into' });
+    await escape(picker);
+    expect(screen.queryByRole('combobox', { name: 'Translate into' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Message to the assistant' }));
+  });
+});
+
+describe('the privacy notice', () => {
+  it('waits for the answer without saying the assistant is thinking', async () => {
+    const api = makeApi({ consent: false, answers: ['Hello.'] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('hi');
+    await pressEnter();
+    await screen.findByRole('button', { name: 'Continue' });
+    expect(screen.queryByText('Thinking…')).toBeNull();
+    expect(api.calls('proxy.fetch')).toHaveLength(0);
+    await click(button('Continue'));
+    await settled();
+    expect(screen.getByText('Hello.')).toBeTruthy();
+  });
+});
+
+describe('what the notice says is sent', () => {
+  it('names what goes with every request, and lookups and actions only when they are on', async () => {
+    const api = makeApi({ consent: false, answers: ['Hello.'] });
+    await api.storage.set('prefs', { lookups: false, actions: 'off' });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('hi');
+    await pressEnter();
+    const notice = (await screen.findByText(/sends your request to Anthropic/)).textContent;
+    expect(notice).toContain('your name, addresses and signature');
+    expect(notice).toContain('the names of the app and your mail server');
+    expect(notice).toContain('the earlier messages of this chat');
+    expect(notice).not.toContain('calendar events');
+    expect(notice).not.toContain('folders');
+    expect(notice.endsWith('Nothing is sent until you ask.')).toBe(true);
+    cleanup();
+
+    const on = makeApi({ consent: false });
+    await on.storage.set('prefs', { lookups: true, actions: 'manual' });
+    await mount(on, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('hi');
+    await pressEnter();
+    const full = (await screen.findByText(/sends your request to Anthropic/)).textContent;
+    expect(full).toContain('messages from a mail search, calendar events, contacts and your settings');
+    expect(full).toContain('the names of your folders');
+  });
+
+  it('asks again once after the update, since it now names more', async () => {
+    const api = makeApi({ consent: false, answers: ['Hello.'] });
+    await api.storage.set('consent:anthropic:http://localhost:18099', true);
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await type('hi');
+    await pressEnter();
+    expect(await screen.findByRole('button', { name: 'Continue' })).toBeTruthy();
+  });
+
+  it('does not promise lookups in the empty panel when they are off', async () => {
+    const api = makeApi();
+    await api.storage.set('prefs', { lookups: false });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    expect(screen.getByText('Open a message to work on it, or ask anything.')).toBeTruthy();
+  });
+});
+
+describe('the header', () => {
+  it('is as high as the side panel headers of the app, with or without a conversation', async () => {
+    const api = makeApi({ answers: ['Sure.'] });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const header = document.querySelector('[data-assistant-header]');
+    expect(header.style.height).toBe('56px');
+    // The border comes on top, as under the app's h-14 rows.
+    expect(header.style.boxSizing).toBe('content-box');
+    expect(screen.getByRole('heading', { name: 'AI assistant' })).toBeTruthy();
+    // New chat keeps its place while hidden, so the title doesn't move when it appears.
+    expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull();
+    const slot = header.lastElementChild;
+    expect(slot.style.visibility).toBe('hidden');
+    await type('hello');
+    await pressEnter();
+    await settled();
+    expect(document.querySelector('[data-assistant-header]').style.height).toBe('56px');
+    expect(slot.style.visibility).toBe('visible');
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy();
+  });
+});
+
+describe('the Actions menu with nothing to work on', () => {
+  const entries = async () => {
+    await click(button('Actions'));
+    const names = screen.getAllByRole('menuitem').map((el) => el.textContent);
+    return names;
+  };
+
+  it('offers ways to start in the reader with no message open', async () => {
+    const api = makeApi({ answers: ['Nothing today.'] });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    // Catch me up (the everywhere area) joins them after a line.
+    expect(await entries()).toEqual(["What's on my calendar today?", 'Find a message', 'Catch me up']);
+    await click(screen.getByRole('menuitem', { name: "What's on my calendar today?" }));
+    await settled();
+    expect(sentPrompt(api).messages.at(-1).content).toBe("What's on my calendar today?");
+  });
+
+  it('starts a search in the input, and leaves out the calendar when lookups are off', async () => {
+    const api = makeApi();
+    await api.storage.set('prefs', { lookups: false });
+    await mount(api, { email: null, selection: null, focusRequest: 0 });
+    // Catch me up reads mail, the calendar and tasks: not with lookups off.
+    expect(await entries()).toEqual(['Find a message']);
+    await click(screen.getByRole('menuitem', { name: 'Find a message' }));
+    const box = screen.getByRole('textbox', { name: 'Message to the assistant' });
+    expect(box.value).toBe('Find the message about ');
+    expect(document.activeElement).toBe(box);
+    expect(api.calls('proxy.fetch')).toHaveLength(0);
+  });
+
+  it('stays when the user takes the message out of the context', async () => {
+    const api = makeApi();
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    await click(button('Remove from context'));
+    expect(await entries()).toEqual(["What's on my calendar today?", 'Find a message']);
+  });
+
+  it('offers the examples for an empty draft', async () => {
+    const api = makeApi({ body: '' });
+    await mount(api, { composerId: 'c1', selection: { text: '', empty: true }, focusRequest: 0 });
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Message to the assistant' }).getAttribute('placeholder')).toBe('Describe what the email should say…'));
+    expect(await entries()).toEqual([
+      'Thank Anna for the offer and propose a call on Tuesday at 10',
+      'Decline the invitation politely and suggest next month instead',
+      'Ask for a corrected invoice: the VAT number is missing',
+    ]);
+    await click(screen.getByRole('menuitem', { name: 'Ask for a corrected invoice: the VAT number is missing' }));
+    expect(screen.getByRole('textbox', { name: 'Message to the assistant' }).value).toBe('Ask for a corrected invoice: the VAT number is missing');
   });
 });

@@ -6,6 +6,7 @@ import { appBlock, buildPrompt, clip, contextSuffix, composerChatSystem, readerC
 import { defaultTarget, languageOptions } from '../src/lib/languages.js';
 import plugin from '../src/index.js';
 import manifest from '../manifest.json' with { type: 'json' };
+import { allStrings } from '../src/lib/i18n.js';
 
 const configured = { 'admin.getAllConfig': async () => ({ openaiBaseUrl: 'http://localhost:11434/v1' }) };
 
@@ -57,11 +58,11 @@ describe('the context every request carries', () => {
       instructions: { admin: ' House style: short. ', user: 'Sign with Anna' },
     });
     // The app comes first, then the user, then the instructions.
-    expect(extra.startsWith('About the app (from the app itself):\nYou are the AI Writing Assistant, a plugin inside Bulwark Mail: ')).toBe(true);
+    expect(extra.startsWith('About the app (from the app itself):\nYou are the AI assistant, a plugin inside Bulwark Mail: ')).toBe(true);
     expect(extra.slice(extra.indexOf('About the user'))).toBe([
       'About the user (data, from their account):',
       'Name: Anna', 'Email addresses: a@e.org', 'Signs emails with:\nKind regards', 'Time zone: Europe/Zurich',
-      'Local date and time now: Tuesday 20 October 2026 at 18:00', 'Language of the mail client: German',
+      'Language of the mail client: German',
       '', 'Standing instructions from the administrator:\nHouse style: short.', '',
       'Standing instructions from the user (these win over the administrator\'s):\nSign with Anna',
     ].join('\n'));
@@ -71,7 +72,7 @@ describe('the context every request carries', () => {
   });
 
   it('says which app, version, account and server it runs in, and the app\'s places by the names the user sees', () => {
-    const de = Object.fromEntries(Object.entries(manifest.locales.de).filter(([k]) => k.startsWith('app.')).map(([k, v]) => [k.slice(4), v]));
+    const de = Object.fromEntries(Object.entries(allStrings().de).filter(([k]) => k.startsWith('app.')).map(([k, v]) => [k.slice(4), v]));
     const block = appBlock({
       app: { product: 'Bulwark Mail', name: 'Rath Mail', version: '1.17.1', edition: 'full', stalwartFeatures: false },
       account: { email: 'linus@rath.li', server: 'mail.rath.li', accounts: 2 },
@@ -86,7 +87,7 @@ describe('the context every request carries', () => {
     expect(block).toContain('undo send (a short delay before a message goes out)');
     expect(block).toContain('Use find_setting to tell the user where a setting is');
     // Without Stalwart's features there is no Security page.
-    expect(block).not.toContain(manifest.locales.de['app.settings.security']);
+    expect(block).not.toContain(allStrings().de['app.settings.security']);
     // An older webmail without api.app: still the product, no version.
     const old = appBlock({}, { panel: 'composer', labels: {} });
     expect(old).toContain('a plugin inside Bulwark Mail: ');
@@ -97,6 +98,16 @@ describe('the context every request carries', () => {
   it('answers in the language of the user\'s message, not the email\'s', () => {
     expect(readerChatSystem({ language: 'de' })).toContain('Answer in the language of the user\'s latest message (German when that is unclear)');
     expect(composerChatSystem({ language: 'de', scope: 'body', text: 'x' })).toContain('in the language of their latest message (German when that is unclear)');
+  });
+
+  it('asks for a reply next to a message, and for a new email with recipients without one', () => {
+    const withMail = readerChatSystem({ email: { subject: 'Hi', text: 'x' } });
+    expect(withMail).toContain('the complete reply text inside <text></text>');
+    expect(withMail).not.toContain('to="');
+    const without = readerChatSystem({ email: null });
+    expect(without).toContain('No email is open, so a draft is a new email, not a reply');
+    expect(without).toContain('<text to="anna@example.org" subject="Short subject">');
+    expect(without).not.toContain('the complete reply text');
   });
 
   it('goes to the end of the task prompts and the chat prompts', () => {
@@ -134,6 +145,15 @@ describe('background', () => {
     expect(await api.storage.get(DRAFT_KEY)).toBeNull();
   });
 
+  it('forgets the per-message chats of older versions when it starts', async () => {
+    const api = fakeApi({ handlers: configured });
+    await api.storage.set('chat:email:M1', { turns: [{ role: 'user', content: 'x'.repeat(1000) }] });
+    await api.storage.set('chat:reader', { turns: [] });
+    await createBackground(api).activate();
+    expect(await api.storage.get('chat:email:M1')).toBeNull();
+    expect(await api.storage.get('chat:reader')).toEqual({ turns: [] });
+  });
+
   it('forgets a draft left from an earlier session when it starts', async () => {
     const api = fakeApi({ handlers: configured });
     await api.storage.set(DRAFT_KEY, { text: 'old' });
@@ -149,7 +169,7 @@ describe('background', () => {
     await off.activate();
     expect(off.shouldShow.composer()).toBe(false);
     expect(actionsBySurface(offApi)).toEqual({ [COMPOSER_SURFACE]: [], [COMPOSER_MENU_SURFACE]: [], [READER_MENU_SURFACE]: [], [READER_SURFACE]: [] });
-    const onApi = fakeApi({ handlers: configured, translations: manifest.locales });
+    const onApi = fakeApi({ handlers: configured, translations: allStrings() });
     const on = createBackground(onApi);
     await on.activate();
     expect(on.shouldShow.composer()).toBe(true);
@@ -158,12 +178,30 @@ describe('background', () => {
     expect(actions[COMPOSER_MENU_SURFACE].map((a) => a.id)).toEqual(['improve', 'grammar', 'shorter', 'translate', 'ask']);
     expect(actions[COMPOSER_MENU_SURFACE][0]).toMatchObject({ label: 'Improve writing', icon: 'sparkles', order: 10 });
     expect(actions[READER_MENU_SURFACE].map((a) => a.id)).toEqual(['explain', 'translate', 'reply', 'ask']);
-    expect(actions[READER_SURFACE]).toEqual([{ id: 'assistant', label: 'Assistant', icon: 'sparkles' }]);
+    // One button for the reader's panel: the host's toggle, not a second one of the plugin's.
+    expect(actions[READER_SURFACE]).toEqual([]);
     // The host allows 8 entries per surface and 60-character labels.
     for (const list of Object.values(actions)) {
       expect(list.length).toBeLessThanOrEqual(8);
       for (const a of list) expect(a.label.length).toBeLessThanOrEqual(60);
     }
+  });
+
+  it('opens and closes the reader panel with Alt+A, but leaves Alt+A to an open composer', async () => {
+    const api = fakeApi({ handlers: { ...configured, 'ui.togglePanel': async () => true } });
+    const bg = createBackground(api);
+    await bg.activate();
+    expect(typeof plugin.shortcuts['toggle-panel'].handler).toBe('function');
+    expect(plugin.shortcuts['toggle-panel'].keys).toBe('Alt+A');
+    expect(manifest.permissions).toContain('ui:keyboard');
+    await bg.shortcutToggle();
+    expect(api.calls('ui.togglePanel').map((c) => c.args)).toEqual([['email-detail-sidebar']]);
+    await bg.hooks.onComposerOpen({ mode: 'new' });
+    await bg.shortcutToggle();
+    expect(api.calls('ui.togglePanel')).toHaveLength(1);
+    await bg.hooks.onComposerClose();
+    await bg.shortcutToggle();
+    expect(api.calls('ui.togglePanel')).toHaveLength(2);
   });
 
   it('takes the buttons away again when the service is removed, and the reader entries when the reader is off', async () => {
@@ -194,11 +232,6 @@ describe('background', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(api.calls('ui.togglePanel').map((c) => c.args)).toEqual([['composer-sidebar-right', { composerId: 'c7' }]]);
     expect(api.calls('ui.openDialog')).toHaveLength(0);
-    // The reader's button toggles the panel next to the message.
-    bg.hooks.onAction({ surface: READER_SURFACE, actionId: 'assistant', context: { emailId: 'M1' } });
-    await new Promise((r) => setTimeout(r, 0));
-    expect(api.calls('ui.togglePanel')[1].args).toEqual(['email-detail-sidebar']);
-
     // A phone: no panel answers (null). The dialog opens, once at a time.
     panel = null;
     bg.hooks.onAction({ surface: COMPOSER_SURFACE, actionId: 'assistant', context: { composerId: 'c8' } });

@@ -75,7 +75,7 @@ export async function streamTurn(api, endpoint, prompt, {
       if (err instanceof AiError) throw err;
       throw new AiError('unreachable', { detail: err?.message });
     }
-    if (!res || !res.ok) throw errorFromResponse(res);
+    if (!res || !res.ok) throw errorFromResponse(res, endpoint);
 
     const emit = (piece) => {
       if (!piece) return;

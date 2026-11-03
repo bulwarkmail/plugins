@@ -1,10 +1,10 @@
-# AI Writing Assistant
+# AI Assistant
 
-A chat next to the message you write or read. It rewrites, translates and
-proofreads your text, summarises messages and drafts replies, with an
-OpenAI-compatible service (OpenAI, Ollama, LM Studio, vLLM, ...) or the
-Anthropic Messages API. It works on the text you highlight, else on the
-whole message.
+An assistant next to your mail. Ask it about the open message, let it
+write or rewrite yours, look things up in your mail, calendar and
+contacts, or do small tasks for you, like filing a message or adding an
+event. It works with an OpenAI-compatible service (OpenAI, Ollama, LM
+Studio, vLLM, ...) or the Anthropic Messages API.
 
 Nothing is sent to the AI service until you ask the assistant something.
 Before the first request to a service you see which service it is, which
@@ -58,6 +58,31 @@ last 20 messages. On phones, where there is no side panel, the actions
 are in a bar above the message and the composer opens the assistant in a
 dialog.
 
+## Calendar, Contacts, Files and Settings
+
+From webmail 1.20 on the assistant also sits next to Calendar, Contacts,
+Files and Settings: the panel button at the end of the toolbar row (or
+**Alt+A**) opens it, in the same place as next to a message. It is the
+same chat as in Mail and knows what you have open there: the event, the
+contact, the selected files and the folder, or the settings page, shown
+as a chip in the input. Its Actions offer what fits: **What's on this
+week?** in Calendar, **Last mails with** the open contact, **Summarize
+this file** for one selected file (when the webmail can read files), and
+**Explain this page** in Settings. In Files the assistant and the details
+panel take turns. On phones, and in Settings below 1024 px, the panel
+button in the header (in Contacts also over an open contact) opens the
+assistant as a dialog that fits above the keyboard.
+
+**Catch me up** (in the Actions menu, and as a button in the empty panel
+whenever no message is open, while lookups are on) lists what came in and
+what is due: unread mail in the inbox since your last visit, sorted by the model into what
+needs an answer and what is for your information, then today's events,
+open tasks due today or earlier, and (on webmails that can read whole
+conversations) mail you sent in the last week that nobody answered yet.
+Your last visit is when the webmail was last open before this time (the
+assistant notes the time every few minutes while it is open), or your
+last Catch me up; the first time, the last day.
+
 ## Lookups
 
 When an answer needs it, the assistant can look things up for you and
@@ -77,6 +102,45 @@ setting up in the app's own settings index and names the page and the
 setting as you see them, in your language. Nothing is looked up or sent unless you asked a
 question.
 
+## More context
+
+Next to an open message the assistant can read more than its text, when
+your question needs it. The input box shows what it may read as chips;
+take any of them out with its x.
+
+- **Attachments**: one chip per attachment (one chip for all when there
+  are more than three). Ask "what is on the agenda?" and it reads the
+  file: PDF (up to 50 pages), Word, Excel (up to 5 sheets of 2,000 rows),
+  PowerPoint, OpenDocument, text, CSV, HTML, calendar and contact files.
+  It says so when a file is too big (over 20 MB), protected with a
+  password, scanned without a text layer, or of a kind it can't read
+  (old .doc, .xls and .ppt files among them).
+- **Pictures**: attached images and pictures in the message go to the
+  model as images when it can see them (Anthropic, and OpenAI's own
+  models; for other servers the administrator decides). They are made
+  smaller in the webmail first. Tracking pixels and tiny images are left
+  out, and remote images are never loaded. A model that can't see images
+  only hears the file name and the picture's description. The date and
+  place a photo was taken go along only when you ask for them and have
+  switched on **Send a photo's date and place** (off by default).
+- **This conversation**: when the message is part of a conversation, it
+  can read every message of it, without the quoted earlier mail.
+- **Messages selected in the list**: tick two or more messages and the
+  panel shows "3 messages". The Actions menu then offers **Summarize
+  these**, **What do I have to do?** and, with actions on, **One reply
+  to all**, a new message to everyone who wrote them (it always asks
+  first, since the recipients come from the messages). Up to 50 messages
+  are read.
+- **@ mentions**: type `@` and a few letters to add a message or a
+  contact from your mail and address book.
+
+Everything one request reads shares a limit of 60,000 characters and 8
+pictures (4 per message). Users can switch attachments, pictures and
+whole conversations off in the plugin's settings; the administrator can
+switch the whole group off with **More context**. A user who connected their own
+key sets "My model can see images" themselves; the administrator's image
+setting is about the administrator's service.
+
 ## Actions
 
 When you turn them on, the assistant can also do things for you: archive
@@ -86,7 +150,7 @@ in the composer with the text it drafted. It never sends and never
 deletes mail; a reply or a message waits in the composer for you.
 
 Each action shows as a card in the chat with what it will do ("Move
-“Invoice 42” to Projects 2026"). Settings > AI Writing Assistant >
+“Invoice 42” to Projects 2026"). Settings > AI Assistant >
 Actions has two modes:
 
 - **Ask me first**: the card waits with Do it and Skip, and nothing
@@ -102,6 +166,75 @@ admin settings. The model is told to act only when you ask or agree,
 never because a message says so; ask first is the safer mode for
 mailboxes that receive mail from strangers.
 
+### More actions
+
+With actions on, and on a webmail that offers them, the assistant can
+also:
+
+- answer an invitation (accept, maybe or decline); Bulwark sends the
+  answer to the organiser, so this can't be undone
+- change an event's title, time, place or description (never who is
+  invited), and delete a single event you created; repeating events and
+  events someone else invited you to stay for the calendar
+- add or remove one of your tags on a message
+- turn the out-of-office reply on, with a subject, text and dates, or
+  off; while the reply forwards mail it refuses and points you to
+  Settings > Out of office
+- create a filter that moves, copies, marks as read, stars or tags new
+  mail; never one that forwards, redirects, rejects or deletes mail, and
+  never one that moves mail to the trash
+- archive, move, mark or tag many messages at once, up to the
+  administrator's limit (50 unless set)
+- change one of your app settings, when the administrator allows it and
+  you turn it on; a setting your organisation set stays as it is
+- change a contact's name, addresses, phone numbers, company or postal
+  address
+
+It also looks up your out-of-office reply and your filters when it
+needs them.
+
+Answering an invitation, deleting an event, the out-of-office reply,
+filters, many messages at once, settings and contacts **always ask you
+first**, even in automatic mode. The card says what will happen
+("Archive 12 messages?" with the first five subjects, "Change Time
+format: 12-hour → 24-hour?", the filter in plain words). Undo puts things
+back: the event, the filter, the messages, the setting and the contact
+as they were.
+
+Settings > AI Assistant has a switch for each of these groups. All are
+on except settings changes, which stay off until you turn them on (and
+greyed out unless the administrator allows them). Switches for what your
+webmail doesn't offer are hidden.
+
+## Files
+
+Where the webmail has Files, the assistant can look in them when your
+question needs it: find files and folders by name, kind or date, list a
+folder, and read a file (the same readers as for attachments) or look at
+a picture. It sees your own files and the ones others shared with you,
+never the Files trash. Type `@` and part of a name to add a file to the
+chat; it shows as a chip.
+
+With actions on it can also:
+
+- **attach files** to the message you write, or to a new message. This
+  always asks first and the card names the files and the recipients;
+- **save attachments** of the open message into a folder;
+- **create a note**, a Markdown or plain text file, in a folder you name,
+  and **create folders**. A name that is taken gets a number, nothing is
+  overwritten;
+- **replace a text file**: always asks first, and the old version goes to
+  the Files trash, where Restore brings it back;
+- **move and rename** files and folders: always asks first, and Undo
+  puts them back.
+
+It only changes your own files, never a folder you share with others or
+a drive someone shared with you, and it can't delete or share a file:
+the webmail offers no such call. Another plugin that checks uploads,
+moves or renames in Files sees these changes too and can stop them.
+Users switch reading and writing off separately; the administrator
+switches the whole group off with **Files**.
+
 ## Answers, cards and what the assistant knows
 
 Answers come as formatted text (bullet lists, bold, small tables, links
@@ -115,13 +248,48 @@ name, your addresses, how you sign (the plain-text signature of your
 first identity), your time zone, the local time and the language of the
 mail client. Two kinds of standing instructions go along as well:
 **the administrator's**, for everyone (the plugin's admin settings), and
-**your own** (Settings > AI Writing Assistant > Standing instructions):
+**your own** (Settings > AI Assistant > Standing instructions):
 "I am a teacher, keep my emails short and warm, sign with Anna". Yours
 come last, so they win when the two disagree.
 
 Mail text is put between tags and the model is told that it is data, not
 instructions, so a message that says "ignore your instructions" is
 summarised, not obeyed. Very long texts are cut at 30 000 characters.
+
+## Chat tools
+
+- **Earlier chats.** Next to a message the assistant keeps one running
+  chat. After 8 hours without use, the next time the panel opens the chat
+  moves to Earlier chats (the clock button in the panel's header) and a
+  fresh one starts; New chat does the same at once. There you can search
+  the chats, read one, continue it, rename it or delete it. The newest 30
+  chats are kept, at most 400 KB together. The composer keeps its own
+  chat per draft.
+- **Saved prompts.** Add your own in Settings > AI Assistant > Chat; the
+  administrator can add some for everyone. They are in the Actions menu
+  and run like a typed request, on the message or text the panel works on.
+- **Slash commands.** Type `/` at the start of the input for a list of the
+  quick actions and saved prompts. Type to filter, arrow keys to move,
+  Enter runs, Tab completes the name, Escape closes the list.
+- **Edit and Answer again.** The pencil next to your last question puts it
+  back into the input; sending it replaces that question and its answer
+  (Escape stops editing). Answer again asks for a new last answer, while
+  the message it was about is open. Neither is offered after an answer
+  that did something (an event, a note), so nothing happens twice.
+- **Remember.** "Remember that my manager is Jan": the assistant asks
+  before it keeps a note. Notes (at most 50, 200 characters each) go with
+  every request; see, change and delete them in the settings, or switch
+  them off there.
+- **Templates.** With lookups on, the assistant can read your message
+  templates. In the composer it can put one into the draft at the cursor,
+  below what you selected, never over it. When it fills in placeholders it
+  shows the values and asks first. It can save a written reply as a new
+  template after you agree. A plugin enabled before this update needs to
+  be turned off and on (or installed again by the administrator) to get
+  the templates permissions; until then the templates tools stay hidden.
+- When the browser storage is full, New chat and the 8-hour split keep
+  the chat and say so, after dropping the oldest earlier chats did not
+  make room. A chat too big for the history keeps shorter lookup results.
 
 ## Setting it up (administrator)
 
@@ -140,6 +308,21 @@ settings. Set up one or both services:
 | Instructions for the assistant | Standing instructions for everyone, added to every request (house style, sign-offs, languages, things never to say) |
 | Actions | The most users may choose: off, ask first, or automatic (default: automatic allowed; each user starts with actions off) |
 | Let users connect their own API key | Off by default |
+| More context | Attachments and images of the open message, the whole conversation, the messages selected in the list, and @-mentioned messages, contacts and files. On by default |
+| Anthropic: images, OpenAI-compatible: images | Whether that service's model gets images. Automatic: yes for Anthropic and api.openai.com (apart from text-only models), no for other servers such as Ollama. Without images the model gets the file name only |
+| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once, contacts. On by default. All but changing an event and tags always ask the user first |
+| Most messages per batch | 1 to 200, default 50 |
+| Change settings | Let users allow the assistant to change their app settings (appearance, reading, composing, list, notifications, calendar view). Off by default |
+| Files | Find, read and attach the user's files, save attachments to Files, create files and folders. Never deletes or shares. On by default |
+| Chat tools | Earlier chats, saved prompts, / commands, Edit and Answer again, notes and templates. Off switches all of these off. On by default |
+| Prompts for everyone | Saved prompts all users get, one per line: `Name: what to ask` |
+| Remember notes | Users can have the assistant keep short notes about them. On by default |
+| Every view | The assistant in Calendar, Contacts, Files and Settings, and Catch me up. On by default |
+
+What each switch does in detail, and what it sends to the AI service, is
+in "What is sent where". A webmail older than the one these features need
+installs the plugin and leaves them out: the assistant checks what the
+webmail offers (`api.host.features`) and shows only what works.
 
 Without a model the defaults are `gpt-4o-mini` and `claude-haiku-4-5`.
 Lookups need a model that supports tool calls; small local models often
@@ -160,10 +343,15 @@ menus and `api.ui.openPanel`).
 
 ## Settings (users)
 
-Settings > AI Writing Assistant shows which service and model are used. A
+Settings > AI Assistant shows which service and model are used. A
 user can pick another model, choose between the two services when both
 are set up, hide the assistant next to messages, turn the lookups
-off, and turn actions on (ask first or automatic). When the administrator allows it, a user can connect their own key:
+off, switch reading attachments, looking at pictures and reading whole
+conversations off, switch finding and reading files and saving and
+creating files off, and turn actions on (ask first or automatic). Under **Other views
+and Catch me up** they can hide the assistant in Calendar, Contacts, Files
+and Settings, turn Catch me up off, and leave out the check for mail
+waiting for a reply. When the administrator allows it, a user can connect their own key:
 they pick the service and address here, and type the key into the
 webmail's own dialog, so the plugin never sees it. Their key is stored
 encrypted on the server and only sent to the address they approved there.
@@ -175,15 +363,41 @@ encrypted on the server and only sent to the address they approved there.
 | Describe an empty message | Your description and the subject |
 | Use Improve, Shorten, Formal, Casual, Translate or Fix spelling | The selected text, or your own text of the message (no signature, no quote) |
 | Type a request in the composer | The same text, the subject, whether it is a reply and to what, and the earlier turns of the chat |
-| Anything | Your name, addresses, plain-text signature, time zone, local time and language, and the standing instructions (the administrator's and yours) |
+| Anything | Your name, addresses, plain-text signature, time zone, local time and language, the names of the app and your mail server, the standing instructions (the administrator's and yours), and the earlier turns of the chat |
 | Use Summarize, To-dos and dates, Reply ideas, Explain or Translate on a message | Sender, date, subject and text of the open message (and the highlighted passage) |
 | Type a request about a message | The same, and the earlier turns of the chat |
 | Summarize a conversation | Sender, date, subject and text (without quotes) of up to 20 messages |
-| Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, or the message you reply to |
+| Ask something that needs a lookup | What the lookup found: calendar events of the days asked for, matching contacts, the messages a mail search found (sender, date, subject, preview) and the text of a message it reads, the message you reply to, and the settings it reads |
+| Anything, with a message open (More context on) | The names, types and sizes of its attachments, the descriptions of its pictures, and how many messages its conversation has; with messages ticked in the list, how many |
+| Ask about an attachment (More context on) | The attachment's text (up to 20,000 characters, more when the model asks, at most 60,000 per request with everything else it reads), or the picture itself, made smaller, when the model can see images (otherwise its name and description) |
+| Ask when or where a photo was taken (only with **Send a photo's date and place** on) | The date and place stored in the photo |
+| Ask about the conversation | Sender, recipients, date, subject and text (without quotes) of every message in it, up to 50 |
+| Ask about messages you selected in the list | The same for up to 50 of them, and how many you selected |
+| Mention a message or contact with @ | The message's sender, date and subject (its text when the model reads it), or the contact's name, addresses and company |
+| Ask about your files, or mention a file with @ (Files on) | The names, folder paths, kinds, sizes and dates of the files and folders a search or a folder list finds, and for a file someone shared with you, whose drive it is in; the same for the files and folders you mention with @; the contents of a file it reads (the same limits as attachments); a picture, made smaller, when the model can see images and you left Read attachments and Look at images on; its date and place only with your switch Send a photo's date and place |
+| Let it save, create, move or rename a file | The file and folder names it used and the folder the file ended up in |
+| Let it do something (actions on) | What the action did, and the names of your folders when it files a message |
+| Ask in Calendar, Contacts, Files or Settings | What you have open there: the event (title, time, place, participants, description), the contact (name, addresses, phones, company, dates, notes) and how many contacts are ticked, the names, types, sizes and dates of up to 20 selected files and the folder's path, or the settings page's name |
+| Use Catch me up | Your unread inbox mail since your last visit (sender, recipients, date, subject, preview, message id), today's events (time, title, place), your open tasks (title, due date) due today or earlier, and the sent mail of the last week that is waiting for a reply (same fields as the unread mail). They go with that one request as data; the chat keeps only the answer and its cards |
+| Anything, with notes kept (chat tools) | The notes you asked it to remember |
+| Run a saved prompt or a / command | The prompt's text, as if you typed it, with the message or text the panel works on |
+| Ask about your templates (lookups on) | The names, categories, subjects, placeholders and the first 300 characters of your templates |
+| Have it save a template | Nothing more: the text it saves is your draft's own text or what it wrote |
+| Ask about or change your out-of-office reply | Whether it is on, its dates, subject and text, and whether it forwards mail |
+| Ask about or create a filter | Your filter rules: names, conditions, what they do (folder and tag names, and the address of a forwarding rule) |
+| Tag messages, or file or tag many at once | The names of your tags and folders, and how many messages changed |
+| Change a setting (when allowed) | The setting's name and its old and new value, or why it can't be changed |
+| Change an event, a contact or answer an invitation | The event's title and time, the contact's name, addresses, phones, company and postal address, the invitation's title and organiser |
+
+The privacy notice before the first request lists the same, and names
+lookups and actions only when they are switched on. When an update makes
+the assistant send more, the notice comes once more.
 
 Nothing else leaves the webmail. In the browser the plugin keeps your
 choices, which services you confirmed, the chats of the open composer and
-of the messages you talked about, and, while a composer is open, the
+of the messages you talked about, the earlier chats, your saved prompts
+and the notes you asked it to remember, when the webmail was last open and
+your last Catch me up (for "unread since"), and, while a composer is open, the
 draft's subject and what the composer is a reply to (removed when the
 composer closes).
 
@@ -206,13 +420,24 @@ composer closes).
 | `compose:open` | Open a reply with a drafted reply or a reply idea in it, and the reply or new message of an action |
 | `calendar:read` | The calendar lookup |
 | `contacts:read` | The contact lookup |
-| `email:write` | Actions: archive, move and mark messages |
-| `calendar:write` | Actions: add an event (and delete it again on Undo) |
+| `email:write` | Actions: archive, move, mark and tag messages, one or many at once |
+| `calendar:write` | Actions: add, change and delete an event (and undo it) |
 | `tasks:write` | Actions: add a task (and delete it again on Undo) |
-| `contacts:write` | Actions: add a contact (and delete it again on Undo) |
+| `contacts:write` | Actions: add or change a contact (and undo it) |
 | `identity:read` | Your name, addresses and signature, so the model knows who writes |
 | `account:read` | Your account's name and address when there is no identity, and the mail server it is on |
-| `settings:read` | Your settings (layout, formats, reading and sending options), for the settings lookup |
+| `settings:read` | Your settings (layout, formats, reading and sending options), for the settings lookup, and what a settings change would do |
+| `files:read` | Find, list and read your files, and attach them to a draft (webmail 1.20 and later) |
+| `files:write` | Save attachments to Files, create text files and folders, replace a text file, move and rename, in your own files only |
+| `ui:side-panel` | The panel next to Calendar, Contacts, Files and Settings (`app-side-panel`; asked for as an optional permission, so older webmails install the plugin without it) |
+| `ui:keyboard` | Alt+A outside the composer: the panel of the view you are in |
+| `tasks:read` | Catch me up: your open tasks due today or earlier |
+| `templates:read` | Your message templates, for the templates lookup and to put one into the draft |
+| `templates:write` | Save a written reply as a template when you agree (and delete it again on Undo) |
+| `calendar:respond` | Actions: answer an invitation (optional; newer webmails) |
+| `settings:change` | Actions: change a setting, and undo it (optional; newer webmails; only when the administrator allows it) |
+| `vacation:read`, `vacation:write` | The out-of-office lookup, and turning it on or off |
+| `filters:read`, `filters:write` | The filters lookup, and creating a filter (and removing it again on Undo) |
 
 ## Credentials
 

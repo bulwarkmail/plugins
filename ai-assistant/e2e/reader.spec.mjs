@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test';
 import { adminApi, install } from './admin.mjs';
 import { installPlugin, uninstallPlugin, preparePage, signIn, waitForPlugin, shoot } from '../../e2e/helpers.mjs';
 import { ID, ask, configure, acceptPrivacy, editor, readerPanel, waitDone, OLLAMA_CONFIG, ollamaUp, mockReadsChunked } from './common.mjs';
+import { seedReaderMail } from './jmap.mjs';
 
 // The reader: a panel next to the open message with Summarize, To-dos and
 // dates, Reply ideas and Translate, a chat about the message, and the
@@ -16,6 +17,12 @@ import { ID, ask, configure, acceptPrivacy, editor, readerPanel, waitDone, OLLAM
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+// The mail these tests open: through JMAP on any server (BULWARK_JMAP_URL),
+// else the Docker test-env's seed (seed_mail.py already has the question).
+test.beforeAll(async () => {
+  if (process.env.BULWARK_JMAP_URL) await seedReaderMail();
+});
 
 async function service() {
   if (await mockReadsChunked()) return { config: {}, answer: /Mock reply/ };
@@ -118,7 +125,7 @@ for (const theme of ['light', 'dark']) {
       await frame.getByRole('button', { name: 'Actions' }).click();
       await frame.getByRole('menuitem', { name: 'Summarize' }).click();
       await acceptPrivacy(page, { frame });
-      await expect(frame.getByText('Summarize · this message')).toBeVisible();
+      await expect(frame.getByText('Summarize', { exact: true })).toBeVisible();
       await waitDone(frame);
       await expect(frame.locator('[data-turn="assistant"]').last()).toContainText(svc.answer);
       await shoot(page, ID, 'reader-summary', theme);
@@ -173,8 +180,8 @@ test('a highlighted passage: explain it from the right-click menu, then draft a 
   try {
     const svc = await setUp(page, api);
     await openMessage(page, 'Can we meet on Thursday?', page.getByText('send me the slides').first());
-    // The plugin declares its reader entries while it starts; its toolbar button shows when it has.
-    await expect(page.locator('[data-plugin-actions="reader-actions"] [aria-label="Assistant"]')).toBeAttached({ timeout: 60_000 });
+    // The plugin offers its panel while it starts; the host's panel button shows when it has.
+    await expect(page.locator('[data-plugin-panel-toggle]').first()).toBeAttached({ timeout: 60_000 });
     const body = await selectInBody(page, 'Thursday at 15:00');
     // A right-click on the selection (a synthetic click would collapse it first, so the event is dispatched as the browser would).
     const menu = page.getByRole('menu');
@@ -188,7 +195,7 @@ test('a highlighted passage: explain it from the right-click menu, then draft a 
 
     const { frame } = await readerPanel(page);
     await acceptPrivacy(page, { frame });
-    await expect(frame.getByText('Explain · highlighted passage')).toBeVisible();
+    await expect(frame.getByText('Explain · highlighted text')).toBeVisible();
     await waitDone(frame);
     await expect(frame.locator('[data-turn="assistant"]').last()).toContainText(svc.answer);
     // The panel follows the selection while it is there.
@@ -196,7 +203,7 @@ test('a highlighted passage: explain it from the right-click menu, then draft a 
     await frame.getByRole('button', { name: 'Actions' }).click();
       await frame.getByRole('menuitem', { name: 'Draft a reply' }).click();
     await waitDone(frame);
-    await expect(frame.getByText('Draft a reply · highlighted passage')).toBeVisible();
+    await expect(frame.getByText('Draft a reply · highlighted text')).toBeVisible();
     await expect(frame.locator('[data-turn="assistant"][data-status="done"]')).toHaveCount(2);
   } finally {
     await uninstallPlugin(api, ID);
@@ -218,7 +225,7 @@ test('on a phone the bar above the message has the actions', async ({ page }) =>
 });
 
 test('on a phone a conversation gets a summary', async ({ page }) => {
-  execFileSync('python', [path.join(HERE, 'seed_thread.py')], { stdio: 'inherit' });
+  if (!process.env.BULWARK_JMAP_URL) execFileSync('python', [path.join(HERE, 'seed_thread.py')], { stdio: 'inherit' });
   const api = await install(await adminApi(), ID, installPlugin);
   try {
     const svc = await setUp(page, api, { viewport: { width: 390, height: 844 } });

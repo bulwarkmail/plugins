@@ -6,7 +6,9 @@
 // contact data in them is untrusted like everything else.
 
 import { clip } from './prompts.js';
+import { userZone, whenIn } from './clock.js';
 import { calendarWidget, contactParts, contactsWidget, emailsWidget } from './widgets.js';
+import { areaTool, areaTools, offered } from './areas/index.js';
 
 /** Longest tool result handed to the model, in characters. */
 export const MAX_TOOL_RESULT = 8000;
@@ -92,7 +94,9 @@ export function toolsFor(ctx = {}) {
   if (ctx.lookups !== false) names.push('check_calendar', 'find_contact', 'search_mail', 'read_message', 'read_my_settings');
   // Where a setting is: the app's own texts, nothing of the user's.
   names.push('find_setting');
-  return names.map((name) => ({ name, ...DEFINITIONS[name] }));
+  // The 2.2 areas' lookups (src/lib/areas), where they are offered.
+  const extra = areaTools().filter((tool) => offered(tool, ctx)).map(({ name, description, parameters }) => ({ name, description, parameters }));
+  return [...names.map((name) => ({ name, ...DEFINITIONS[name] })), ...extra];
 }
 
 function person(p) {
@@ -107,12 +111,12 @@ function addDays(date, days) {
 }
 
 /** Events as lines the model reads: one per event, day first. */
-export function formatEvents(events, { from, to, locale = 'en' } = {}) {
+export function formatEvents(events, { from, to, locale = 'en', zone } = {}) {
   if (!events.length) return `No events between ${from} and ${to}.`;
   const fmt = (value) => {
     if (!value) return '';
     try {
-      return new Intl.DateTimeFormat(locale, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+      return new Intl.DateTimeFormat(locale, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', ...(zone ? { timeZone: zone } : {}) }).format(new Date(value));
     } catch {
       return value;
     }
@@ -154,16 +158,16 @@ export function formatMySettings(settings) {
 }
 
 /** Search results as lines the model reads, with the ids read_message takes. */
-export function formatMessages(messages, query) {
+export function formatMessages(messages, query, zone) {
   const what = Object.entries(query).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
   if (!messages.length) return `No messages match (${what}).`;
-  const lines = messages.map((m) => `- id ${m.id} | ${m.receivedAt ?? ''} | from ${m.from?.map(person).join(', ') || '?'} | ${m.subject || '(no subject)'}${m.preview ? ` | ${String(m.preview).slice(0, 120)}` : ''}`);
+  const lines = messages.map((m) => `- id ${m.id} | ${zone && m.receivedAt ? whenIn(zone, m.receivedAt) : (m.receivedAt ?? '')} | from ${m.from?.map(person).join(', ') || '?'} | ${m.subject || '(no subject)'}${m.preview ? ` | ${String(m.preview).slice(0, 120)}` : ''}`);
   return `Messages matching (${what}), newest first:\n${lines.join('\n')}`;
 }
 
-function messageText(email) {
+function messageText(email, zone) {
   const from = Array.isArray(email.from) ? email.from.map(person).join(', ') : person(email.from);
-  return clip(`From: ${from}\nDate: ${email.receivedAt ?? ''}\nSubject: ${email.subject ?? ''}\n\n${email.text ?? email.preview ?? ''}`, MAX_TOOL_RESULT);
+  return clip(`From: ${from}\nDate: ${zone && email.receivedAt ? whenIn(zone, email.receivedAt) : (email.receivedAt ?? '')}\nSubject: ${email.subject ?? ''}\n\n${email.text ?? email.preview ?? ''}`, MAX_TOOL_RESULT);
 }
 
 /**
@@ -171,13 +175,23 @@ function messageText(email) {
  * card for the panel; throws when the lookup failed (the chat tells the
  * model so).
  */
+/** The user's time zone for a lookup: the panel's, else the host's. */
+function zoneOf(api, ctx) {
+  return ctx.zone || userZone(api);
+}
+
 export async function runTool(api, name, args = {}, ctx = {}) {
+  const area = areaTool(name);
+  if (area) {
+    if (!offered(area, ctx)) throw new Error(`${name} is not available here`);
+    return area.run(api, args, ctx);
+  }
   switch (name) {
     case 'read_original_message': {
       if (!ctx.inReplyToId) throw new Error('there is no original message');
       const email = await api.email.get(ctx.inReplyToId);
       if (!email) throw new Error('the message could not be read');
-      return messageText(email);
+      return messageText(email, zoneOf(api, ctx));
     }
     case 'check_calendar': {
       const from = DATE_RE.test(args.from ?? '') ? args.from : null;
@@ -188,8 +202,8 @@ export async function runTool(api, name, args = {}, ctx = {}) {
       // `to` of the api is exclusive: the day after the last day.
       const events = (await api.calendar.getEvents({ from, to: addDays(to, 1) })) ?? [];
       return {
-        text: clip(formatEvents(events, { from, to, locale: api.i18n?.getLocale?.() ?? 'en' }), MAX_TOOL_RESULT),
-        widget: calendarWidget(events, { from, to }),
+        text: clip(formatEvents(events, { from, to, locale: api.i18n?.getLocale?.() ?? 'en', zone: zoneOf(api, ctx) }), MAX_TOOL_RESULT),
+        widget: calendarWidget(events, { from, to, zone: zoneOf(api, ctx) }),
       };
     }
     case 'find_contact': {
@@ -213,7 +227,7 @@ export async function runTool(api, name, args = {}, ctx = {}) {
       if (!Object.keys(query).length) throw new Error('give at least one of text, from, subject, after or before');
       const limit = Math.min(MAX_SEARCH_RESULTS, Math.max(1, Number(args.limit) || 5));
       const messages = (await api.email.search({ ...query, limit })) ?? [];
-      return { text: clip(formatMessages(messages, query), MAX_TOOL_RESULT), widget: emailsWidget(messages) };
+      return { text: clip(formatMessages(messages, query, zoneOf(api, ctx)), MAX_TOOL_RESULT), widget: emailsWidget(messages) };
     }
     case 'find_setting': {
       const query = String(args.query ?? '').trim().slice(0, 200);
@@ -230,7 +244,7 @@ export async function runTool(api, name, args = {}, ctx = {}) {
       if (!id) throw new Error('id is empty');
       const email = await api.email.get(id);
       if (!email) throw new Error('no message with that id');
-      return messageText(email);
+      return messageText(email, zoneOf(api, ctx));
     }
     default:
       throw new Error(`unknown tool ${name}`);

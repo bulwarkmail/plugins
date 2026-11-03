@@ -47,6 +47,16 @@ describe('parseAnswer', () => {
   it('ignores case and spacing of the tags', () => {
     expect(parseAnswer('<TEXT>  Hello </TEXT>')).toEqual([{ kind: 'proposal', text: 'Hello', open: false }]);
   });
+
+  it('reads the recipients and subject of a new email, addresses only', () => {
+    expect(parseAnswer('Here:\n<text to="Jannis Gollwitzer <info@it-media-hof.de>, not-an-address, bo@example.org" subject=" Kurzes Gespräch ">\nHallo Jannis,\n</text>')).toEqual([
+      { kind: 'say', text: 'Here:' },
+      { kind: 'proposal', text: 'Hallo Jannis,', open: false, to: ['info@it-media-hof.de', 'bo@example.org'], subject: 'Kurzes Gespräch' },
+    ]);
+    // Streaming: the opening tag and its attributes are not shown as talk while they come in.
+    expect(parseAnswer('Here:\n<text to="info@it-me')).toEqual([{ kind: 'say', text: 'Here:' }]);
+    expect(parseAnswer('<text to="info@it-media-hof.de">Hallo')).toEqual([{ kind: 'proposal', text: 'Hallo', open: true, to: ['info@it-media-hof.de'] }]);
+  });
 });
 
 describe('historyMessages', () => {
@@ -105,6 +115,26 @@ const openaiToolTurn = ({ id, name, args }) => {
 const TOOLS = [{ name: 'check_calendar', description: 'd', parameters: { type: 'object', properties: {} } }];
 
 describe('runChat', () => {
+  it('keeps the tools in the request after the last lookup round, but lets the model only answer', async () => {
+    for (const [endpoint, toolTurn, answer] of [
+      [ANTHROPIC_EP, (i) => anthropicToolTurn('', { id: `tu_${i}`, name: 'check_calendar', input: {} }), anthropicSse(['Done.'])],
+      [OPENAI_EP, (i) => openaiToolTurn({ id: `call_${i}`, name: 'check_calendar', args: {} }), openaiSse(['Done.'])],
+    ]) {
+      const sent = [];
+      // The model asks for a lookup every time it may.
+      const api = modelApi([toolTurn(1), toolTurn(2), toolTurn(3), toolTurn(4), answer], { sent });
+      const out = await runChat(api, endpoint, { system: 's', messages: [{ role: 'user', content: 'x' }], tools: TOOLS, runTool: async () => 'nothing' });
+      expect(out.text).toBe('Done.');
+      expect(sent).toHaveLength(5);
+      const last = sent.at(-1);
+      // The history holds tool calls, so the tools must still be there...
+      expect(last.tools).toHaveLength(1);
+      // ...but the model may not use them.
+      expect(last.tool_choice).toEqual(endpoint === ANTHROPIC_EP ? { type: 'none' } : 'none');
+      expect(sent[0].tool_choice).toEqual(endpoint === ANTHROPIC_EP ? undefined : 'auto');
+    }
+  });
+
   it('answers without tools in one round and streams the text', async () => {
     const seen = [];
     const api = modelApi([anthropicSse(['Tues', 'day works.'])]);
@@ -177,13 +207,20 @@ describe('runChat', () => {
     await expect(runChat(api2, ANTHROPIC_EP, { system: 's', messages: [{ role: 'user', content: 'x' }], tools: TOOLS, runTool: async () => 'r' })).rejects.toThrow(/empty/);
   });
 
-  it('stops offering tools after a few rounds so the model has to answer', async () => {
+  it('stops letting the model call tools after a few rounds so it has to answer', async () => {
     const sent = [];
     const loop = anthropicToolTurn('', { id: 'tu', name: 'check_calendar', input: {} });
     const api = modelApi([loop, loop, loop, loop, anthropicSse(['Done.'])], { sent });
     const out = await runChat(api, ANTHROPIC_EP, { system: 's', messages: [{ role: 'user', content: 'x' }], tools: TOOLS, runTool: async () => 'r' });
     expect(out.text).toBe('Done.');
     expect(sent).toHaveLength(5);
-    expect(sent[4].tools).toBeUndefined();
+    expect(sent[4].tool_choice).toEqual({ type: 'none' });
+  });
+
+  it('answers with what it said last when the model calls a tool after the last round anyway', async () => {
+    const loop = anthropicToolTurn('Still looking.', { id: 'tu', name: 'check_calendar', input: {} });
+    const api = modelApi([loop, loop, loop, loop, loop]);
+    const out = await runChat(api, ANTHROPIC_EP, { system: 's', messages: [{ role: 'user', content: 'x' }], tools: TOOLS, runTool: async () => 'r' });
+    expect(out.text).toBe('Still looking.');
   });
 });
