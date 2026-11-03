@@ -258,7 +258,7 @@ const STYLES = `
 
 .ct-card { border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-card, var(--color-background)); padding: 14px 16px; margin-bottom: 10px; transition: opacity 0.2s; }
 .ct-card.ct-disabled { opacity: 0.55; }
-.ct-card-header { display: flex; align-items: center; gap: 10px; }
+.ct-card-header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .ct-card-body { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 
 .ct-input, .ct-textarea, .ct-select {
@@ -349,7 +349,7 @@ function TabEditor({ tab, onChange, onRemove }) {
     h('div', { className: 'ct-card-header' },
       h(Toggle, { checked: !!tab.enabled, onChange: (v) => set({ enabled: v }), label: 'Show this tab' }),
       h('input', {
-        className: 'ct-input', style: { width: '180px', fontWeight: 500 },
+        className: 'ct-input', style: { flex: '1 1 140px', width: 'auto', minWidth: 0, maxWidth: '240px', fontWeight: 500 },
         value: tab.label, maxLength: 40, placeholder: 'Tab name',
         onChange: (e) => set({ label: e.target.value }),
       }),
