@@ -1602,6 +1602,7 @@ the webmail offers, so a plugin can hide what isn't there:
 | `changeSettings` | `api.app.describeSettings`, `setSettings` and `undoSettings`, per plugin: `true` only once the plugin holds `settings:change` |
 | `files` | `api.files`: the server has Files for the signed-in account and the admin left Files on (see [api.files](#apifiles)) |
 | `keystore` | `api.keystore`, per plugin, in the desktop app: the privileged tier, the `keystore` permission and a shell with the native helper. Absent rather than `false` when off (see [api.keystore](#apikeystore)) |
+| `blockExternalContent` | `onRenderEmailBody` may return `blockExternalContent: true`, per plugin with `email:render-takeover`. External content stays off for that body whatever the settings and trusted senders allow, and the reader offers no way to load it, so say why in your own banner. Absent on webmails that ignore the field |
 
 Read each as `=== true` (older webmails don't send them) and check
 `typeof api.email.getThread === 'function'` before calling a method.
@@ -2494,10 +2495,13 @@ await api.keystore.agree(id, peerPublicKeySpki);
 - **Errors are bare codes in `err.message`:** `keystore:cancelled` (Deny, or a
   PIN prompt closed; a Deny lasts until the app quits), `keystore:not-found`
   (the certificate is gone: list again), `keystore:unsupported`,
-  `keystore:locked` (busy: try later), `keystore:failed`, `keystore:invalid`
-  (bad input: a bug in the plugin, so don't fall back to something else over
-  it). Handle them: don't let one escape from a hook, since three errors in a
-  minute switch a plugin off.
+  `keystore:locked` (card missing or locked, or busy), `keystore:failed`, `keystore:invalid`
+  (bad input). What's bad on a signature is the plugin's bug, so don't fall back
+  to something else over it. On `decrypt` and `agree` the bytes come from a
+  message, so treat it as a failure like any other. `keystore:locked` is also
+  what a card left out of its reader looks like, so move on to another key if
+  there is one. Handle them all: don't let one escape from a hook, since three
+  errors in a minute switch a plugin off.
 - **Time.** `sign`, `decrypt` and `agree` have no timeout, and while one runs
   the calling hook's timer waits as it does for a plugin's own dialog, up to 10
   minutes from the hook's start. `list` never touches a card, has the usual
@@ -2514,6 +2518,12 @@ await api.keystore.agree(id, peerPublicKeySpki);
   `keystore:unsupported`.
 - **`signSchemes`, `decryptSchemes` and `canAgree`** are best effort for a key
   on a token, until tried. Only certificates fit for mail are listed. No CA is.
+- **One render, one question.** `onRenderEmailBody` runs once per message and
+  blob, and again for `api.ui.rerenderEmail()`. Older webmails also run it again
+  when mark-read replaces the message, so share a result per message for a moment
+  if a render asks the OS, and go past that on a retry.
+- **Grants** clear at sign-out and account switch, and when the screen locks, so
+  the next call may ask again. Forget your list then too.
 - **Keep nothing.** Hold the list in memory. An id is the SHA-256 of the
   certificate, and calls only accept ids from the last list.
 
