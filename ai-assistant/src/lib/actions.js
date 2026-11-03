@@ -199,8 +199,11 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
   const area = areaAction(name);
   if (area) {
     if (!offered(area, ctx)) throw new Error(`${name} is not available here`);
-    const { summary, plan } = await area.describe(api, args, ctx);
-    const alwaysAsk = typeof area.alwaysAsk === 'function' ? area.alwaysAsk(args, ctx) === true : area.alwaysAsk === true;
+    const described = await area.describe(api, args, ctx);
+    const { summary, plan } = described;
+    // An action may also ask first for this one call (described.alwaysAsk).
+    const alwaysAsk = (typeof area.alwaysAsk === 'function' ? area.alwaysAsk(args, ctx) === true : area.alwaysAsk === true)
+      || described.alwaysAsk === true;
     return { summary, plan: { ...plan, name, area: area.area }, alwaysAsk };
   }
   const t = api.i18n.t;
