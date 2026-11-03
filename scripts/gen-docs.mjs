@@ -12,6 +12,7 @@
 //   lib/plugin-types.ts                     ALL_PERMISSIONS, IMPLICIT_PERMISSIONS
 //   lib/plugin-sandbox/permission-text.ts   HIGH_RISK_PERMISSIONS
 //   lib/plugin-sandbox/host-api.ts          PERM_PER_METHOD (read as text)
+//   lib/plugin-sandbox/assistant/<area>.ts  PERMS of each area, spread into it
 //   locales/en/common.json                  what the consent dialog says
 //
 // The TypeScript files are bundled with esbuild into a temporary ES module
@@ -77,8 +78,30 @@ function readMethodPermissions() {
   const end = src.indexOf('\n};', start);
   if (start < 0 || end < 0) throw new Error('PERM_PER_METHOD not found in host-api.ts');
   const out = [];
-  for (const m of src.slice(start, end).matchAll(/^\s*'([\w.]+)'\s*:\s*(null|'([\w:-]+)')/gm)) {
-    out.push([m[1], m[3] ?? null]);
+  for (const m of src.slice(start, end).matchAll(/^\s*(?:'([\w.]+)'\s*:\s*(null|'([\w:-]+)')|\.\.\.ASSISTANT_PERMS\b)/gm)) {
+    if (m[1]) out.push([m[1], m[3] ?? null]);
+    else out.push(...readAssistantPermissions());
+  }
+  return out;
+}
+
+/** The PERMS tables of the assistant's areas (lib/plugin-sandbox/assistant), in the order index.ts merges them. */
+function readAssistantPermissions() {
+  const dir = 'lib/plugin-sandbox/assistant';
+  const index = readFileSync(need(`${dir}/index.ts`), 'utf8');
+  const out = [];
+  for (const [, area] of index.matchAll(/^import \* as \w+ from '\.\/([\w-]+)';/gm)) {
+    const src = readFileSync(need(`${dir}/${area}.ts`), 'utf8');
+    const start = src.indexOf('export const PERMS');
+    if (start < 0) continue;
+    const firstLine = src.slice(start, src.indexOf('\n', start));
+    if (/=\s*\{\s*\};/.test(firstLine)) continue; // an area without methods
+    const end = src.indexOf('\n};', start);
+    if (end < 0) throw new Error(`PERMS of ${area}.ts not closed`);
+    const block = src.slice(start, end);
+    for (const m of block.matchAll(/^\s*'([\w.]+)'\s*:\s*(null|'([\w:-]+)')/gm)) {
+      out.push([m[1], m[3] ?? null]);
+    }
   }
   return out;
 }
