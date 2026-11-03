@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.2.1 (2026-11-03)
+
+### Fixed
+- Keep the assistant's actions menu inside a narrow panel
+- Escape in the chat dialog closes an open menu first, and no longer closes the dialog over a typed question
+
 ## 2.2.0 (2026-11-03)
 
 ### Added
