@@ -51,6 +51,9 @@ export const editor = (page) => page.locator('[contenteditable="true"]').first()
 /** Open the composer and type a message body; lines are separate paragraphs. */
 export async function composeWith(page, text) {
   await page.getByRole('button', { name: 'Compose' }).first().click();
+  // A new message puts the caret into To shortly after it opens; typing
+  // into the body before that would lose the rest of the text to To.
+  await expect(page.locator('[data-testid="composer-to"] input').first()).toBeFocused();
   const box = editor(page);
   await box.click();
   const lines = text.split('\n');
@@ -58,6 +61,7 @@ export async function composeWith(page, text) {
     if (i > 0) await box.press('Enter');
     if (lines[i]) await box.pressSequentially(lines[i], { delay: 5 });
   }
+  if (text) await expect(box).toContainText(lines.at(-1) || lines[0]);
   // onDraftChange (the subject) is debounced.
   await page.waitForTimeout(1500);
 }
