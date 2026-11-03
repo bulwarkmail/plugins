@@ -64,7 +64,8 @@ export function ActionsMenu({ api, actions, extra = [], actionLabel: labelOf, di
   useEffect(() => {
     if (!open) return undefined;
     const away = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    const key = (e) => { if (e.key === 'Escape') setOpen(false); };
+    // Prevented, or the dialog this panel may be in closes with the menu.
+    const key = (e) => { if (e.key === 'Escape') { e.preventDefault(); setOpen(false); } };
     document.addEventListener('mousedown', away);
     document.addEventListener('keydown', key);
     return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key); };

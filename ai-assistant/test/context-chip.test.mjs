@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import * as React from 'react';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
 import { AssistantPanel } from '../src/ui/Panel.jsx';
 import { ContextChip, chipMinWidth, rowFit } from '../src/ui/panel/ContextChips.jsx';
@@ -127,6 +127,14 @@ describe('the Actions menu in a narrow panel', () => {
       window.innerWidth = inner;
     };
   }
+
+  it('keeps Escape to itself, so a dialog around the panel stays open', async () => {
+    await openMenu();
+    let notPrevented;
+    await act(async () => { notPrevented = fireEvent.keyDown(document, { key: 'Escape' }); });
+    expect(notPrevented).toBe(false);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
 
   async function openMenu() {
     render(React.createElement(ActionsMenu, { api: { i18n: { t: (k) => k } }, actions: ['summary'], actionLabel: (a) => a, onPick: () => {} }));
