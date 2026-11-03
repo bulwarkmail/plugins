@@ -29,11 +29,14 @@ export const MAX_LISTED = 30;
 export function filesFlags(api, { config = {}, prefs = {}, endpoint = null } = {}) {
   const on = areaAllowed(config, 'files') && has(api, 'files', 'files.find');
   const read = on && prefs.filesRead !== false;
+  const images = read && prefs.ctxImages !== false && typeof api?.files?.getImage === 'function' && canSeeImages(config, endpoint, prefs);
   return {
     on,
     read,
     write: on && prefs.filesWrite !== false,
-    images: read && prefs.ctxImages !== false && typeof api?.files?.getImage === 'function' && canSeeImages(config, endpoint, prefs),
+    images,
+    // A photo's date and place: only with the user's own switch (the context area's), never because a file or message asks.
+    photoDetails: images && prefs.ctxPhotoDetails === true,
   };
 }
 
@@ -202,7 +205,7 @@ async function readPicture(api, file, args, ctx, budget) {
   if (budget.images <= 0 || budget.perMessage.get(key)) return imageStandIn(stand, 'No more images fit in this request.');
   const endpoint = ctx.files?.endpoint ?? ctx.endpoint;
   const local = endpoint?.provider === 'openai' && !/^https:\/\/api\.openai\.com(\/|$)/i.test(endpoint?.baseUrl ?? '');
-  const exif = args.photoDetails === true;
+  const exif = args.photoDetails === true && ctx.files?.flags?.photoDetails === true;
   const read = await api.files.getImage(file.id, { ...(local ? { maxSide: LOCAL_IMAGE_SIDE } : {}), ...(exif ? { exif: true } : {}) });
   if (!read || read.status !== 'ok' || !read.data) return statusSentence(read?.status, file.name);
   budget.images -= 1;
@@ -213,6 +216,8 @@ async function readPicture(api, file, args, ctx, budget) {
     lines.push(read.exif?.taken || where
       ? `The photo says it was taken${read.exif?.taken ? ` on ${read.exif.taken}` : ''}${where ? ` at ${where} (latitude, longitude)` : ''}.`
       : 'The photo has no date or place stored.');
+  } else if (args.photoDetails === true) {
+    lines.push("The user has not allowed sending a photo's date and place. Tell them they can turn it on in the assistant's settings.");
   }
   return { text: lines.join('\n'), images: [{ mediaType: read.type, data: read.data, name: file.name, width: read.width, height: read.height }] };
 }

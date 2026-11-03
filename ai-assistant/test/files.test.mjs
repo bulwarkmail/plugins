@@ -39,7 +39,8 @@ beforeEach(() => forgetSeen());
 describe('what the files area offers', () => {
   it('needs the webmail\'s Files calls, the admin\'s switch and the user\'s switches', () => {
     const endpoint = { provider: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'm' };
-    expect(filesFlags(makeApi(), { endpoint })).toEqual({ on: true, read: true, write: true, images: true });
+    expect(filesFlags(makeApi(), { endpoint })).toEqual({ on: true, read: true, write: true, images: true, photoDetails: false });
+    expect(filesFlags(makeApi(), { endpoint, prefs: { ctxPhotoDetails: true } }).photoDetails).toBe(true);
     // Webmail 1.19, or a server without Files: nothing.
     expect(filesFlags(fakeApi({}), { endpoint })).toMatchObject({ on: false, read: false, write: false });
     expect(filesFlags(makeApi({}, { files: false }), { endpoint })).toMatchObject({ on: false, read: false });
@@ -96,6 +97,11 @@ describe('the lookups', () => {
     await runTool(api, 'find_file', {}, ctxWith());
     const seen = await runTool(api, 'read_file', { id: 'p1' }, ctxWith());
     expect(seen.images).toEqual([{ mediaType: 'image/jpeg', data: 'AAAA', name: 'whiteboard.jpg', width: 800, height: 600 }]);
+    // The date and place only with the user's switch.
+    await runTool(api, 'read_file', { id: 'p1', photoDetails: true }, ctxWith());
+    expect(api.calls('files.getImage').at(-1).args[1]).toEqual({});
+    await runTool(api, 'read_file', { id: 'p1', photoDetails: true }, ctxWith({ files: { flags: { ...ON, photoDetails: true } } }));
+    expect(api.calls('files.getImage').at(-1).args[1]).toEqual({ exif: true });
     const blind = await runTool(api, 'read_file', { id: 'p1' }, ctxWith({ files: { flags: { ...ON, images: false } } }));
     expect(blind).toBe('[Image: whiteboard.jpg. This model can\'t see images.]');
   });
