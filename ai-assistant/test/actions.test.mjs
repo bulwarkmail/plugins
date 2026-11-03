@@ -163,6 +163,21 @@ describe('carrying out and taking back', () => {
     expect(api.calls().some((c) => /send|submit|destroy|delete/i.test(c.method) && !c.method.startsWith('calendar') && !c.method.startsWith('tasks'))).toBe(false);
   });
 
+  it('asks first for a new message to anyone the user didn\'t name, whatever the mode', async () => {
+    const api = apiWith({});
+    // Typed by the user in the chat, or taking part in the open message: the user's choice.
+    const typed = await describeAction(api, 'draft_email', { to: ['anna@example.org'], subject: 's', body: 'b' }, { userTyped: 'write to anna@example.org about Friday' });
+    expect(typed.alwaysAsk).toBe(false);
+    const participant = await describeAction(api, 'draft_email', { to: ['Bob@Example.org'], subject: 's', body: 'b' }, { participants: ['bob@example.org'] });
+    expect(participant.alwaysAsk).toBe(false);
+    // Found only in data (a mail, a lookup): ask.
+    const chosen = await describeAction(api, 'draft_email', { to: ['anna@example.org', 'x@example.com'], subject: 's', body: 'b' }, { userTyped: 'reply to anna@example.org', participants: [] });
+    expect(chosen.alwaysAsk).toBe(true);
+    expect(chosen.summary).toContain('x@example.com');
+    const none = await describeAction(api, 'draft_email', { to: ['x@example.com'], subject: 's', body: 'b' }, {});
+    expect(none.alwaysAsk).toBe(true);
+  });
+
   it('fails when the composer did not open', async () => {
     const api = apiWith({ 'compose.reply': async () => false });
     const { plan } = await describeAction(api, 'draft_reply', { text: 'Hi' }, { openEmailId: 'M1' });
