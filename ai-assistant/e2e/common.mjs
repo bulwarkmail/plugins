@@ -189,11 +189,26 @@ export async function mockScript(name, steps) {
   if (!res.ok) throw new Error(`mock script ${name}: HTTP ${res.status}`);
 }
 
-/** The AI requests the mock got for a script, oldest first: [{ provider, step, tools, body }]. */
+/** The AI requests the mock got for a script, oldest first: [{ at, provider, step, tools, body }]. Without a name, the last 60 of any kind. */
 export async function mockRequests(name) {
-  const res = await fetch(`${MOCK}/__ai/requests?marker=${encodeURIComponent(name)}`);
+  const res = await fetch(`${MOCK}/__ai/requests${name ? `?marker=${encodeURIComponent(name)}` : ''}`);
   if (!res.ok) throw new Error(`mock requests: HTTP ${res.status}`);
   return res.json();
+}
+
+/**
+ * The chip of what the panel works on, by its accessible name ("Your
+ * message: <draft>"). In a narrow panel the chip shows only its icon; the
+ * name and the title keep the whole text.
+ */
+export function contextChip(frame, name) {
+  return frame.getByRole('group', { name, exact: true });
+}
+
+/** Whether an AI request the mock got since `since` (ms) carries `text`. */
+export async function mockGotText(text, since) {
+  const requests = await mockRequests();
+  return requests.some((r) => r.at * 1000 >= since && JSON.stringify(r.body).includes(JSON.stringify(text).slice(1, -1)));
 }
 
 /** Search for a message by its subject and open it (other suites add mail to the same inbox). */

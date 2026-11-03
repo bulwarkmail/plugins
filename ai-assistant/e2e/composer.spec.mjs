@@ -4,6 +4,7 @@ import { installPlugin, uninstallPlugin, preparePage, signIn, waitForPlugin, sho
 import {
   ID, ask, assistantButton, assistantDialog, chatInput, composerPanel, configure, acceptPrivacy, composeWith, editor, editorText,
   lastProposal, openAssistant, selectLastLine, waitDone, OLLAMA_CONFIG, mockReadsChunked, ollamaUp, MOCK, MOCK_HOST,
+  contextChip, mockGotText,
 } from './common.mjs';
 
 // The composer: the Assistant button in the composer's bottom bar (Alt+A)
@@ -58,13 +59,18 @@ for (const service of SERVICES) {
       const before = await editorText(page);
 
       const { frame } = await openAssistant(page);
-      await expect(frame.getByText('Your message')).toBeVisible();
-      await expect(frame.getByText(DRAFT)).toBeVisible();
+      // The panel's default width leaves room for the chip's icon only; its name and title keep the draft.
+      const chip = contextChip(frame, `Your message: ${DRAFT}`);
+      await expect(chip).toBeVisible();
+      await expect(chip).toHaveAttribute('title', `Your message: ${DRAFT}`);
       await shoot(page, ID, `composer-panel-${slug(service.name)}`, service.theme);
+      const since = Date.now();
       await frame.getByRole('button', { name: 'Actions' }).click();
       await frame.getByRole('menuitem', { name: 'More formal' }).click();
       await acceptPrivacy(page, { frame, expectText: service.provider });
       await expect(frame.getByText('More formal', { exact: true })).toBeVisible();
+      // The draft is what goes to the AI service.
+      if (service.available === mockReadsChunked) await expect.poll(() => mockGotText(DRAFT, since)).toBe(true);
 
       await waitDone(frame);
       const { card, preview } = lastProposal(frame);
@@ -160,13 +166,18 @@ test('translate a selected line and insert it below', async ({ page }) => {
     await selectLastLine(page);
 
     const { frame } = await openAssistant(page);
-    await expect(frame.getByText('Selected text')).toBeVisible();
-    await expect(frame.getByText('Guten Tag, wir sehen uns am Dienstag.')).toBeVisible();
+    const chip = contextChip(frame, 'Selected text: Guten Tag, wir sehen uns am Dienstag.');
+    await expect(chip).toBeVisible();
+    await expect(chip).toHaveAttribute('title', 'Selected text: Guten Tag, wir sehen uns am Dienstag.');
+    const since = Date.now();
     await frame.getByRole('button', { name: 'Actions' }).click();
     await frame.getByRole('menuitem', { name: 'Translate' }).click();
     await frame.getByLabel('Translate into').selectOption('en');
     await acceptPrivacy(page, { frame });
     await expect(frame.getByText('Translate to English · selected text')).toBeVisible();
+    // Only the selected line goes to the AI service.
+    await expect.poll(() => mockGotText('Guten Tag, wir sehen uns am Dienstag.', since)).toBe(true);
+    expect(await mockGotText('Dear team,', since)).toBe(false);
     await waitDone(frame);
     const { card } = lastProposal(frame);
     await card.getByRole('button', { name: 'Insert below' }).click();
