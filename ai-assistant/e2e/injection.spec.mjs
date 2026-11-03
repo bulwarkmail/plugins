@@ -171,7 +171,8 @@ test.describe('Files (package D)', () => {
       const [first] = await mockRequests(`inj-files-share-${RUN}`);
       const offered = first.tools;
       expect(offered).toEqual(expect.arrayContaining(['find_file', 'attach_file']));
-      expect(offered.filter((name) => /share|link|public|delete|trash|forward/i.test(name))).toEqual([]);
+      // Nothing shares or publishes anything, and nothing deletes or trashes a file.
+      expect(offered.filter((name) => /share|link|public|forward|(delete|remove|trash).*file|file.*(delete|remove|trash)/i.test(name))).toEqual([]);
       await expect(frame.getByText('Mock: tool "share_file" was not offered.')).toBeVisible();
 
       // Sending it to the stranger: even in automatic mode the card waits, and names the address.

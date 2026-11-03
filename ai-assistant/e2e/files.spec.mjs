@@ -92,7 +92,8 @@ test('a file found in Files is read, attached to a reply, and a note is created 
     await expect(chatInput(frame)).toBeVisible({ timeout: 60_000 });
 
     await mockScript(`files-attach-${RUN}`, [
-      { tools: [{ name: 'find_file', input: { text: `budget ${RUN}` } }] },
+      // Actions take only files and folders this chat found: the file and the folder for the note. (At most four rounds of tools.)
+      { tools: [{ name: 'find_file', input: { text: `budget ${RUN}` } }, { name: 'find_file', input: { text: `notes ${RUN}`, kind: 'folder' } }] },
       { tools: [{ name: 'read_file', input: { id: ids.budget } }] },
       { tools: [{ name: 'attach_file', input: { ids: [ids.budget] } }] },
       { tools: [{ name: 'create_file', input: { name: `Minutes ${RUN}`, content: '# Minutes\n\nBudget sent to Bob.', format: 'markdown', folderId: ids.notes } }] },
@@ -162,7 +163,7 @@ test('overwriting a file asks first even when actions are automatic, and the old
     await expect(page.getByRole('heading', { name: 'My files – Files' })).toBeVisible({ timeout: 30_000 });
     const trashView = page.getByRole('heading', { name: 'Trash – Files' });
     for (let i = 0; i < 5 && !(await trashView.isVisible().catch(() => false)); i++) {
-      await clickSoon(page, page.getByRole('button', { name: /^Trash/ }).first());
+      await clickSoon(page, page.getByRole('button', { name: /^Trash( \d+)?$/ }).locator('visible=true').first());
       await trashView.waitFor({ timeout: 5_000 }).catch(() => {});
     }
     await expect(trashView).toBeVisible();
