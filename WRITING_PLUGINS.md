@@ -351,6 +351,7 @@ that refuses the install there.
 | `email:write` | **Change and organise your email.** Add or remove tags, flags and other keywords on your messages, move them between your folders and to the archive, and save drafts. It can also store a small value that every member of a team mailbox can read. |  |
 | `email:send` | **Change mail before it is sent.** Read and change the recipients, subject, text and attachments of messages you write, and stop a message from being sent. | yes |
 | `crypto:full` | **Full access to this app.** Runs with the same rights as the webmail itself. It can read all your mail and stored keys and act for you. Only allow this for plugins you fully trust. | yes |
+| `keystore` | **Use certificates on this computer.** Ask to sign and decrypt messages with certificates on this computer or a smart card. The app asks you first. The plugin never gets the private key, but while you allow it, it can sign in your name and read what it decrypts. | yes |
 | `email:raw-send` | **Send messages it built itself.** Send complete messages, for example signed or encrypted ones, from your account. | yes |
 | `email:blob-read` | **Read attachments and message sources.** Read attachments (their text and pictures too) and the full source of messages you act on, and every file you attach before it is sent. | yes |
 | `email:blob-write` | **Replace attachments before sending.** Upload files to your mail server and replace a file you attached with another one before the message is sent. | yes |
@@ -1600,6 +1601,7 @@ the webmail offers, so a plugin can hide what isn't there:
 | `batchMail` | `api.email.batch` and `api.email.undoBatch` |
 | `changeSettings` | `api.app.describeSettings`, `setSettings` and `undoSettings`, per plugin: `true` only once the plugin holds `settings:change` |
 | `files` | `api.files`: the server has Files for the signed-in account and the admin left Files on (see [api.files](#apifiles)) |
+| `keystore` | `api.keystore`, per plugin, in the desktop app: the privileged tier, the `keystore` permission and a shell with the native helper. Absent rather than `false` when off (see [api.keystore](#apikeystore)) |
 
 Read each as `=== true` (older webmails don't send them) and check
 `typeof api.email.getThread === 'function'` before calling a method.
@@ -2457,6 +2459,63 @@ await api.crypto.getPublicKeyFromWKD(email)
 
 These exist for encryption plugins such as `smime`. The WebAuthn PRF salt
 comes from the plugin id, so one plugin can't derive another plugin's key.
+
+### api.keystore
+
+Certificates in the operating system's store, in the desktop app: Windows
+`CurrentUser\My` with smart cards through their minidriver, and the macOS
+keychain. Signing and unwrapping happen in the OS. The private key never
+reaches the plugin. Privileged tier only, with the `keystore` permission.
+List it in `optionalPermissions`, as an older webmail refuses the install if
+it's in `permissions`, and read the flag as
+`api.host?.features?.keystore === true`: it's absent, not `false`, when off.
+
+```js
+const certificates = await api.keystore.list();
+// [{ id, certificate, chain, subject, issuer, serial, notBefore, notAfter, usages,
+//    extendedUsages, algorithm, keyType, curve, keyBits, source, signSchemes,
+//    decryptSchemes, canAgree, askEachUse }]
+// certificate and chain are DER. chain leaves out the leaf and the root.
+
+// digest: the hash of what's signed. RSA gives the raw signature, ECDSA DER.
+await api.keystore.sign(id, digest, { scheme: 'rsa-pkcs1', hash: 'SHA-256' }); // or rsa-pss, ecdsa
+// A wrapped content key. rsa-oaep also takes label; MGF1 uses the same hash.
+await api.keystore.decrypt(id, data, { scheme: 'rsa-oaep', hash: 'SHA-1' });   // or { scheme: 'rsa-pkcs1' }
+// ECDH: the raw shared secret, big-endian, from the peer's SubjectPublicKeyInfo.
+await api.keystore.agree(id, peerPublicKeySpki);
+```
+
+- **Every call can ask the user.** The shell shows a native dialog by origin,
+  certificate and use (Allow for this session, Allow once, Deny), and the OS may
+  show a card's PIN prompt after it. It's not the plugin's to skip, and a
+  same-origin frame can't go around it either. Don't list when the plugin
+  starts: list when the user opens the plugin's settings or a message needs a
+  key.
+- **Errors are bare codes in `err.message`:** `keystore:cancelled` (Deny, or a
+  PIN prompt closed; a Deny lasts until the app quits), `keystore:not-found`
+  (the certificate is gone: list again), `keystore:unsupported`,
+  `keystore:locked` (busy: try later), `keystore:failed`, `keystore:invalid`
+  (bad input: a bug in the plugin, so don't fall back to something else over
+  it). Handle them: don't let one escape from a hook, since three errors in a
+  minute switch a plugin off.
+- **Time.** `sign`, `decrypt` and `agree` have no timeout, and while one runs
+  the calling hook's timer waits as it does for a plugin's own dialog, up to 10
+  minutes from the hook's start. `list` never touches a card, has the usual
+  30 s timeout and holds no timer. So a hook with a short budget, such as
+  `onRenderEmailBody`, can't wait for the consent dialog over a list: race it
+  and call `api.ui.rerenderEmail()` when the answer comes. If a dialog outlasts
+  the timeout the call rejects with a timeout error and no code, but the answer
+  still counts: list again and it joins the dialog that's up.
+- **What's refused.** SHA-1 signatures (`keystore:unsupported`). A digest of the
+  wrong length (`keystore:invalid`). `decrypt` answers only with up to 64 bytes
+  for OAEP and 16, 24 or 32 for PKCS#1 v1.5, and every failure there reads
+  `keystore:failed`, so it's no padding oracle. `rsa-pss` uses a salt as long as
+  the hash. macOS has no OAEP label, and a card may have no OAEP at all:
+  `keystore:unsupported`.
+- **`signSchemes`, `decryptSchemes` and `canAgree`** are best effort for a key
+  on a token, until tried. Only certificates fit for mail are listed. No CA is.
+- **Keep nothing.** Hold the list in memory. An id is the SHA-256 of the
+  certificate, and calls only accept ids from the last list.
 
 ### Method permissions
 
