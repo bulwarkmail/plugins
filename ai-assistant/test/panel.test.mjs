@@ -901,6 +901,19 @@ describe('Escape', () => {
     expect(api.calls('ui.closePanel').map((c) => c.args)).toEqual([['email-detail-sidebar']]);
   });
 
+  it('keeps a dialog around the chat open while there is text, and lets it close without', async () => {
+    const api = makeApi({ handlers: { 'ui.closePanel': async () => true } });
+    await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });
+    const box = screen.getByRole('textbox', { name: 'Message to the assistant' });
+    await type('half a question');
+    let notPrevented;
+    await act(async () => { notPrevented = fireEvent.keyDown(box, { key: 'Escape' }); });
+    expect(notPrevented).toBe(false);
+    await type('');
+    await act(async () => { notPrevented = fireEvent.keyDown(box, { key: 'Escape' }); });
+    expect(notPrevented).toBe(true);
+  });
+
   it('closes the language picker and goes back to the input', async () => {
     const api = makeApi();
     await mount(api, { email: EMAIL, selection: { text: '' }, focusRequest: 0 });

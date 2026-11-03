@@ -11,6 +11,20 @@ const nameOf = (list, id) => list?.find((x) => x.id === id)?.name || '';
 const EMPTY_FILTERS = { text: '', tags: [], correspondent: null, documentType: null, from: '', to: '' };
 /** Wait this long after the last key press before searching. */
 const SEARCH_DELAY_MS = 300;
+/** On a phone the app's own header above the page already names it. */
+const PHONE = '(max-width: 640px)';
+
+function usePhone() {
+  const query = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(PHONE) : null;
+  const [phone, setPhone] = useState(() => query?.matches ?? false);
+  useEffect(() => {
+    if (!query) return undefined;
+    const on = () => setPhone(query.matches);
+    query.addEventListener?.('change', on);
+    return () => query.removeEventListener?.('change', on);
+  }, []);
+  return phone;
+}
 
 /** The image itself for picture documents, else Paperless' thumbnail of the first page. */
 function Preview({ client, doc }) {
@@ -96,6 +110,7 @@ export function DocumentBrowser({ onClose, inDialog = false }) {
   const [open, setOpen] = useState(null);
   const [picked, setPicked] = useState(() => new Set());
   const [busy, setBusy] = useState('');
+  const phone = usePhone();
   const api = getApi();
 
   // Only the latest search may fill the list: an earlier, slower one must
@@ -164,7 +179,9 @@ export function DocumentBrowser({ onClose, inDialog = false }) {
   const wrap = (header, body) => (inDialog
     ? <Stack gap={4}>{body}</Stack>
     : <Page wide>{header}{body}</Page>);
-  const pageHeader = (actions) => <PageHeader title={t('page.title')} icon="archive" actions={actions} />;
+  const pageHeader = (actions) => (phone
+    ? actions && <Row>{actions}</Row>
+    : <PageHeader title={t('page.title')} icon="archive" actions={actions} />);
 
   if (loading) return wrap(pageHeader(), <Loading label={t('common.loading')} />);
   if (connection?.state === 'disconnected') {

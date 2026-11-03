@@ -1,7 +1,7 @@
 // The quick actions: which ones fit what the assistant works on, their
 // names, and the menu that offers them above the input.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button, Icon } from '@plugin-host/ui';
 import { COMPOSER_ACTIONS, EMPTY_DRAFT_ACTIONS, NO_MESSAGE_ACTIONS, PASSAGE_ACTIONS, READER_ACTIONS } from './model.js';
 
@@ -42,6 +42,7 @@ export function ActionsMenu({ api, actions, extra = [], actionLabel: labelOf, di
   // Where the menu opens: from the button's start, or from its end when that would run past the panel.
   const [place, setPlace] = useState({ end: false, width: 200 });
   const ref = useRef(null);
+  const menuRef = useRef(null);
   const toggle = () => {
     if (!open && ref.current) {
       const box = ref.current.getBoundingClientRect();
@@ -51,10 +52,20 @@ export function ActionsMenu({ api, actions, extra = [], actionLabel: labelOf, di
     }
     setOpen((v) => !v);
   };
+  // A panel narrower than the menu's room on either side: slide it back inside the frame.
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    const room = window.innerWidth || 0;
+    if (!open || !menu || !room) return;
+    const box = menu.getBoundingClientRect();
+    const shift = box.left < 8 ? 8 - box.left : box.right > room - 8 ? room - 8 - box.right : 0;
+    menu.style.transform = shift ? `translateX(${shift}px)` : '';
+  }, [open, place]);
   useEffect(() => {
     if (!open) return undefined;
     const away = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    const key = (e) => { if (e.key === 'Escape') setOpen(false); };
+    // Prevented, or the dialog this panel may be in closes with the menu.
+    const key = (e) => { if (e.key === 'Escape') { e.preventDefault(); setOpen(false); } };
     document.addEventListener('mousedown', away);
     document.addEventListener('keydown', key);
     return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key); };
@@ -76,7 +87,7 @@ export function ActionsMenu({ api, actions, extra = [], actionLabel: labelOf, di
         </Button>
       )}
       {open && (
-        <div role="menu" style={{ position: 'absolute', bottom: 'calc(100% + 4px)', ...(place.end ? { insetInlineEnd: 0 } : { insetInlineStart: 0 }), minWidth: place.width, maxWidth: 'calc(100vw - 16px)', zIndex: 20, background: 'var(--color-popover, var(--color-background))', color: 'var(--color-foreground)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)', padding: 4 }}>
+        <div ref={menuRef} role="menu" style={{ position: 'absolute', bottom: 'calc(100% + 4px)', ...(place.end ? { insetInlineEnd: 0 } : { insetInlineStart: 0 }), minWidth: place.width, maxWidth: 'calc(100vw - 16px)', zIndex: 20, background: 'var(--color-popover, var(--color-background))', color: 'var(--color-foreground)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)', padding: 4 }}>
           {actions.map((action) => (
             <button
               key={action}

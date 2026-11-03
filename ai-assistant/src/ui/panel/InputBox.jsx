@@ -108,9 +108,12 @@ export function InputBox({ chat, composerId }) {
               // Escape stops editing the last message first (chat tools).
               e.preventDefault();
               chat.cancelEdit();
-            } else if (e.key === 'Escape' && !input) {
-              // Back to the message; Alt+A or the toolbar button brings the panel back.
+            } else if (e.key === 'Escape' && input) {
+              // Prevented, so a dialog around the chat doesn't close and lose the text.
               e.preventDefault();
+            } else if (e.key === 'Escape') {
+              // Back to the message; Alt+A or the toolbar button brings the panel back.
+              // Not prevented: in a dialog the host closes it.
               const closing = mode === 'composer' ? api.ui.closePanel?.(COMPOSER_PANEL, { composerId }) : api.ui.closePanel?.(chat.view ? APP_PANEL : READER_PANEL);
               void closing?.catch?.(() => {});
             }
