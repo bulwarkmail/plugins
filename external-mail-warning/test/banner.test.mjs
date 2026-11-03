@@ -15,6 +15,8 @@ describe('external sender banner', () => {
     const bar = document.querySelector('.bk-infobar');
     expect(bar.getAttribute('data-tone')).toBe('warning');
     expect(bar.textContent).toBe('External sender · SPF, DMARC failedEve <eve@evil.test>');
+    // The address can't lose its bracket to a line break or a right-to-left page.
+    expect(bar.querySelector('bdi').textContent).toBe('<eve@evil.test>');
     expect(document.querySelector('[style]')).toBeNull();
   });
 
