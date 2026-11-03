@@ -12,6 +12,13 @@ encrypted to it. Nothing here protects anything.
   SHA-256 (Stalwart's AES-256-GCM encryption at rest)
 - `rc2.p7m`: EnvelopedData, RC2-CBC (old Outlook), which the plugin can't
   decrypt
+- `key.pem`: the key from `test.p12`, for the fake `api.keystore`
+- `oaep-sha1.p7m`: EnvelopedData, AES-256-CBC, key wrapped with RSA-OAEP SHA-1
+- `ec-<curve>-cert.pem`, `ec-<curve>-key.pem`, `ec-<curve>.p7m`: a throwaway EC
+  key for smime-ec@example.com on P-256, P-384 and P-521, and EnvelopedData
+  with AES-256-CBC, ECDH-ES and AES key wrap
+- `ec-p256.p12`: the P-256 certificate and key, password `fixture`
+- `ec-p256-gcm.p7m`: the same recipient, in AuthEnvelopedData with AES-256-GCM
 
 OpenSSL can't write ChaCha20-Poly1305 CMS, so the test builds that one.
 
@@ -29,5 +36,15 @@ openssl cms -encrypt -binary -aes256 -in plain.eml -out cbc.p7m cert.pem
 openssl cms -encrypt -binary -aes-256-gcm -in plain.eml -out gcm.p7m -recip cert.pem \
   -keyopt rsa_padding_mode:oaep -keyopt rsa_oaep_md:sha256 -keyopt rsa_mgf1_md:sha256
 openssl cms -encrypt -binary -rc2-128 -provider legacy -provider default -in plain.eml -out rc2.p7m cert.pem
-rm key.pem
+openssl cms -encrypt -binary -aes256 -in plain.eml -out oaep-sha1.p7m -recip cert.pem -keyopt rsa_padding_mode:oaep
+for c in P-256:p256 P-384:p384 P-521:p521; do
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:${c%%:*} -nodes -keyout ec-${c##*:}-key.pem -out ec-${c##*:}-cert.pem -days 36500 \
+    -subj "/CN=S-MIME EC Test/emailAddress=smime-ec@example.com" \
+    -addext "subjectAltName=email:smime-ec@example.com" \
+    -addext "keyUsage=critical,digitalSignature,keyAgreement" \
+    -addext "extendedKeyUsage=emailProtection"
+  openssl cms -encrypt -binary -aes256 -in plain.eml -out ec-${c##*:}.p7m -recip ec-${c##*:}-cert.pem -keyopt ecdh_kdf_md:sha256
+done
+openssl pkcs12 -export -in ec-p256-cert.pem -inkey ec-p256-key.pem -out ec-p256.p12 -passout pass:fixture -name "S-MIME EC Test"
+openssl cms -encrypt -binary -aes-256-gcm -in plain.eml -out ec-p256-gcm.p7m -recip ec-p256-cert.pem -keyopt ecdh_kdf_md:sha256
 ```

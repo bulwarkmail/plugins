@@ -220,3 +220,25 @@ export async function withLinerEngine(fn) {
 export function nativeEngine() {
   return new pkijs.CryptoEngine({ crypto, subtle: crypto.subtle, name: 'webcrypto' });
 }
+
+/**
+ * Signs through api.keystore (os-keys.js). pkijs gives this the DER of the signed
+ * attributes, and the OS wants their digest. The override is on signWithPrivateKey
+ * and not on sign: the base class would turn an ECDSA answer, already DER, into DER
+ * a second time.
+ */
+class KeystoreEngine extends pkijs.CryptoEngine {
+  async signWithPrivateKey(data, privateKey, parameters) {
+    const hash = parameters.algorithm.hash.name;
+    const digest = new Uint8Array(await crypto.subtle.digest(hash, data));
+    const signature = await privateKey.keystore.sign(digest, hash);
+    return signature.buffer.slice(signature.byteOffset, signature.byteOffset + signature.byteLength);
+  }
+}
+
+/** The engine that can sign with this key: an imported CryptoKey or an OS key's handle. */
+export function signingEngine(privateKey) {
+  return privateKey.keystore
+    ? new KeystoreEngine({ crypto, subtle: crypto.subtle, name: 'keystore' })
+    : nativeEngine();
+}

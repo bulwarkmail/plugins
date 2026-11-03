@@ -1,7 +1,7 @@
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 import { parseCertificateDer } from './certificate-utils.js';
-import { nativeEngine } from './crypto-engine.js';
+import { signingEngine } from './crypto-engine.js';
 
 /**
  * Produce an opaque CMS SignedData wrapping the given MIME content.
@@ -22,7 +22,7 @@ export async function smimeSign(mimeBytes, privateKey, signerCertDer, chainCerts
   );
 
   const hashAlgorithm = 'SHA-256';
-  await cmsSigned.sign(privateKey, 0, hashAlgorithm, undefined, nativeEngine());
+  await cmsSigned.sign(privateKey, 0, hashAlgorithm, undefined, signingEngine(privateKey));
 
   const cmsBytes = contentInfoDer(cmsSigned);
   return new Blob([cmsBytes], { type: 'application/pkcs7-mime; smime-type=signed-data' });
@@ -38,7 +38,7 @@ export async function smimeSignDetached(entityBytes, privateKey, signerCertDer, 
     await sha256(entityBytes),
   );
 
-  await cmsSigned.sign(privateKey, 0, 'SHA-256', copyBytes(entityBytes), nativeEngine());
+  await cmsSigned.sign(privateKey, 0, 'SHA-256', copyBytes(entityBytes), signingEngine(privateKey));
 
   return new Uint8Array(contentInfoDer(cmsSigned));
 }

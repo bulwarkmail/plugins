@@ -12,6 +12,7 @@ const OID_AUTH_ENVELOPED_DATA = '1.2.840.113549.1.9.16.1.23';
 const OID_CONTENT_TYPE_ATTR = '1.2.840.113549.1.9.3';
 const OID_RSAES_OAEP = '1.2.840.113549.1.1.7';
 const OID_MGF1 = '1.2.840.113549.1.1.8';
+const OID_P_SPECIFIED = '1.2.840.113549.1.1.9';
 const OID_SHA256 = '2.16.840.1.101.3.4.2.1';
 export const OID_AES256_GCM = '2.16.840.1.101.3.4.1.46';
 export const OID_CHACHA20_POLY1305 = '1.2.840.113549.1.9.16.3.18';
@@ -45,7 +46,7 @@ export function addSealer(contentOid, seal) {
  * authAttrs: undefined (Stalwart), 'match', or 'altered' (sent attributes
  * differ from the ones the MAC covers).
  */
-export async function buildAuthEnveloped(cert, { contentOid = OID_AES256_GCM, plaintext, authAttrs } = {}) {
+export async function buildAuthEnveloped(cert, { contentOid = OID_AES256_GCM, plaintext, authAttrs, oaepLabel } = {}) {
   const key = crypto.getRandomValues(new Uint8Array(32));
   const nonce = crypto.getRandomValues(new Uint8Array(12));
 
@@ -65,14 +66,15 @@ export async function buildAuthEnveloped(cert, { contentOid = OID_AES256_GCM, pl
   const publicKey = await crypto.subtle.importKey(
     'spki', cert.subjectPublicKeyInfo.toSchema().toBER(false), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'],
   );
-  const encryptedKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, publicKey, key);
+  const encryptedKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP', ...(oaepLabel ? { label: oaepLabel } : {}) }, publicKey, key);
+  const labelSource = oaepLabel ? [explicit(2, algorithm(OID_P_SPECIFIED, new asn1js.OctetString({ valueHex: oaepLabel })))] : [];
 
   const recipient = new asn1js.Sequence({
     value: [
       new asn1js.Integer({ value: 0 }),
       new asn1js.Sequence({ value: [cert.issuer.toSchema(), cert.serialNumber] }),
       algorithm(OID_RSAES_OAEP, new asn1js.Sequence({
-        value: [explicit(0, sha256()), explicit(1, algorithm(OID_MGF1, sha256()))],
+        value: [explicit(0, sha256()), explicit(1, algorithm(OID_MGF1, sha256())), ...labelSource],
       })),
       new asn1js.OctetString({ valueHex: encryptedKey }),
     ],

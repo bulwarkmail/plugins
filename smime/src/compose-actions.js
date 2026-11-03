@@ -43,7 +43,9 @@ export function composeActions({ intent, ready, detached, t }) {
 
 /**
  * Reads the stored intent (or the defaults) and whether a key exists, and
- * publishes the entries. `deps`: getPrefs, listKeyRecords, detached().
+ * publishes the entries. `deps`: getPrefs, listKeyRecords, detached(), and
+ * optionally mayHaveOsKeys(): OS keys nobody has looked for yet count as there,
+ * as looking could bring up the shell's consent dialog when nobody asked for one.
  */
 export async function publishComposeActions(host, deps) {
   const stored = (await host.storage.get(INTENT_KEY)) || {};
@@ -53,7 +55,7 @@ export async function publishComposeActions(host, deps) {
     encrypt: typeof stored.encrypt === 'boolean' ? stored.encrypt : !!prefs.defaultEncrypt,
   };
   let ready = false;
-  try { ready = (await deps.listKeyRecords()).length > 0; } catch { ready = false; }
+  try { ready = (await deps.listKeyRecords()).length > 0 || deps.mayHaveOsKeys?.() === true; } catch { ready = false; }
   await host.ui.setActions(OPTIONS_SURFACE, composeActions({ intent, ready, detached: deps.detached(), t: translator(host) }));
   return { intent, ready };
 }

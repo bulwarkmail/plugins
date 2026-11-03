@@ -9,12 +9,15 @@ import * as asn1js from 'asn1js';
 import { getLinerCryptoEngine, withLinerEngine } from './crypto-engine.js';
 import { arraysEqual, toHex } from './util.js';
 import {
-  OID_AUTH_ENVELOPED_DATA, UnsupportedAlgorithmError, parseAuthEnvelopedData, authCipher, unwrapContentKey,
+  OID_AUTH_ENVELOPED_DATA, UnsupportedAlgorithmError, parseAuthEnvelopedData, authCipher, keyTransScheme, unwrapContentKey,
 } from './auth-enveloped.js';
+import { unwrapKeyAgree } from './key-agree.js';
+import { keystoreCode } from './os-keys.js';
 
 export { UnsupportedAlgorithmError };
 
 const OID_ENVELOPED_DATA = '1.2.840.113549.1.7.3';
+const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 
 // Content ciphers pkijs + webcrypto-liner decrypt in EnvelopedData. Anything
 // else fails in there with an error that reads like a wrong key.
@@ -35,9 +38,13 @@ export class SmimeKeyLockedError extends Error {
 /**
  * Attempt to decrypt CMS EnvelopedData or AuthEnvelopedData.
  * @param input { cmsBytes, keyRecords, unlockedKeys: Map, legacyUnlockedKeys?: Map,
- *                rsaOaepKey?: (keyRecordId, hash) => Promise<CryptoKey|undefined> }
- *              (the keys as session-keys.js unlockedDecryptMaps returns them)
+ *                rsaOaepKey?: (keyRecordId, hash) => Promise<CryptoKey|undefined>,
+ *                keystoreKeys?: Map }
+ *              (the keys as session-keys.js unlockedDecryptMaps returns them, and
+ *              os-keys.js addDecryptKeys adds)
  * @returns { mimeBytes: Uint8Array, keyRecordId: string }
+ * @throws an api.keystore error (see os-keys.js) when the user said no or the store
+ *         is busy, and no imported key is left that the user could unlock instead
  */
 export async function smimeDecrypt(input) {
   const { cmsBytes, keyRecords, unlockedKeys, legacyUnlockedKeys } = input;
@@ -45,7 +52,7 @@ export async function smimeDecrypt(input) {
   const contentInfo = parseContentInfo(cmsBytes);
   const envelopedData = extractEnvelopedData(contentInfo);
 
-  const matchedRecords = findMatchingKeyRecords(envelopedData, keyRecords);
+  const matchedRecords = inTryOrder(findMatchingKeyRecords(envelopedData, keyRecords), input);
   if (matchedRecords.length === 0) {
     throw new Error('No imported S/MIME key matches any recipient in this encrypted message');
   }
@@ -55,13 +62,27 @@ export async function smimeDecrypt(input) {
   const contentOid = envelopedData.encryptedContentInfo.contentEncryptionAlgorithm.algorithmId;
   if (!ENVELOPED_CIPHERS.has(contentOid)) throw new UnsupportedAlgorithmError(contentOid);
 
-  for (const { keyRecord, recipientIndex } of matchedRecords) {
+  const os = osAttempts();
+  for (const match of matchedRecords) {
+    const { keyRecord } = match;
+    const osKey = input.keystoreKeys?.get(keyRecord.id);
+    if (osKey) {
+      if (!os.mayTry(keyRecord.id)) continue;
+      try {
+        const decrypted = await decryptWithKey(envelopedData, match, osKey, keyRecord);
+        return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
+      } catch (err) {
+        os.failed(err);
+        continue;
+      }
+    }
+
     const privateKey = unlockedKeys.get(keyRecord.id);
     if (!privateKey) {
       const legacyKey = legacyUnlockedKeys?.get(keyRecord.id);
       if (legacyKey) {
         try {
-          const decrypted = await decryptWithKey(envelopedData, recipientIndex, legacyKey, keyRecord);
+          const decrypted = await decryptWithKey(envelopedData, match, legacyKey, keyRecord);
           return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
         } catch {
           continue;
@@ -71,13 +92,13 @@ export async function smimeDecrypt(input) {
     }
 
     try {
-      const decrypted = await decryptWithKey(envelopedData, recipientIndex, privateKey, keyRecord);
+      const decrypted = await decryptWithKey(envelopedData, match, privateKey, keyRecord);
       return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
     } catch {
       const legacyKey = legacyUnlockedKeys?.get(keyRecord.id);
       if (legacyKey) {
         try {
-          const decrypted = await decryptWithKey(envelopedData, recipientIndex, legacyKey, keyRecord);
+          const decrypted = await decryptWithKey(envelopedData, match, legacyKey, keyRecord);
           return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
         } catch {
           /* try next record */
@@ -87,27 +108,71 @@ export async function smimeDecrypt(input) {
     }
   }
 
-  throwLockedOrFailed(matchedRecords, input);
+  throwLockedOrFailed(matchedRecords, input, os.stopped());
 }
 
 async function decryptAuthEnveloped(envelope, matchedRecords, input) {
   const cipher = authCipher(envelope.encryptedContentInfo);
-  for (const { keyRecord, recipientIndex } of matchedRecords) {
+  const os = osAttempts();
+  for (const { keyRecord, recipientIndex, encryptedKey } of matchedRecords) {
+    const isOs = input.keystoreKeys?.has(keyRecord.id);
+    if (isOs && !os.mayTry(keyRecord.id)) continue;
     try {
-      const cek = await unwrapContentKey(envelope.recipientInfos[recipientIndex].value, keyRecord.id, input);
+      const recipient = envelope.recipientInfos[recipientIndex].value;
+      const cek = encryptedKey
+        ? await agreedContentKey(recipient, encryptedKey, keyRecord, input)
+        : await unwrapContentKey(recipient, keyRecord.id, input);
       if (!cek) continue; // locked
       const decrypted = await cipher.decrypt(cek, envelope);
       return { mimeBytes: new Uint8Array(decrypted), keyRecordId: keyRecord.id };
     } catch (err) {
       if (err instanceof UnsupportedAlgorithmError) throw err;
+      if (isOs) os.failed(err);
       /* wrong key or a broken message: try the next record */
     }
   }
-  throwLockedOrFailed(matchedRecords, input);
+  throwLockedOrFailed(matchedRecords, input, os.stopped());
 }
 
-function throwLockedOrFailed(matchedRecords, { unlockedKeys, legacyUnlockedKeys }) {
-  const isUnlocked = (id) => unlockedKeys.has(id) || (legacyUnlockedKeys?.has(id) ?? false);
+/**
+ * An unlocked imported key needs no question, so it goes first. An OS key next,
+ * which may ask. A locked imported key last: that ends in the unlock banner.
+ */
+function inTryOrder(matches, { unlockedKeys, legacyUnlockedKeys, keystoreKeys }) {
+  const rank = ({ keyRecord: { id } }) => {
+    if (unlockedKeys.has(id) || legacyUnlockedKeys?.has(id)) return 0;
+    return keystoreKeys?.has(id) ? 1 : 2;
+  };
+  return matches.map((m, i) => [m, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([m]) => m);
+}
+
+/**
+ * One question per OS key and message, however many recipient entries a message
+ * invents for it. Once the user has said no or the store is busy, no further OS key
+ * gets asked about. Other failures move on to the next key, an imported one if there
+ * is one, except for keystore:invalid, which is our own bug and not a key problem.
+ */
+function osAttempts() {
+  const tried = new Set();
+  let stop = null;
+  return {
+    mayTry(id) {
+      if (stop || tried.has(id)) return false;
+      tried.add(id);
+      return true;
+    },
+    failed(err) {
+      if (err instanceof UnsupportedAlgorithmError) throw err;
+      const code = keystoreCode(err);
+      if (code === 'invalid') throw err;
+      if (code === 'cancelled' || code === 'locked') stop = err;
+    },
+    stopped: () => stop,
+  };
+}
+
+function throwLockedOrFailed(matchedRecords, { unlockedKeys, legacyUnlockedKeys, keystoreKeys }, osError) {
+  const isUnlocked = (id) => unlockedKeys.has(id) || (legacyUnlockedKeys?.has(id) ?? false) || (keystoreKeys?.has(id) ?? false);
   const hasLockedMatch = matchedRecords.some((m) => !isUnlocked(m.keyRecord.id));
   if (hasLockedMatch) {
     const lockedRecord = matchedRecords.find((m) => !isUnlocked(m.keyRecord.id));
@@ -117,6 +182,7 @@ function throwLockedOrFailed(matchedRecords, { unlockedKeys, legacyUnlockedKeys 
     );
   }
 
+  if (osError) throw osError;
   throw new Error('Failed to decrypt message with any available key');
 }
 
@@ -244,8 +310,22 @@ function findMatchingKeyRecords(envelopedData, keyRecords) {
 
     if (ktri) {
       for (const keyRecord of keyRecords) {
-        if (matchesKeyTransRecipient(ktri, keyRecord)) {
+        if (matchesRecipient(ktri, keyRecord)) {
           matches.push({ keyRecord, recipientIndex: i });
+        }
+      }
+      continue;
+    }
+
+    if (ri.variant === 2 && ri.value instanceof pkijs.KeyAgreeRecipientInfo) {
+      for (const encryptedKey of ri.value.recipientEncryptedKeys.encryptedKeys) {
+        // KeyAgreeRecipientIdentifier: issuerAndSerialNumber, or [0] with a subject key id.
+        const { variant, value } = encryptedKey.rid;
+        const recipient = { rid: variant === 2 ? value.subjectKeyIdentifier : value };
+        for (const keyRecord of keyRecords) {
+          if (matchesRecipient(recipient, keyRecord)) {
+            matches.push({ keyRecord, recipientIndex: i, encryptedKey });
+          }
         }
       }
     }
@@ -254,7 +334,7 @@ function findMatchingKeyRecords(envelopedData, keyRecords) {
   return matches;
 }
 
-function matchesKeyTransRecipient(recipientInfo, keyRecord) {
+function matchesRecipient(recipientInfo, keyRecord) {
   const rid = recipientInfo.rid;
 
   if (rid instanceof pkijs.IssuerAndSerialNumber) {
@@ -297,16 +377,57 @@ function matchesKeyTransRecipient(recipientInfo, keyRecord) {
   return false;
 }
 
-async function decryptWithKey(envelopedData, recipientIndex, privateKey, keyRecord) {
+async function decryptWithKey(envelopedData, { recipientIndex, encryptedKey }, privateKey, keyRecord) {
   const certAsn1 = asn1js.fromBER(keyRecord.certificate);
   const cert = new pkijs.Certificate({ schema: certAsn1.result });
+  const recipient = envelopedData.recipientInfos[recipientIndex].value;
+
+  if (encryptedKey) {
+    const cek = await unwrapKeyAgree(recipient, encryptedKey, privateKey, cert);
+    return withContentKey(envelopedData, cert, cek);
+  }
 
   return withLinerEngine(async () => {
     const cryptoEngine = getLinerCryptoEngine();
-    return envelopedData.decrypt(
-      recipientIndex,
-      { recipientCertificate: cert, recipientPrivateKey: privateKey },
-      cryptoEngine,
-    );
+    const parameters = { recipientCertificate: cert, recipientPrivateKey: privateKey };
+    // pkijs does the rest of the CMS work and only needs this one call from the key. It
+    // passes the key's algorithm, not the message's, so the OAEP parameters come from the
+    // RecipientInfo here: that's what lets OAEP SHA-1 mail open.
+    if (privateKey.keystore) {
+      parameters.crypto = {
+        subtle: { decrypt: (_algorithm, _key, data) => privateKey.keystore.decrypt(new Uint8Array(data), keyTransScheme(recipient)) },
+      };
+    }
+    return envelopedData.decrypt(recipientIndex, parameters, cryptoEngine);
   });
+}
+
+/** The content key from an ECDH recipient entry, or undefined when its key isn't unlocked. */
+async function agreedContentKey(recipient, encryptedKey, keyRecord, { keystoreKeys, unlockedKeys }) {
+  const privateKey = keystoreKeys?.get(keyRecord.id) ?? unlockedKeys.get(keyRecord.id);
+  if (!privateKey) return undefined;
+  const cert = new pkijs.Certificate({ schema: asn1js.fromBER(keyRecord.certificate).result });
+  return unwrapKeyAgree(recipient, encryptedKey, privateKey, cert);
+}
+
+/**
+ * EnvelopedData's content, when the content key is already known. pkijs has no entry
+ * point for that, so this hands it a one-off key transport entry that answers with it.
+ */
+function withContentKey(envelopedData, cert, cek) {
+  const carrier = new pkijs.EnvelopedData({
+    encryptedContentInfo: envelopedData.encryptedContentInfo,
+    recipientInfos: [new pkijs.RecipientInfo({
+      variant: 1,
+      value: new pkijs.KeyTransRecipientInfo({
+        keyEncryptionAlgorithm: new pkijs.AlgorithmIdentifier({ algorithmId: OID_RSA_ENCRYPTION }),
+        encryptedKey: new asn1js.OctetString(),
+      }),
+    })],
+  });
+  return withLinerEngine(() => carrier.decrypt(0, {
+    recipientCertificate: cert,
+    recipientPrivateKey: { algorithm: { name: 'RSA-OAEP' } },
+    crypto: { subtle: { decrypt: async () => cek } },
+  }, getLinerCryptoEngine()));
 }

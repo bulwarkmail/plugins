@@ -12,8 +12,9 @@ material ever leaves the device.
 | **Sign** outgoing mail | `onComposeSend` builds the MIME and signs it with CMS `SignedData`, then submits via `api.jmap.sendRaw`. The *Signature format* setting picks detached (`multipart/signed`, readable without S/MIME; the default) or opaque (`application/pkcs7-mime`). |
 | **Encrypt** outgoing mail | `onComposeSend` builds CMS `EnvelopedData` to every recipient (AES-256-GCM by default; AES-128 optional) plus the sender, then submits raw. Sign + Encrypt does proper sign-then-encrypt. |
 | **Verify** incoming signatures | `onRenderEmailBody` fetches the CMS blob (`api.jmap.fetchBlob`) — for detached `multipart/signed` mail the raw message, so the signed part is checked byte-for-byte — validates the signature cryptographically, checks validity dates, flags self-signed signers and signer≠From mismatches, and renders the inner body. |
-| **Decrypt** incoming mail | `onRenderEmailBody` decrypts with your unlocked key: `EnvelopedData` with AES-CBC (128/192/256), 3DES or DES, and `AuthEnvelopedData` with AES-GCM (128/256) or ChaCha20-Poly1305. That covers Thunderbird, Outlook and all four modes of Stalwart's encryption at rest. The content key can be wrapped with RSAES-PKCS1-v1_5 or RSA-OAEP (SHA-256 in `EnvelopedData`; SHA-1, SHA-256, SHA-384 or SHA-512 in `AuthEnvelopedData`). Mail in anything else, such as RC2, gets a banner that names the algorithm. |
+| **Decrypt** incoming mail | `onRenderEmailBody` decrypts with your unlocked key: `EnvelopedData` with AES-CBC (128/192/256), 3DES or DES, and `AuthEnvelopedData` with AES-GCM (128/256) or ChaCha20-Poly1305. That covers Thunderbird, Outlook and all four modes of Stalwart's encryption at rest. The content key can be wrapped with RSAES-PKCS1-v1_5, RSA-OAEP (SHA-256 in `EnvelopedData`, or any of these with an OS key; SHA-1, SHA-256, SHA-384 or SHA-512 in `AuthEnvelopedData`), or ECDH-ES on P-256, P-384 or P-521 with AES key wrap. Mail in anything else, such as RC2, gets a banner that names the algorithm. |
 | **Key management** | `settings-section` slot: import PKCS#12 (`.p12`/`.pfx`), unlock/lock, delete, import recipient certificates, set sign/encrypt defaults. |
+| **Keys in the OS** | In the desktop app, certificates from the Windows store, the macOS keychain and smart cards show up next to imported keys, marked as from the system store. They sign and decrypt without an import, through the optional `keystore` permission. Without it, everything runs on the PKCS#12 import as before. |
 | **Status** | `email-banner` slot shows signature / encryption state as reader info bars; Sign and Encrypt are check items in the composer's Options menu, per message, starting from the defaults in Settings. |
 
 ## Security model
@@ -38,6 +39,18 @@ material ever leaves the device.
   liner key from it and keeps it in memory until the iframe goes away. Code
   running in the plugin's origin can recover the key while it is unlocked;
   it is wiped with the rest of the session entry.
+- **Keys in the OS.** `api.keystore` signs and unwraps in the OS. The plugin
+  never sees the private key, and holds the certificate list in memory only,
+  per frame. The shell asks in a native dialog before a certificate is used,
+  and the list is only asked for when the settings page opens or a message
+  needs a key, not at start. An OS key comes before an imported one, except that
+  a key already unlocked opens mail without a question. If the OS can't do it
+  (`keystore:unsupported`, a key that's gone, a failure) the imported key takes
+  over. A No or a cancelled PIN stops the send, which keeps the draft, and shows
+  in the banner on read with a way to try again. A later try skips to an
+  imported key if there is one. RSA signs PKCS#1 v1.5, which Outlook needs, and
+  PSS only if the key has nothing else. An EC key without key agreement is
+  sign-only, and the settings page says so.
 - Returned HTML still passes through the host sanitizer.
 
 ## Build
@@ -67,6 +80,8 @@ src/
   smime-encrypt.js    CMS EnvelopedData
   smime-decrypt.js    CMS decrypt + blob normalisation + recipient matching
   auth-enveloped.js   AuthEnvelopedData: parse, key unwrap, AES-GCM / ChaCha20-Poly1305
+  key-agree.js        ECDH recipients: X9.63 KDF + AES key wrap
+  os-keys.js          keys in the OS store: virtual key records, handles for api.keystore
   smime-verify.js     CMS signature verification + signer status
   pkcs12.js           PKCS#12 import + key wrap/unlock
   key-storage.js      IndexedDB: key records, recipient certs, session keys

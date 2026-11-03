@@ -164,13 +164,24 @@ function oaepParams(params) {
   return { hash, label };
 }
 
+/** What api.keystore.decrypt needs to know, as the message says it. */
+export function keyTransScheme(ktri) {
+  const { algorithmId, algorithmParams } = ktri.keyEncryptionAlgorithm;
+  if (algorithmId === OID_RSA_ENCRYPTION) return { scheme: 'rsa-pkcs1' };
+  if (algorithmId !== OID_RSAES_OAEP) throw new UnsupportedAlgorithmError(algorithmId);
+  const { hash, label } = oaepParams(algorithmParams);
+  return { scheme: 'rsa-oaep', hash, ...(label ? { label: new Uint8Array(label) } : {}) };
+}
+
 /**
  * The content key from a KeyTransRecipientInfo, or undefined when the key it
- * needs isn't unlocked. keys: { rsaOaepKey(id, hash), legacyUnlockedKeys }.
+ * needs isn't unlocked. keys: { rsaOaepKey(id, hash), legacyUnlockedKeys, keystoreKeys }.
  */
 export async function unwrapContentKey(ktri, keyRecordId, keys) {
   const { algorithmId, algorithmParams } = ktri.keyEncryptionAlgorithm;
   const encryptedKey = ktri.encryptedKey.valueBlock.valueHexView;
+  const osKey = keys.keystoreKeys?.get(keyRecordId);
+  if (osKey) return osKey.keystore.decrypt(new Uint8Array(encryptedKey), keyTransScheme(ktri));
   if (algorithmId === OID_RSAES_OAEP) {
     const { hash, label } = oaepParams(algorithmParams);
     const key = await keys.rsaOaepKey?.(keyRecordId, hash);

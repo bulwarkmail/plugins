@@ -113,6 +113,15 @@ function SignatureDetails({ status, t, locale }) {
 
 const BANNER_TONE = { success: 'success', warning: 'warning', destructive: 'danger', info: 'info' };
 
+// Stored by the render hook when the OS's store had no answer for it. Each comes with a way to retry.
+const OS_DECRYPT_BANNERS = {
+  'os-cancelled': 'banner.osCancelled',
+  'os-busy': 'banner.osBusy',
+  'os-pending': 'banner.osPending',
+};
+// The hook renders again by itself once this one is answered.
+const stillWaiting = (status) => status?.decryptionError === 'os-pending';
+
 // How long the banner waits between looks for the render hook's result:
 // often at first, then less often, giving up after about 30 seconds.
 const VERIFY_WAIT_MS = [100, 150, 250, 400, 600, 1000, 1500, 2000, 2000, 2000, 2000, 3000, 3000, 3000, 3000, 3000, 3000];
@@ -124,6 +133,7 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
     const eyebrow = t('banner.encryption');
     if (status.decryptionSuccess) rows.push({ icon: 'lock-open', eyebrow, text: t('banner.decrypted'), tone: 'success' });
     else if (status.decryptionError === 'locked') rows.push({ icon: 'lock', eyebrow, text: t('banner.locked'), tone: 'warning', action: 'unlock' });
+    else if (OS_DECRYPT_BANNERS[status.decryptionError]) rows.push({ icon: 'lock', eyebrow, text: t(OS_DECRYPT_BANNERS[status.decryptionError]), tone: 'warning', action: 'retry' });
     else if (status.decryptionError) {
       // As smime-decrypt.js UnsupportedAlgorithmError words it.
       const algorithm = String(status.decryptionError).match(/^Unsupported encryption algorithm (.+)$/)?.[1];
@@ -210,6 +220,23 @@ export function makeUi(host, deps) {
       }
     }, [email]);
 
+    // "Try again" after a No or a busy store: render again, and wait for the new verdict.
+    const retryNow = useCallback(async () => {
+      setBusy(true);
+      try {
+        await host.ui.rerenderEmail();
+        if (!email || !email.id) return;
+        for (const ms of VERIFY_WAIT_MS) {
+          await new Promise((resolve) => setTimeout(resolve, ms));
+          let next = null;
+          try { next = await host.storage.get(deps.VERIFY_PREFIX + email.id); } catch { /* try again */ }
+          if (next && next.at !== status?.at) { setStatus(next); break; }
+        }
+      } finally {
+        setBusy(false);
+      }
+    }, [email, status]);
+
     useEffect(() => {
       let alive = true;
       (async () => {
@@ -217,16 +244,16 @@ export function makeUi(host, deps) {
         const key = deps.VERIFY_PREFIX + email.id;
         const stored = await host.storage.get(key);
         if (!alive) return;
-        if (stored) { setStatus(stored); setLoaded(true); return; }
+        if (stored && !stillWaiting(stored)) { setStatus(stored); setLoaded(true); return; }
         // No render-hook result yet: best-effort detect from headers.
         const ct = email.headers && (email.headers['Content-Type'] || email.headers['content-type']);
         const det = deps.detectSmime(Array.isArray(ct) ? ct[0] : ct, undefined, undefined);
         const guess = det.type === 'enveloped-data' ? { isEncrypted: true }
           : det.type === 'signed-data' || det.type === 'detached-sig' ? { isSigned: true }
           : null;
-        setStatus(guess);
+        setStatus(stored ?? guess);
         setLoaded(true);
-        if (!guess) return;
+        if (!stored && !guess) return;
         // The first time a message opens, the render hook is still verifying
         // or decrypting in the background instance when this banner mounts.
         // Wait for the result it stores, so the banner turns from "Signed
@@ -237,7 +264,8 @@ export function makeUi(host, deps) {
           let next = null;
           try { next = await host.storage.get(key); } catch { /* try again */ }
           if (!alive) return;
-          if (next) { setStatus(next); return; }
+          if (next) setStatus(next);
+          if (next && !stillWaiting(next)) return;
         }
       })();
       return () => { alive = false; };
@@ -254,13 +282,14 @@ export function makeUi(host, deps) {
       eyebrow: r.eyebrow,
       title: r.text,
     },
-    (r.details || r.action === 'unlock') && h(Row, { gap: 2 },
+    (r.details || r.action) && h(Row, { gap: 2 },
       r.details && h(BarButton, {
         icon: detailsOpen ? 'chevron-up' : 'chevron-down',
         active: detailsOpen,
         onClick: () => setDetailsOpen(!detailsOpen),
       }, detailsOpen ? t('banner.hideDetails') : t('banner.showDetails')),
       r.action === 'unlock' && h(BarButton, { icon: 'lock-open', busy, onClick: unlockNow }, t('banner.unlockNow')),
+      r.action === 'retry' && h(BarButton, { icon: 'refresh', busy, onClick: retryNow }, t('banner.tryAgain')),
     ),
     r.details && detailsOpen && h(SignatureDetails, { status, t, locale: localeOf(host) }),
     )));
@@ -271,6 +300,8 @@ export function makeUi(host, deps) {
     const [certs, setCerts] = useState([]);
     const [prefs, setPrefsState] = useState(deps.DEFAULT_PREFS);
     const [unlocked, setUnlocked] = useState({}); // id -> bool
+    const [osRecords, setOsRecords] = useState([]);
+    const [osState, setOsState] = useState('idle');
     const [busy, setBusy] = useState(false);
     const [capable, setCapable] = useState(true);
     const fileRef = useRef(null);
@@ -291,7 +322,18 @@ export function makeUi(host, deps) {
       try { await deps.onKeysChanged?.(); } catch { /* the menu catches up on the next composer */ }
     }, [refresh]);
 
-    useEffect(() => { void refresh(); }, [refresh]);
+    // OS keys are listed here, when the page opens: the list can bring up the shell's
+    // consent dialog, so it isn't done at plugin start. Waits out a slow answer.
+    const loadOsKeys = useCallback(async (again) => {
+      if (!deps.osKeys?.available()) return;
+      setOsState('loading');
+      const { records, state } = await (again ? deps.osKeys.refresh() : deps.osKeys.loadPatiently());
+      setOsRecords(records);
+      setOsState(state);
+      try { await deps.onKeysChanged?.(); } catch { /* the menu catches up on the next composer */ }
+    }, []);
+
+    useEffect(() => { void refresh(); void loadOsKeys(false); }, [refresh, loadOsKeys]);
 
     if (!capable) {
       return h(Alert, { tone: 'danger', icon: 'alert-triangle' },
@@ -425,6 +467,14 @@ export function makeUi(host, deps) {
       rec.capabilities && rec.capabilities.canSign ? t('keys.canSign') : '',
       rec.capabilities && rec.capabilities.canEncrypt ? t('keys.canEncrypt') : '',
     ].filter(Boolean).join(' · ');
+    const osKeyDetails = (rec) => [
+      rec.osSource === 'smartcard' ? t('keys.smartcard') : '',
+      rec.algorithm,
+      t('keys.valid', { from: fmtDate(rec.notBefore, locale), until: fmtDate(rec.notAfter, locale) }),
+      rec.capabilities.canSign ? t('keys.canSign') : '',
+      rec.capabilities.canEncrypt ? t('keys.canEncrypt') : '',
+      rec.capabilities.canSign && !rec.capabilities.canEncrypt ? t('keys.signOnly') : '',
+    ].filter(Boolean).join(' · ');
     const SOURCE_KEYS = { manual: 'certificates.sourceManual', 'signed-email': 'certificates.sourceSignedEmail' };
     const source = (c) => (SOURCE_KEYS[c.source] ? t(SOURCE_KEYS[c.source]) : c.source);
 
@@ -439,11 +489,27 @@ export function makeUi(host, deps) {
         description: t('keys.description'),
       },
       picker(fileRef, '.p12,.pfx', importKeyFile, t('keys.file')),
+      deps.osKeys?.available() && h(Text, { tone: 'muted' }, t('keys.systemHint')),
       h(Row, null,
-        h(Button, { icon: 'upload', busy, onClick: () => fileRef.current && fileRef.current.click() }, t('keys.import'))),
-      keys.length === 0
+        h(Button, { icon: 'upload', busy, onClick: () => fileRef.current && fileRef.current.click() }, t('keys.import')),
+        deps.osKeys?.available() && h(Button, {
+          variant: 'secondary', icon: 'refresh', busy: osState === 'loading', onClick: () => loadOsKeys(true),
+        }, t('keys.systemRefresh'))),
+      osState === 'denied' && h(Alert, { tone: 'warning', icon: 'alert-triangle' }, h(Text, null, t('keys.systemDenied'))),
+      (osState === 'failed' || osState === 'pending' || osState === 'busy') && h(Alert, { tone: 'warning', icon: 'alert-triangle' }, h(Text, null, t('keys.systemFailed'))),
+      keys.length === 0 && osRecords.length === 0
         ? h(EmptyState, { compact: true, icon: 'key', title: t('keys.empty') })
         : h(List, { label: t('keys.title') },
+          // No unlock and no delete: the key isn't ours, and the OS asks for itself.
+          osRecords.map((rec) => h(ListRow, {
+            key: rec.id,
+            icon: h(Icon, { name: 'certificate' }),
+            title: h(Row, { gap: 2, wrap: false },
+              h('span', null, rec.email || rec.subject || t('keys.unnamed')),
+              isExpired(rec.notAfter) && h(Badge, { tone: 'danger' }, t('badge.expired')),
+              h(Badge, { tone: 'info' }, t('keys.fromSystem'))),
+            subtitle: osKeyDetails(rec),
+          })),
           keys.map((rec) => h(ListRow, {
             key: rec.id,
             icon: h(Icon, { name: unlocked[rec.id] ? 'lock-open' : 'lock' }),
