@@ -20,6 +20,7 @@ with the tools to build and test them:
 | [auto-tag](auto-tag/) | Tags incoming mail by rules (newsletters, invoices, GitHub notifications, your own) | `email:read` `email:write` |
 | [birthdays](birthdays/) | Upcoming birthdays from your contacts in the sidebar, with reminders, a quick greeting and optional calendar events | `contacts:read` `ui:sidebar-widget` `ui:notifications` `compose:open` `calendar:read` `calendar:write` |
 | [calendar-agenda](calendar-agenda/) | An agenda of your next events in the sidebar | `calendar:read` `ui:sidebar-widget` `ui:email-details` `ui:app-top-banner` |
+| [category-tabs](category-tabs/) | Gmail-style inbox tabs (Primary, Social, Promotions, Updates) with your own tabs, rules and per-sender overrides | `email:read` `email:write` `ui:message-list-tabs` `ui:settings-section` `filters:read` `filters:write` |
 | [email-stats](email-stats/) | Counts the mail you open and send during a session, in the sidebar | `email:read` `ui:sidebar-widget` |
 | [email-to-task](email-to-task/) | Turns a message into a task in Bulwark, Vikunja, Todoist or a CalDAV list, with a link back and a due date from the text | `email:read` `email:write` `email:render-takeover` `tasks:read` `tasks:write` `http:proxy` `ui:message-list` `ui:toolbar` `ui:observe` `ui:keyboard` `admin:config` |
 | [external-link-warning](external-link-warning/) | Asks before opening links to domains that aren't on a trusted list | `admin:config` |
