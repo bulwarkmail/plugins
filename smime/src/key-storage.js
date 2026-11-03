@@ -19,6 +19,8 @@
  * as a plain Object (see session-keys.js).
  */
 
+import { classifyCapabilities, parseCertificateDer } from './certificate-utils.js';
+
 const DB_NAME = 'smime-plugin-store';
 const DB_VERSION = 1;
 const KEY_RECORDS_STORE = 'key-records';
@@ -61,6 +63,17 @@ function txPromise(db, storeName, mode, fn) {
 
 // ── Key record CRUD ─────────────────────────────────────────────────
 
+// What a key can do comes from its certificate on every load. Records saved
+// before version 1.5 hold false for any certificate with a keyUsage extension.
+function withCapabilities(record) {
+  if (!record) return record;
+  try {
+    return { ...record, capabilities: classifyCapabilities(parseCertificateDer(record.certificate)) };
+  } catch {
+    return record;
+  }
+}
+
 export async function saveKeyRecord(record) {
   const db = await openDB();
   await txPromise(db, KEY_RECORDS_STORE, 'readwrite', (s) => s.put(record));
@@ -68,12 +81,12 @@ export async function saveKeyRecord(record) {
 
 export async function getKeyRecord(id) {
   const db = await openDB();
-  return txPromise(db, KEY_RECORDS_STORE, 'readonly', (s) => s.get(id));
+  return withCapabilities(await txPromise(db, KEY_RECORDS_STORE, 'readonly', (s) => s.get(id)));
 }
 
 export async function listKeyRecords(accountId) {
   const db = await openDB();
-  const all = await txPromise(db, KEY_RECORDS_STORE, 'readonly', (s) => s.getAll());
+  const all = (await txPromise(db, KEY_RECORDS_STORE, 'readonly', (s) => s.getAll())).map(withCapabilities);
   if (!accountId) return all;
   return all.filter((r) => r.accountId === accountId || !r.accountId);
 }

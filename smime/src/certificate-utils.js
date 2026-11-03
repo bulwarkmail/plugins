@@ -5,6 +5,7 @@ import * as pkijs from 'pkijs';
 import { Convert } from 'pvtsutils';
 
 const OID_EMAIL_PROTECTION = '1.3.6.1.5.5.7.3.4';
+const OID_ANY_EXTENDED_KEY_USAGE = '2.5.29.37.0';
 const OID_SAN = '2.5.29.17';
 
 // ── PEM/DER conversions ──────────────────────────────────────────────
@@ -108,21 +109,18 @@ function extractAlgorithm(cert) {
   return algOid;
 }
 
+// In the order of the KeyUsage BIT STRING (RFC 5280 §4.2.1.3). pkijs hands the
+// extension over as that BitString, with no flags of its own.
+const KEY_USAGE_BITS = [
+  'digitalSignature', 'contentCommitment', 'keyEncipherment', 'dataEncipherment', 'keyAgreement',
+  'keyCertSign', 'cRLSign', 'encipherOnly', 'decipherOnly',
+];
+
 function extractKeyUsage(cert) {
   const ext = cert.extensions?.find((e) => e.extnID === '2.5.29.15');
   if (!ext?.parsedValue) return undefined;
-  const ku = ext.parsedValue;
-  const names = [];
-  if (ku.digitalSignature) names.push('digitalSignature');
-  if (ku.contentCommitment) names.push('contentCommitment');
-  if (ku.keyEncipherment) names.push('keyEncipherment');
-  if (ku.dataEncipherment) names.push('dataEncipherment');
-  if (ku.keyAgreement) names.push('keyAgreement');
-  if (ku.keyCertSign) names.push('keyCertSign');
-  if (ku.cRLSign) names.push('cRLSign');
-  if (ku.encipherOnly) names.push('encipherOnly');
-  if (ku.decipherOnly) names.push('decipherOnly');
-  return names;
+  const bytes = new Uint8Array(ext.parsedValue.valueBlock.valueHexView);
+  return KEY_USAGE_BITS.filter((_, bit) => (bytes[bit >> 3] ?? 0) & (0x80 >> (bit & 7)));
 }
 
 function extractExtendedKeyUsage(cert) {
@@ -180,8 +178,7 @@ export function classifyCapabilities(cert) {
   }
 
   if (eku && eku.length > 0) {
-    const hasEmailProtection = eku.includes(OID_EMAIL_PROTECTION);
-    if (!hasEmailProtection) {
+    if (!eku.includes(OID_EMAIL_PROTECTION) && !eku.includes(OID_ANY_EXTENDED_KEY_USAGE)) {
       canSign = false;
       canEncrypt = false;
     }
