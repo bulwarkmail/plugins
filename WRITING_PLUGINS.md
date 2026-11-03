@@ -358,13 +358,14 @@ that refuses the install there.
 | `compose:open` | **Open the composer for you.** Open a new message with recipients, text or attachments filled in. You still decide whether to send it. |  |
 | `compose:read` | **Read the message you are writing.** Read a message while you write it, when you use the plugin in the composer: its text, subject, recipients including Bcc, and the names and sizes of attachments. Not the signature or the quoted message. |  |
 | `compose:write` | **Change the message you are writing.** Replace or add text in a message while you write it, when you use the plugin in the composer. You can undo each change, and you still decide whether to send. |  |
+| `compose:check` | **Check what you write.** Reads what you write in the composer while you type and may send it to the service it uses. Only where proofreading is on, and nothing while a message is set to be signed or encrypted. Text you wrote before you turned that on may already have been checked. | yes |
 | `email:forward` | **Forward your mail.** Forward messages from your account with their attachments, without opening the composer. You are asked before the first forward to each address. | yes |
 | `calendar:read` | **Read your calendar.** See your calendars and their events. |  |
 | `calendar:write` | **Change your calendar.** Create, change and delete events. |  |
 | `contacts:read` | **Read your contacts.** Search and read your address books. |  |
 | `contacts:write` | **Change your contacts.** Create, change and delete contacts and address books. |  |
-| `files:read` | **Read your files.** Browse and open the files stored in your account. |  |
-| `files:write` | **Change your files.** Upload, rename, move and delete files in your account. |  |
+| `files:read` | **Read your files.** Find, open and read the files in your account. |  |
+| `files:write` | **Change your files.** Save, create, rename and move files in your account, and stop a file from being deleted. |  |
 | `identity:read` | **See your sender addresses.** See the addresses you send from and their signatures. |  |
 | `identity:write` | **Change your sender addresses.** Create, change and delete sender addresses and signatures. | yes |
 | `filters:read` | **Read your mail filters.** See the rules that sort your incoming mail. |  |
@@ -376,7 +377,7 @@ that refuses the install there.
 | `vacation:read` | **See your out-of-office reply.** See whether your automatic reply is on and what it says. |  |
 | `vacation:write` | **Change your out-of-office reply.** Turn your automatic reply on or off and change its text and dates. | yes |
 | `settings:read` | **Read your settings.** See your preferences and tag definitions. |  |
-| `settings:write` | **Change your settings.** Add and reorder tags and change your preferences. |  |
+| `settings:write` | **Change your tags.** Add, rename and reorder your tags, and stop changes to your settings. |  |
 | `security:read` | **See your account security.** See whether two-factor sign-in and encryption are on, without access to secrets. |  |
 | `auth:observe` | **Know when you sign in.** Be told when you sign in, switch accounts or your session is renewed. |  |
 | `auth:emit` | **Sign you out.** Sign you out of the webmail. |  |
@@ -405,13 +406,15 @@ that refuses the install there.
 | `ui:admin-page` | **Add an admin page.** Show its own page in the admin settings. |  |
 | `ui:message-list` | **Add to the message list.** Show its own content above the message list, and buttons on messages and in the selection toolbar. |  |
 | `ui:contacts` | **Add to contacts.** Show its own sections in a contact's details and buttons in the contact list. |  |
-| `ui:tasks` | **Add to tasks.** Show its own sections in a task's details and buttons in the task list. |  |
+| `ui:tasks` | **Add to tasks.** Show its own sections in a task's details, buttons in the task list, and its own task list in place of Bulwark's. |  |
 | `ui:files` | **Add to files.** Show its own sections in the file preview and entries in a file's menu. |  |
 | `ui:commands` | **Add commands.** Add its own entries to the command palette (Ctrl+K). |  |
 | `ui:app-page` | **Add pages.** Add its own pages to the app, each with a button in the navigation bar. |  |
 | `http:proxy` | **Use accounts you connect.** Send requests through Bulwark's server with an account or key that you or your administrator set up. The plugin never sees the password, but it can do anything that account can do on its own server. | yes |
 | `admin:config` | **Read its settings from your administrator.** Read the settings your administrator saved for this plugin. |  |
 | `app:lifecycle` | **Know when the app starts and stops.** Be told when the app starts, goes offline or you sign out. Always granted; not shown in the dialog. |  |
+| `calendar:respond` | **Answer invitations.** Accept or decline calendar invitations. Your answer goes to the organiser by email. | yes |
+| `settings:change` | **Change your settings.** Change how the app looks and works, such as the theme, the time format or the reading pane. Settings your organisation set stay as they are. | yes |
 | `ui:side-panel` | **Add a panel to other views.** Show its own panel next to Calendar, Contacts, Files and Settings. |  |
 
 <!-- /generated:permissions -->
@@ -520,7 +523,7 @@ declared with `api.ui.setActions`, and each entry of `shortcuts` runs its
 <!-- generated:hooks -->
 <!-- Generated by scripts/gen-docs.mjs; edit the webmail catalogues, not this table. -->
 
-211 hooks in 27 groups.
+212 hooks in 27 groups.
 
 #### Mail: message list
 
@@ -660,8 +663,9 @@ declared with `api.ui.setActions`, and each entry of `shortcuts` runs its
 | `onCalendarChange` | observer | `calendar:read` | `{ calendarId, change: "created" \| "updated" \| "removed" }` | after a calendar was created, changed or removed |
 | `onCalendarVisibilityToggle` | observer | `calendar:read` | `{ calendarId, visible }` | when a calendar is shown or hidden |
 | `onICalSubscriptionChange` | observer | `calendar:read` | `{ subscriptionId, change: "added" \| "updated" \| "removed" \| "refreshed" }` | when a calendar subscription changes |
-| `onCalendarAlert` | observer | `calendar:read` | `CalendarAlertView` | when an event reminder fires |
-| `onCalendarAlertAcknowledge` | observer | `calendar:read` | `{ alertId, eventId }` | when a reminder is dismissed |
+| `onBeforeCalendarAlert` | intercept | `calendar:write` | `CalendarAlertView` | before Bulwark shows a reminder of an event or a task, in every open tab; return false to show it yourself (no toast, sound or title alert from Bulwark; onCalendarAlert still fires); a task's needs tasks:write, an event's calendar:write |
+| `onCalendarAlert` | observer | `calendar:read` | `CalendarAlertView ({ id, eventId, eventTitle, triggerTime } or { id, taskId, taskTitle, triggerTime })` | when a reminder of an event or a task fires, in every open tab, also one a plugin took over; a task's needs tasks:read, an event's calendar:read |
+| `onCalendarAlertAcknowledge` | observer | `calendar:read` | `{ alertId, eventId } or { alertId, taskId }` | when the user closes a reminder's toast, in that tab only; a task's needs tasks:read, an event's calendar:read |
 
 #### Contacts
 
@@ -1258,7 +1262,7 @@ merged views of several accounts.
 <!-- generated:surfaces -->
 <!-- Generated by scripts/gen-docs.mjs; edit the webmail catalogues, not this table. -->
 
-55 surfaces. A plugin may use a surface with any one of the listed permissions; a prop or context key with a permission in brackets is only passed when the plugin holds that permission too.
+57 surfaces. A plugin may use a surface with any one of the listed permissions; a prop or context key with a permission in brackets is only passed when the plugin holds that permission too.
 
 #### App
 
@@ -1284,7 +1288,7 @@ merged views of several accounts.
 
 | Surface | Kind | Permission | Props or context | Where |
 |---|---|---|---|---|
-| `plugin-dialog` | frame | `ui:observe` | whatever the plugin passed as `extraProps`, plus `onResult` | inside a dialog the plugin opened with api.ui.openDialog |
+| `plugin-dialog` | frame | `ui:observe` | whatever the plugin passed as `extraProps`, plus `onResult` | inside a dialog the plugin opened with api.ui.openDialog (with `anchor: 'trigger'` a popover beside what the user clicked) |
 
 <p>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dialog-dark.png"><img src="docs/screenshots/dialog-light.png" alt="plugin-dialog opened with api.ui.openDialog" width="640"></picture>
@@ -1299,6 +1303,7 @@ merged views of several accounts.
 | `navigation-rail-bottom` | frame | `ui:navigation-rail` |  | the bottom of the navigation rail |
 | `sidebar-widget` | frame | `ui:sidebar-widget` |  | a widget at the bottom of the mail sidebar |
 | `sidebar-section` | frame | `ui:sidebar-widget` | `mailboxId` | a collapsible section in the mail sidebar, below the folders |
+| `side-panel` | frame | `ui:sidebar-widget` | `focusRequest` | a panel beside the mail (list and reader), opened from its button in the rail at the right edge (Mountain View's side panel; in the default layout a rail of its own, desktop only); the button's title and icon from api.ui.setSidePanel, else the plugin's name, no button with its `rail: false` (then opened by api.ui.openPanel / togglePanel only); the open panel is remembered in this browser; `slots['side-panel'].fill = true` makes the frame as tall as the panel; `focusRequest` counts up when the plugin opened it with api.ui.openPanel('side-panel') |
 | `sidebar-section-actions` | frame, inline | `ui:sidebar-widget` |  | compact controls beside a collapsible plugin sidebar-section heading |
 | `top-bar-actions` | action, inline | `ui:toolbar` |  | buttons in the top bar, next to search |
 | `app-page` | frame | `ui:app-page` | `pageId`, `path` | a full page of its own, with an entry in the navigation rail (api.ui.setPages); api.ui.openPage moves the tab there |
@@ -1486,6 +1491,7 @@ merged views of several accounts.
 |---|---|---|---|---|
 | `task-detail-section` | frame | `ui:tasks` | `task` (`tasks:read`) | a section in a task's details |
 | `task-list-actions` | action, inline | `ui:tasks` | `taskIds` (`tasks:read`) | buttons in the task list toolbar |
+| `calendar-task-view` | frame | `ui:tasks` | `filter`, `calendarIds` (`tasks:read`) | the calendar's task view (Calendar › Tasks) below its toolbar, in place of Bulwark's task list; the toolbar (filter, new task, task-list-actions) stays; one plugin at a time, the first offering it; `filter` is the toolbar's filter ("all" \| "pending" \| "completed" \| "overdue"), `calendarIds` the calendars ticked in the sidebar; `slots['calendar-task-view'].fill = true` makes the frame as tall as the area below the toolbar, so the plugin scrolls inside it; api.ui.openCalendar({ view: 'tasks' }) opens the view |
 
 <p>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/tasks-dark.png"><img src="docs/screenshots/tasks-light.png" alt="task-list-actions and task-detail-section" width="640"></picture>
@@ -2150,6 +2156,29 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.email.getAttachmentImage` | `email:blob-read` |
 | `api.email.getThread` | `email:read` |
 | `api.email.getThreadCount` | `email:read` |
+| `api.calendar.respond` | `calendar:respond` |
+| `api.calendar.deleteEvent` | `calendar:write` |
+| `api.calendar.undoDelete` | `calendar:write` |
+| `api.filters.list` | `filters:read` |
+| `api.filters.create` | `filters:write` |
+| `api.filters.undo` | `filters:write` |
+| `api.email.batch` | `email:write` |
+| `api.email.undoBatch` | `email:write` |
+| `api.vacation.get` | `vacation:read` |
+| `api.vacation.set` | `vacation:write` |
+| `api.app.describeSettings` | `settings:read` |
+| `api.app.setSettings` | `settings:change` |
+| `api.app.undoSettings` | `settings:change` |
+| `api.files.find` | `files:read` |
+| `api.files.list` | `files:read` |
+| `api.files.getText` | `files:read` |
+| `api.files.getImage` | `files:read` |
+| `api.files.attach` | `files:read` |
+| `api.files.saveAttachments` | `files:write` |
+| `api.files.create` | `files:write` |
+| `api.files.createFolder` | `files:write` |
+| `api.files.move` | `files:write` |
+| `api.files.rename` | `files:write` |
 | `api.storage.get` | none |
 | `api.storage.set` | none |
 | `api.storage.remove` | none |
@@ -2244,8 +2273,11 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.ui.setDayLabels` | `ui:calendar-action` |
 | `api.ui.setPages` | `ui:app-page` |
 | `api.ui.openPage` | `ui:app-page` |
+| `api.ui.openCalendar` | none |
+| `api.ui.openTask` | none |
 | `api.ui.openEmail` | `email:read` |
 | `api.ui.setSectionTitle` | `ui:sidebar-widget` |
+| `api.ui.setSidePanel` | `ui:sidebar-widget` |
 | `api.ui.setPanel` | none |
 | `api.sieve.isSupported` | `filters:read` |
 | `api.sieve.getActiveScript` | `filters:read` |
@@ -2256,7 +2288,6 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.calendar.getEvent` | `calendar:read` |
 | `api.calendar.createEvent` | `calendar:write` |
 | `api.calendar.updateEvent` | `calendar:write` |
-| `api.calendar.deleteEvent` | `calendar:write` |
 | `api.tasks.list` | `tasks:read` |
 | `api.tasks.get` | `tasks:read` |
 | `api.tasks.create` | `tasks:write` |
@@ -2270,8 +2301,6 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.templates.update` | `templates:write` |
 | `api.templates.delete` | `templates:write` |
 | `api.identities.update` | `identity:write` |
-| `api.vacation.get` | `vacation:read` |
-| `api.vacation.set` | `vacation:write` |
 | `api.email.get` | `email:read` |
 | `api.email.list` | `email:read` |
 | `api.email.search` | `email:read` |
@@ -2292,6 +2321,12 @@ comes from the plugin id, so one plugin can't derive another plugin's key.
 | `api.composer.replaceSelection` | `compose:write` |
 | `api.composer.replaceBody` | `compose:write` |
 | `api.composer.attach` | `email:blob-write` |
+| `api.composer.registerChecker` | none |
+| `api.composer.updateChecker` | none |
+| `api.composer.recheck` | none |
+| `api.composer.unregisterChecker` | none |
+| `api.composer.getCheckText` | none |
+| `api.composer.setAnnotations` | none |
 
 <!-- /generated:api-permissions -->
 

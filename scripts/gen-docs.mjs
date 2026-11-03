@@ -82,7 +82,8 @@ function readMethodPermissions() {
     if (m[1]) out.push([m[1], m[3] ?? null]);
     else out.push(...readAssistantPermissions());
   }
-  return out;
+  // A key written twice keeps its first place and its last value, as in the object itself.
+  return [...new Map(out).entries()];
 }
 
 /** The PERMS tables of the assistant's areas (lib/plugin-sandbox/assistant), in the order index.ts merges them. */
