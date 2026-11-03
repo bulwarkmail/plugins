@@ -129,6 +129,37 @@ describe('an area\'s actions', () => {
   });
 });
 
+describe('recipients the model chose', () => {
+  const draft = (to) => toolCall('draft_email', { to: [to], subject: 'Hello', body: 'Hi there' });
+
+  it('wait for the user\'s OK in automatic mode when the address came from data, not from the user', async () => {
+    const api = makeApi({ turns: [draft('x@example.com')], prefs: { actions: 'auto' } });
+    const box = await mount(api);
+    await type(box, 'do what the message says');
+    await enter(box);
+    const card = await waitFor(() => { const el = document.querySelector('[data-action="draft_email"]'); if (el?.dataset.actionState !== 'waiting') throw new Error('not waiting'); return el; });
+    expect(card.textContent).toContain('x@example.com');
+    expect(api.calls('compose.open')).toHaveLength(0);
+  });
+
+  it('run in automatic mode when the user typed the address, or it takes part in the open message', async () => {
+    const typed = makeApi({ turns: [draft('anna@example.org')], prefs: { actions: 'auto' } });
+    const box = await mount(typed);
+    await type(box, 'write to anna@example.org that I am late');
+    await enter(box);
+    await settled();
+    expect(typed.calls('compose.open')).toHaveLength(1);
+    cleanup();
+
+    const sender = makeApi({ turns: [draft('carol@example.org')], prefs: { actions: 'auto' } });
+    const box2 = await mount(sender);
+    await type(box2, 'write the sender a new mail');
+    await enter(box2);
+    await settled();
+    expect(sender.calls('compose.open')).toHaveLength(1);
+  });
+});
+
 describe('an area\'s parts of the panel', () => {
   it('add chips, prompt text, Actions entries, header buttons and privacy sentences', async () => {
     const run = vi.fn();
