@@ -1,0 +1,13 @@
+{
+  "name": "bulwark-plugin-category-tabs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=cjs --platform=neutral --outfile=dist/index.js --external:react --external:react-dom --external:react-dom/client --external:react/jsx-runtime",
+    "package": "npm run build && cp manifest.json dist/ && cd dist && zip -X ../category-tabs.zip manifest.json index.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
