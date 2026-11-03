@@ -75,7 +75,8 @@ export function privacyMessage(t, endpoint, { lookups = false, actions = false, 
   ];
   if (lookups) lines.push(t('privacy.lookups'));
   if (actions) lines.push(t('privacy.actions'));
-  for (const key of parts) lines.push(t(key));
+  // Two areas may name the same sentence (pictures from attachments and from Files): once is enough.
+  for (const key of new Set(parts)) lines.push(t(key));
   lines.push(t('privacy.until_asked'));
   return lines.join(' ');
 }
