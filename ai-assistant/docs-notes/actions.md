@@ -209,3 +209,45 @@ New permissions and their texts (Settings > plugins consent dialog):
 Webmail fixes on the way: Settings > Composing shows the admin's locks for
 plain text, picking the reply identity and how it matches; "Permanently
 delete junk" now syncs between devices.
+
+### Changes after the review (host)
+
+- **Shared folders:** batch moves, filter move/copy targets and the Archive
+  a batch archive uses are checked against the server's share map
+  (Mailbox/get shareWith, folder and the folders above it; the Archive and
+  its year and month folders too). The folder lists the app loads don't
+  carry it. An answer the server refuses counts as shared.
+- **vacation.set** (every plugin): refuses `isEnabled: true` while the
+  out-of-office forwards mail (set in Settings > Out of office) or while
+  that can't be read; switching it off and changing the text still work.
+  The error says to use Settings > Out of office.
+- **vacation.get** `forwardActive` is `true`, `false`, or `null` when the
+  account has filters but they couldn't be read.
+- **Undo tokens** are spent only when the undo went through; a failed undo
+  can be tried again, one at a time. `calendar.undoDelete` resolves to
+  `{ id }` or rejects (it no longer resolves to null).
+- **Settings:** setSettings and describeSettings also take `language` and
+  `calendarView`, the names app.getSettings uses. undoSettings refuses a
+  setting the admin has locked or hidden since, a gate that now hides its
+  row, and an old value the admin's restriction now rules out
+  (reasons as for setSettings). senderFavicons and showAvatarsInJunk may
+  only be switched off.
+- **Flags per plugin:** answerInvitation and changeSettings are true only for
+  a plugin granted calendar:respond and settings:change; a plugin enabled
+  before the update gets them after the user turns it off and on.
+- **calendar.respond** checks the invitation's sender also when From is one
+  of the user's own addresses; only a sender the server verified passes a
+  mismatch with the organiser.
+
+### Changes after the review (plugin)
+
+- The out-of-office text and an event description are at most 1,000
+  characters and show whole on the card; update_event asks first when it
+  changes the description of an event with other participants.
+- The invitation card says which address the answer goes to (the
+  ORGANIZER of the .ics).
+- update_contact marks each new address or phone number the user didn't
+  type in the chat ("New address from a message: check …").
+- What is sent: the privacy notice also names the details of the contacts
+  and events the actions look up, change or delete and of the invitations
+  they answer.
