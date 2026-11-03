@@ -296,9 +296,10 @@ const STYLES = `
   width: 44px; height: 24px; border-radius: 9999px; border: none; padding: 0;
   cursor: pointer; transition: background-color 0.15s; }
 .ct-toggle[aria-checked="true"] { background: var(--color-primary); }
-.ct-toggle[aria-checked="false"] { background: var(--color-muted); }
+.ct-toggle[aria-checked="false"] { background: var(--color-muted); box-shadow: inset 0 0 0 1px var(--color-muted-foreground); }
 .ct-knob { display: inline-block; width: 16px; height: 16px; border-radius: 9999px;
   background: var(--color-background); transform: translateX(4px); transition: transform 0.15s; }
+.ct-toggle[aria-checked="false"] .ct-knob { background: var(--color-muted-foreground); }
 .ct-toggle[aria-checked="true"] .ct-knob { transform: translateX(24px); }
 
 .ct-chip { font-size: 11px; color: var(--color-muted-foreground); background: var(--color-muted);
