@@ -251,7 +251,7 @@ const STYLES = `
 .ct-desc { font-size: 14px; color: var(--color-muted-foreground); margin: 0 0 8px; }
 .ct-group-label { font-size: 14px; font-weight: 500; margin: 20px 0 8px; }
 
-.ct-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
+.ct-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
 .ct-row:last-child { border-bottom: none; }
 .ct-row-label { font-size: 14px; font-weight: 500; }
 .ct-row-desc { font-size: 12px; color: var(--color-muted-foreground); margin-top: 4px; }
@@ -327,7 +327,7 @@ function Field(label, control) {
 
 function SettingRow({ label, description, children }) {
   return h('div', { className: 'ct-row' },
-    h('div', { style: { flex: 1, minWidth: 0 } },
+    h('div', { style: { flex: '1 1 180px', minWidth: 0 } },
       h('div', { className: 'ct-row-label' }, label),
       description ? h('div', { className: 'ct-row-desc' }, description) : null,
     ),
