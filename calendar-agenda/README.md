@@ -9,7 +9,7 @@ A sidebar section that shows an agenda of your **upcoming calendar events**, eac
 - **Shared calendars** — Events from calendars shared with you and group calendars are included.
 - **Live updates** — Refreshes on a timer, on focus, and immediately whenever you create/update/delete an event.
 - **Looks like the app** — Drawn with the app's UI kit (sidebar rows, list rows, info bar), so it follows light, dark and custom themes.
-- **Read-only** — Needs only `calendar:read`; it never changes your calendar.
+- **Read-only** — Needs only `calendar:read` and `contacts:read` (to show contact birthdays); it never changes your calendar.
 
 ## How it works
 
@@ -20,7 +20,7 @@ The background hooks (`onAfterEventCreate`, `onAfterEventUpdate`, `onAfterEventD
 ## Demonstrates
 
 - `api.calendar.getEvents()` — reading events in a date range
-- `slots['sidebar-section']` with `api.ui.setSectionTitle()` — the host draws the section header and folding
+- `slots['sidebar-section']` with `api.ui.setSectionTitle()`, and `slots['side-panel']` with `api.ui.setSidePanel()` — the host draws the header, button and folding
 - `@plugin-host/ui` — `SidebarRow`, `ListRow`, `InfoBar` and `Chip` from the app's UI kit
 - `api.hooks.onAfter*` calendar hooks — reacting to data changes from the background iframe
 - `api.storage` — cross-iframe coordination via a dirty marker
@@ -31,14 +31,14 @@ The background hooks (`onAfterEventCreate`, `onAfterEventUpdate`, `onAfterEventD
 
 | Setting          | Default        | Description                                                                 |
 | ---------------- | -------------- | --------------------------------------------------------------------------- |
-| `position`       | `Left sidebar` | Where the widget renders: **Left sidebar**, **Email reading pane**, or **Top banner** |
+| `position`       | `Left sidebar` | Where the widget renders: **Left sidebar**, **Email reading pane**, **Top banner**, or **Side panel** |
 | `daysAhead`      | 7              | How many days of upcoming events to include                                 |
 | `maxEvents`      | 50             | Cap on how many events are shown                                            |
 | `refreshMinutes` | 10             | Background auto-refresh interval (also refreshes on edit)                   |
 
 ### Position
 
-The agenda can live in one of three slots: `sidebar-section` (left sidebar, a section below the folders), `email-detail-sidebar` (beside an open email), or `app-top-banner` (top of the app). At load time the plugin reads the `position` setting and registers **only** the matching slot, so the other locations reserve no space. Changing the position requires reloading the plugin (re-enable it from Admin → Plugins) so it re-registers against the new slot.
+The agenda can live in one of four slots: `sidebar-section` (left sidebar, a section below the folders), `side-panel` (beside the mail list and reader, with its button in the rail), `email-detail-sidebar` (beside an open email), or `app-top-banner` (top of the app). At load time the plugin reads the `position` setting and registers **only** the matching slot, so the other locations reserve no space. Changing the position requires reloading the plugin (re-enable it from Admin → Plugins) so it re-registers against the new slot.
 
 ## Build & Install
 

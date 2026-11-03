@@ -77,6 +77,7 @@ describe('position', () => {
     expect(slotForPosition('Left sidebar')).toBe('sidebar-section');
     expect(slotForPosition(undefined)).toBe('sidebar-section');
     expect(slotForPosition('Top banner')).toBe('app-top-banner');
+    expect(slotForPosition('Side panel')).toBe('side-panel');
   });
 });
 
@@ -101,6 +102,7 @@ describe('reading events', () => {
     expect(api.calls('http.post')).toHaveLength(0);
     expect(manifest.permissions).not.toContain('http:post');
     expect(manifest.permissions).toContain('calendar:read');
+    expect(manifest.permissions).toContain('contacts:read');
     expect(manifest.apiPostPaths).toBeUndefined();
   });
 
@@ -172,6 +174,23 @@ describe('sidebar section', () => {
     expect(rows().map((r) => r.querySelector('[data-color]')?.getAttribute('data-color'))).toEqual(['#ef4444', '#22c55e', '#3b82f6']);
   });
 
+  it('displays contact birthdays with the birthday calendar colour', async () => {
+    const birthdayEvent = allDay('birthday-c1-b1-2026', '🎂 Alice Smith (36)', '2026-10-15', {
+      calendarId: '__birthday-calendar__',
+    });
+    const { Agenda } = setup('sidebar-section', {
+      getEvents: async () => [events[0], birthdayEvent],
+      listCalendars: async () => [
+        { id: 'cal', name: 'Work', color: '#3b82f6' },
+        { id: '__birthday-calendar__', name: 'Birthdays', color: '#eab308' },
+      ],
+    });
+    await show(Agenda);
+    expect(rowTitles()).toContain('🎂 Alice Smith (36)');
+    const birthdayRow = rows().find((r) => r.getAttribute('title')?.startsWith('🎂 Alice Smith'));
+    expect(birthdayRow?.querySelector('[data-color]')?.getAttribute('data-color')).toBe('#eab308');
+  });
+
   it('still lists events, all blue, when the calendars cannot be read', async () => {
     const { api, Agenda } = setup('sidebar-section', { listCalendars: async () => { throw new Error('nope'); } });
     await show(Agenda);
@@ -235,6 +254,22 @@ describe('reading pane and top banner', () => {
     const bar = document.querySelector('.bk-infobar');
     expect(bar.textContent.startsWith('Agenda')).toBe(true);
     expect(bar.querySelectorAll('span[title]')).toHaveLength(3);
+  });
+});
+
+describe('side panel', () => {
+  it('lists events without a duplicate heading since the host draws the panel header', async () => {
+    const { Agenda } = setup('side-panel');
+    await show(Agenda);
+    expect(screen.queryByRole('heading', { name: 'Agenda' })).toBeNull();
+    const lists = screen.getAllByRole('list');
+    expect(lists.map((l) => l.getAttribute('aria-label'))).toEqual(['Today', 'Tomorrow']);
+    const items = screen.getAllByRole('listitem');
+    expect(items.map((r) => r.textContent)).toEqual([
+      `Standup${clock(new Date(2026, 9, 14, 10, 0))} · Room 1`,
+      'OffsiteAll day',
+      `Dropped${clock(new Date(2026, 9, 15, 15, 30))}`,
+    ]);
   });
 });
 
