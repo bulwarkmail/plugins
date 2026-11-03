@@ -186,3 +186,60 @@ test('the out-of-office is set only after the user says OK', async ({ page }) =>
     await uninstallPlugin(api, ID);
   }
 });
+
+/**
+ * Settings > Out of office: the reply off, its forwarding on (to `to`) or
+ * off. The page saves by itself a moment after a change and says so.
+ */
+async function setForward(page, to) {
+  await page.getByRole('link', { name: 'Settings' }).first().click();
+  await page.getByRole('button', { name: 'Out of office', exact: true }).first().click();
+  const reply = page.getByRole('switch', { name: 'Reply automatically' });
+  const forward = page.getByRole('switch', { name: 'Forward messages' });
+  await expect(forward).toBeVisible({ timeout: 30_000 });
+  let changed = false;
+  if ((await reply.getAttribute('aria-checked')) === 'true') { await reply.click(); changed = true; }
+  if ((await forward.getAttribute('aria-checked')) !== String(!!to)) { await forward.click(); changed = true; }
+  if (to) { await page.getByLabel('Forward to').fill(to); changed = true; }
+  if (!changed) return;
+  // The page saves a moment later (each change on its own): wait until the
+  // server's filters say what was chosen.
+  const on = (text) => /"vacationForward":\{"enabled":true/.test(text);
+  const done = await eventually(() => sieveText(), (text) => (to ? on(text) && text.includes(`"to":"${to}"`) : !on(text)), { timeout: 60_000 });
+  expect(to ? on(done) : !on(done), 'the forward reached the server').toBe(true);
+}
+
+test('the out-of-office stays off while it forwards mail', async ({ page }) => {
+  const api = await install(await adminApi(), ID, installPlugin);
+  let forwarding = false;
+  try {
+    const tag = runTag();
+    await setVacation({ isEnabled: false });
+    const subject = await seedNote(tag);
+    await mockScript('c-ooo-forward', [
+      { text: 'Setting it.', tools: [{ name: 'set_vacation', input: { subject: `Away ${tag}`, text: 'Back on Monday.' } }] },
+      { text: 'Result: {{tool_results}}' },
+    ]);
+    await setUp(page, api, test);
+    await turnOnActions(page, ['Out-of-office reply']);
+    // The user sets a forward to another of their addresses in the app itself.
+    await setForward(page, PEER);
+    forwarding = true;
+
+    await page.getByRole('link', { name: 'Mail' }).first().click();
+    const frame = await panelFor(page, subject);
+    await ask(frame, '[[mock:c-ooo-forward]] set my out-of-office');
+    await acceptPrivacy(page, { frame });
+    await waitDone(frame);
+    await expect(card(frame, 'set_vacation')).toHaveAttribute('data-action-state', 'failed');
+    await expect(frame.getByText('Your out-of-office forwards mail. Change it in Settings > Out of office.').last()).toBeVisible();
+    await expect(card(frame, 'set_vacation').getByRole('button', { name: 'Do it' })).toHaveCount(0);
+    const now = await vacation();
+    expect(now.isEnabled).toBe(false);
+    expect(now.subject).not.toBe(`Away ${tag}`);
+  } finally {
+    if (forwarding) await setForward(page, null).catch(() => {});
+    await setVacation({ isEnabled: false }).catch(() => {});
+    await uninstallPlugin(api, ID);
+  }
+});

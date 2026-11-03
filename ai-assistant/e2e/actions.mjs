@@ -174,3 +174,22 @@ export async function answerOf(organizer, uid, attendee) {
   }
   return null;
 }
+
+/**
+ * A folder of `owner` shared with `peer` (read and add), made and shared
+ * through JMAP when it isn't yet. Resolves to its id; the server's share map
+ * names the peer.
+ */
+export async function ensureSharedFolder(name, owner = USER, peer) {
+  const SHARE = [...MAIL, 'urn:ietf:params:jmap:principals', 'urn:ietf:params:jmap:mail:share'];
+  const client = await jmap(owner);
+  const [[, found]] = await client.call([['Principal/query', { accountId: client.accountId, filter: { email: peer } }]], SHARE);
+  const principal = found.ids?.[0];
+  if (!principal) throw new Error(`no principal for ${peer}`);
+  const id = await ensureFolder(name, owner);
+  const rights = { mayReadItems: true, mayAddItems: true, mayRemoveItems: false, maySetSeen: true, maySetKeywords: false, mayCreateChild: false, mayRename: false, mayDelete: false, maySubmit: false };
+  await client.call([['Mailbox/set', { accountId: client.accountId, update: { [id]: { [`shareWith/${principal}`]: rights } } }]], SHARE);
+  const [[, got]] = await client.call([['Mailbox/get', { accountId: client.accountId, ids: [id], properties: ['shareWith'] }]], SHARE);
+  if (!got.list[0]?.shareWith?.[principal]) throw new Error(`${name} is not shared with ${peer}`);
+  return id;
+}

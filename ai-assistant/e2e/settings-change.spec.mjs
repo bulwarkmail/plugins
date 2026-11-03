@@ -15,7 +15,12 @@ const CONFIG = { allowSettingsChanges: true };
 async function panel(page, tag) {
   const subject = `Settings note ${tag}`;
   await importMessages([{ messageId: `settings-${tag}@e2e.bulwark.test`, from: 'Carol <carol@example.org>', to: USER, subject, text: `Settings test ${tag}.` }]);
-  await openMessage(page, subject);
+  try {
+    await openMessage(page, subject);
+  } catch {
+    // The list can redraw under the click; search once more.
+    await openMessage(page, subject);
+  }
   return (await readerPanel(page)).frame;
 }
 
