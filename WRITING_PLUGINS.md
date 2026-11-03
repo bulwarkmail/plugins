@@ -1599,6 +1599,7 @@ the webmail offers, so a plugin can hide what isn't there:
 | `filterRules` | `api.filters.list`, `create` and `undo`: the mail server has filters (Sieve) |
 | `batchMail` | `api.email.batch` and `api.email.undoBatch` |
 | `changeSettings` | `api.app.describeSettings`, `setSettings` and `undoSettings`, per plugin: `true` only once the plugin holds `settings:change` |
+| `files` | `api.files`: the server has Files for the signed-in account and the admin left Files on (see [api.files](#apifiles)) |
 
 Read each as `=== true` (older webmails don't send them) and check
 `typeof api.email.getThread === 'function'` before calling a method.
@@ -1606,8 +1607,6 @@ The flags say what the webmail can do; the method's permission is still
 checked on every call. A per-plugin flag stays `false` for a plugin that
 was turned on before an update added the permission, until the user turns
 it off and on.
-
-<!-- TODO(D): flags of the Files host calls -->
 
 
 `api.host.features` is updated in place, like `api.plugin.settings`, so
@@ -2040,8 +2039,6 @@ no). `undoSettings` writes the exact old values back, but refuses a
 setting the admin has locked or hidden since, one a gate now hides, and
 an old value the admin's restriction now rules out.
 
-<!-- TODO(D): the Files host calls -->
-
 ### api.accountData
 
 ```js
@@ -2157,6 +2154,113 @@ await api.contacts.remove(id)
 await api.addressBooks.list()
 await api.addressBooks.create(name)
 ```
+
+### api.files
+
+New in 1.20, with the AI assistant 2.2: the user's Files (Stalwart's file
+storage). Check `api.host.features.files === true` and
+`typeof api.files?.find === 'function'` first. The flag is true where the
+server has Files for the signed-in account and the admin left Files on,
+the same check as the navigation rail; otherwise every call rejects with
+`<method>: Files is not available`. The permissions are the existing
+`files:read` and `files:write`.
+
+```js
+await api.files.find({ text, folderId, kind, modifiedAfter, modifiedBefore, limit })   // files:read → FileInfo[], newest first
+await api.files.list(folderId?)              // files:read → FileInfo[], folders first, then by name
+await api.files.getText(fileId, { maxChars })            // files:read → as email.getAttachmentText
+await api.files.getImage(fileId, { maxSide, exif })      // files:read → as email.getAttachmentImage, without alt
+await api.files.attach(fileIds, { composerId } | { newDraft: { to, subject, body } })   // → { attached, refused }
+await api.files.saveAttachments(emailId, blobIds, folderId?, { accountId })   // files:write + email:read → { saved, stopped }
+await api.files.create({ folderId, name, content, type, replace })            // files:write → { file, kept? }
+await api.files.createFolder({ parentId, name })         // files:write → FileInfo
+await api.files.move(fileId, folderId | null)            // files:write → { file, previousFolderId }
+await api.files.rename(fileId, name)                     // files:write → { file, previousName }
+```
+
+There is no call that deletes a file, shares it, makes a public link or
+moves it to another account.
+
+**FileInfo** is `{ id, name, path, parentId, kind, mimeType, size,
+modified, shared, owner }`. `path` is the folder the item is in, from the
+top of its drive (`/` or `/Documents/2026`); `parentId` is null at the
+top. `kind` is `file` or `folder`; a folder has `mimeType` `''` and `size`
+0. `modified` is ISO 8601, or `''` when the server doesn't say. A file in
+a drive someone shared with the user has `shared: true`, `owner` (whose
+drive it is) and an id of the form `account:node`; such files can be
+found, read and attached, never changed.
+
+**Reading.**
+
+- `find` matches every field given. `text`: words that must all appear in
+  the name or path, any case. `folderId`: only below that folder, at any
+  depth. `kind`: `document` (PDF, Office and text files), `image`, `pdf`,
+  `spreadsheet`, `presentation`, `text` or `folder`. `modifiedAfter`
+  (inclusive) and `modifiedBefore` (exclusive) take ISO 8601 dates.
+  `limit` is 1 to 50, 20 by default. It covers the user's own drive and
+  the drives shared with them, and leaves out the Files trash and what is
+  in it, Stalwart 1.0 symlinks, and folders of another account that are
+  only the way down to something shared. The listing is kept for 60
+  seconds; a change through `api.files` or the Files view drops it.
+- `list` returns at most 200 entries. Without a folder: the top of the
+  user's drive and the top items others shared with them. A file id is
+  refused (`"x" is not a folder`).
+- `getText` and `getImage` share a limit of 30 reads a minute and answer
+  like `email.getAttachmentText` and `email.getAttachmentImage` (see
+  [Attachment text and images](#attachment-text-and-images-conversations-120)).
+  The download stops past 20 MB, whatever size the listing gave, and
+  answers `too_big`. `getImage` reads a photo's date and place only with
+  `exif: true`, and answers `unsupported` for SVG. Files of a shared drive
+  are read from their owner's account.
+
+**Attaching.** `attach` takes 1 to 20 files, no folders, and needs
+`files:read` plus `compose:write` for `{ composerId }` (the draft open in
+the composer, as for `api.composer`) or `compose:open` for `{ newDraft }`.
+At most 20 calls a minute. The files go in by blob: nothing is downloaded
+or uploaded again, and a file keeps the login that holds it, so a draft
+sent from another login copies it over first. Each file passes
+`onBeforeAttachmentUpload` and the server's limit for all attachments of
+one message: the open composer checks them itself, and for a new draft
+the host checks them before it opens the draft. Files turned down are
+named in `refused`; when none are left, no draft opens. A new draft goes
+through `compose.open`, with its address checks, its limit of 5 a minute
+and its question before replacing an open draft.
+
+**Writing.** Writes go only into the user's own drive: never into, out of
+or inside a folder shared with others (`shareWith` on it or on a folder
+above it), never into a drive someone shared with the user, never into
+the Files trash. When a folder above the target is missing from the
+listing, the host can't tell whether it is shared and refuses. Every
+write counts against a limit of 20 a minute, refused ones too, counted
+before the drive is listed. The Files app's hooks run: `onBeforeFileUpload`
+(create, replace, saveAttachments), `onBeforeFileMove` and
+`onBeforeFileRename` can stop a write (`another plugin stopped this`);
+`onAfterFileUpload`, `onDirectoryCreate`, `onFileMove` and `onFileRename`
+report it. `onFileMove` reports the item as it was, with its old path, as
+the Files app does. An open Files view refreshes after a change.
+
+- `saveAttachments` files 1 to 20 attachments of a message into a folder
+  (`null`: the top of the drive), copying them from a shared or group
+  mailbox's account first. Each blob must be an attachment of that
+  message, found as `email.get` finds it. A name that is taken becomes
+  "name (2).ext". It resolves to the saved files and the names another
+  plugin stopped. The reader's Save to Files dialog uses the same code.
+- `create` writes a `text/markdown` or `text/plain` file of up to 512 KB.
+  A new file needs a `name`, checked against the server's naming rules
+  first (reserved names, `:`, control characters, length); a name that is
+  taken becomes "name (2).md", so nothing is overwritten. With `replace:
+  fileId` it gives a text or Markdown file of the user's own drive new
+  content: the old version first goes into the Files trash, in a folder
+  of its own, where Restore brings it back next to the new one, and
+  `kept` names it. Other kinds of files are refused. When the server
+  refuses the new content, the copy is taken out of the trash again.
+- `createFolder` uses the same name checks and Stalwart 1.0's depth limit
+  of 64 levels.
+- `move` works within the user's own drive: not into the folder itself,
+  not into the trash, not where something already has that name. Move it
+  back to `previousFolderId` to undo.
+- `rename` refuses a name the folder already holds. Rename back to
+  `previousName` to undo.
 
 ### api.templates, api.identities, api.vacation, api.user, api.app
 
