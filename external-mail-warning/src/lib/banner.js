@@ -5,10 +5,10 @@
 import * as React from 'react';
 import { InfoBar } from '@plugin-host/ui';
 
-// The address stays in one piece: its own text direction, so the brackets
-// don't flip in a right-to-left language, and no line break before the ">".
+// The address keeps its own text direction, so the brackets don't flip in a
+// right-to-left language. It stays inline, so a very long one can still wrap.
 function Address({ children }) {
-  return React.createElement('bdi', { className: 'inline-block' }, children);
+  return React.createElement('bdi', null, children);
 }
 
 function Sender({ sender }) {
