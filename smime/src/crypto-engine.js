@@ -223,15 +223,15 @@ export function nativeEngine() {
 
 /**
  * Signs through api.keystore (os-keys.js). pkijs gives this the DER of the signed
- * attributes, and the OS wants their digest. The override is on signWithPrivateKey
- * and not on sign: the base class would turn an ECDSA answer, already DER, into DER
- * a second time.
+ * attributes, which is just what the desktop app takes: it checks them and hashes them
+ * itself, so a page can't get a login or a TLS handshake signed. The override is on
+ * signWithPrivateKey and not on sign: the base class would turn an ECDSA answer, already
+ * DER, into DER a second time.
  */
 class KeystoreEngine extends pkijs.CryptoEngine {
   async signWithPrivateKey(data, privateKey, parameters) {
     const hash = parameters.algorithm.hash.name;
-    const digest = new Uint8Array(await crypto.subtle.digest(hash, data));
-    const signature = await privateKey.keystore.sign(digest, hash);
+    const signature = await privateKey.keystore.sign(new Uint8Array(data), hash);
     return signature.buffer.slice(signature.byteOffset, signature.byteOffset + signature.byteLength);
   }
 }

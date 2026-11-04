@@ -295,16 +295,16 @@ describe('signing with an OS key', () => {
     return { ...context, der, record };
   }
 
-  it('asks for the SHA-256 of the DER signed attributes, tagged as a SET OF', async () => {
+  it('hands over the DER signed attributes, tagged as a SET OF, for the shell to hash', async () => {
     const { ks, der } = await signWith([RSA]);
     expect(ks.calls.sign).toHaveLength(1);
-    const { id, digest, scheme } = ks.calls.sign[0];
+    const { id, signedAttributes, scheme } = ks.calls.sign[0];
     expect(id).toBe(ks.id());
     expect(scheme).toEqual({ scheme: 'rsa-pkcs1', hash: 'SHA-256' });
     const { attrs } = signedPart(der);
     expect(attrs[0]).toBe(0x31);
-    expect(digest).toBeInstanceOf(Uint8Array);
-    expect(Array.from(digest)).toEqual(Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', attrs))));
+    expect(signedAttributes).toBeInstanceOf(Uint8Array);
+    expect(Array.from(signedAttributes)).toEqual(Array.from(attrs));
   });
 
   it('writes an RSA PKCS#1 v1.5 signature that Node and the plugin accept', async () => {
@@ -362,9 +362,13 @@ describe('signing with an OS key', () => {
     ['RSA', RSA],
     ['PSS', { ...RSA, signSchemes: ['rsa-pss'] }],
     ['ECDSA', ecFixture('p521')],
-  ])('asks for SHA-256 and a 32-byte digest with %s, never for SHA-1', async (_, spec) => {
+  ])('asks for SHA-256 with %s, never for SHA-1, with what a mail signed now has', async (_, spec) => {
     const { ks } = await signWith([spec]);
-    expect(ks.calls.sign.map((c) => [c.scheme.hash, c.digest.length])).toEqual([['SHA-256', 32]]);
+    expect(ks.calls.sign.map((c) => c.scheme.hash)).toEqual(['SHA-256']);
+    const hex = Buffer.from(ks.calls.sign[0].signedAttributes).toString('hex');
+    // Content type id-data, then a message digest of 32 bytes.
+    expect(hex).toContain('06092a864886f70d010903310b06092a864886f70d010701');
+    expect(hex).toMatch(/06092a864886f70d01090431220420[0-9a-f]{64}/);
   });
 
   it('passes the code on, and remembers a cancel for the next choice', async () => {

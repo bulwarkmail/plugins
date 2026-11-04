@@ -167,6 +167,7 @@ function inTryOrder(matches, { unlockedKeys, legacyUnlockedKeys, keystoreKeys })
  */
 function osAttempts() {
   let refused = null;
+  let askFirst = null;
   let busy = null;
   return {
     mayTry: () => !refused,
@@ -174,13 +175,16 @@ function osAttempts() {
       if (err instanceof UnsupportedAlgorithmError) throw err;
       const code = keystoreCode(err);
       if (code === 'cancelled') refused = err;
+      if (code === 'ask-first') askFirst = err;
       if (code === 'locked') busy = err;
     },
-    stopped: () => refused ?? busy,
+    stopped: () => refused ?? askFirst ?? busy,
   };
 }
 
 function throwLockedOrFailed(matchedRecords, { unlockedKeys, legacyUnlockedKeys, keystoreKeys }, osError) {
+  // An OS key fits and only needs the user's word. If they say no, a locked key still gets its turn.
+  if (keystoreCode(osError) === 'ask-first') throw osError;
   const isUnlocked = (id) => unlockedKeys.has(id) || (legacyUnlockedKeys?.has(id) ?? false) || (keystoreKeys?.has(id) ?? false);
   const hasLockedMatch = matchedRecords.some((m) => !isUnlocked(m.keyRecord.id));
   if (hasLockedMatch) {

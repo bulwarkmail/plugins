@@ -136,6 +136,7 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
     const eyebrow = t('banner.encryption');
     if (status.decryptionSuccess) rows.push({ icon: 'lock-open', eyebrow, text: t('banner.decrypted'), tone: 'success' });
     else if (status.decryptionError === 'locked') rows.push({ icon: 'lock', eyebrow, text: t('banner.locked'), tone: 'warning', action: 'unlock' });
+    else if (status.decryptionError === 'os-ask') rows.push({ icon: 'lock', eyebrow, text: t('banner.osAsk'), tone: 'info', action: 'retry', actionLabel: 'banner.openWithSystem' });
     else if (OS_DECRYPT_BANNERS[status.decryptionError]) rows.push({ icon: 'lock', eyebrow, text: t(OS_DECRYPT_BANNERS[status.decryptionError]), tone: 'warning', action: 'retry' });
     else if (status.decryptionError === 'os-list-denied') rows.push({ icon: 'lock', eyebrow, text: t('banner.osListDenied'), tone: 'warning' });
     else if (status.decryptionError) {
@@ -294,7 +295,7 @@ export function makeUi(host, deps) {
         onClick: () => setDetailsOpen(!detailsOpen),
       }, detailsOpen ? t('banner.hideDetails') : t('banner.showDetails')),
       r.action === 'unlock' && h(BarButton, { icon: 'lock-open', busy, onClick: unlockNow }, t('banner.unlockNow')),
-      r.action === 'retry' && h(BarButton, { icon: 'refresh', busy, onClick: retryNow }, t('banner.tryAgain')),
+      r.action === 'retry' && h(BarButton, { icon: r.actionLabel ? 'lock-open' : 'refresh', busy, onClick: retryNow }, t(r.actionLabel ?? 'banner.tryAgain')),
     ),
     r.details && detailsOpen && h(SignatureDetails, { status, t, locale: localeOf(host) }),
     )));

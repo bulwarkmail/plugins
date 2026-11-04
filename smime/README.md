@@ -41,9 +41,11 @@ material ever leaves the device.
   it is wiped with the rest of the session entry.
 - **Keys in the OS.** `api.keystore` signs and unwraps in the OS. The plugin
   never sees the private key, and holds the certificate list in memory only,
-  per frame. The shell asks in a native dialog before a certificate is used,
-  and the list is only asked for when the settings page opens or a message
-  needs a key, not at start. An OS key comes before an imported one, except that
+  per frame. The shell asks in a native dialog at every signature, and before a
+  certificate unwraps anything. Opening a message never brings up a dialog: if
+  nothing is allowed yet, the banner offers a button. The list is only asked for
+  when the settings page opens or the user asks for a key, not at start. An OS
+  key comes before an imported one, except that
   a key already unlocked opens mail without a question. If the OS can't do it
   (`keystore:unsupported`, a key that's gone, a missing card, a failure) the
   imported key takes over. A No or a cancelled PIN stops the send, which keeps

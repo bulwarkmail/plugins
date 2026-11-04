@@ -2478,22 +2478,36 @@ const certificates = await api.keystore.list();
 //    decryptSchemes, canAgree, askEachUse }]
 // certificate and chain are DER. chain leaves out the leaf and the root.
 
-// digest: the hash of what's signed. RSA gives the raw signature, ECDSA DER.
-await api.keystore.sign(id, digest, { scheme: 'rsa-pkcs1', hash: 'SHA-256' }); // or rsa-pss, ecdsa
+// The DER of a CMS message's signed attributes, as a SET. RSA gives the raw signature, ECDSA DER.
+await api.keystore.sign(id, signedAttributes, { scheme: 'rsa-pkcs1', hash: 'SHA-256' }); // or rsa-pss, ecdsa
 // A wrapped content key. rsa-oaep also takes label; MGF1 uses the same hash.
 await api.keystore.decrypt(id, data, { scheme: 'rsa-oaep', hash: 'SHA-1' });   // or { scheme: 'rsa-pkcs1' }
 // ECDH: the raw shared secret, big-endian, from the peer's SubjectPublicKeyInfo.
 await api.keystore.agree(id, peerPublicKeySpki);
+// list, decrypt and agree take { quiet: true } last: no dialog, see below.
+await api.keystore.decrypt(id, data, scheme, { quiet: true });
 ```
 
+- **Signing is for mail, and asks each time.** The shell takes the signed attributes
+  of a CMS message: content type `id-data`, a message digest as long as the hash, a
+  signing time within 10 minutes of now, and optionally `smimeCapabilities`, ESS
+  `signingCertificateV2` and the key preference attributes, in DER order. It checks
+  them and hashes them itself, so no other digest can be signed. Anything else is
+  `keystore:invalid`.
 - **Every call can ask the user.** The shell shows a native dialog by origin,
-  certificate and use (Allow for this session, Allow once, Deny), and the OS may
-  show a card's PIN prompt after it. It's not the plugin's to skip, and a
+  certificate and use, and the OS may show a card's PIN prompt after it. Signing
+  offers Allow once and Deny. Unwrapping offers Allow for 15 minutes, which each use
+  renews and a lock ends, Allow once and Deny. It's not the plugin's to skip, and a
   same-origin frame can't go around it either. Don't list when the plugin
-  starts: list when the user opens the plugin's settings or a message needs a
-  key.
+  starts: list when the user opens the plugin's settings or asks for a key.
+- **Don't ask for what the user didn't ask for.** Opening a message isn't asking: it
+  can be from anyone. Use `{ quiet: true }` there. It answers from what's already
+  allowed, or with `keystore:ask-first`, and then show a button that makes the same call
+  without it.
 - **Errors are bare codes in `err.message`:** `keystore:cancelled` (Deny, or a
-  PIN prompt closed; a Deny lasts until the app quits), `keystore:not-found`
+  PIN prompt closed. A Deny on a list lasts until the app quits, one on an unwrap for
+  that message, and one on a signature for that send. Three in a row pause that key
+  for 5 minutes), `keystore:ask-first` (a quiet call found nothing allowed), `keystore:not-found`
   (the certificate is gone: list again), `keystore:unsupported`,
   `keystore:locked` (card missing or locked, or busy), `keystore:failed`, `keystore:invalid`
   (bad input). What's bad on a signature is the plugin's bug, so don't fall back

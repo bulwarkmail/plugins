@@ -8,7 +8,9 @@
  * reaches IndexedDB. Its "private key" is a handle that says how to ask the OS.
  *
  * Nothing here calls list() on its own: every list can bring up the shell's consent
- * dialog, so it waits until the settings page opens or a message needs a key.
+ * dialog, so it waits until the settings page opens or the user asks for a key. Opening a
+ * message is no such asking: it may be from a stranger. That goes through the quiet calls,
+ * which answer from what the user already allowed, and never open a dialog.
  *
  * A list has the ordinary 30 s RPC timeout and holds no hook timer (key operations
  * do). If the consent dialog takes longer the call times out here, and the answer
@@ -147,12 +149,16 @@ export function createOsKeys(host) {
 
   const answer = () => ({ records: records ?? [], state });
 
-  async function ask(ks) {
+  async function ask(ks, options) {
     let entries;
     try {
-      entries = await ks.list();
+      entries = await (options ? ks.list(options) : ks.list());
     } catch (err) {
       const code = keystoreCode(err);
+      if (code === 'ask-first') {
+        // Nothing allowed yet, and nothing asked. Stays unknown: a click can still ask.
+        return { records: records ?? [], state: 'ask-first' };
+      }
       if (code === 'cancelled') {
         // A Deny lasts until the app quits: no point in asking the shell again.
         records = [];
@@ -190,6 +196,17 @@ export function createOsKeys(host) {
     return loading;
   }
 
+  /** The list if it's allowed, with no dialog. State 'ask-first' if it isn't yet. */
+  function loadQuietly() {
+    if (loading) return loading;
+    if (records) return Promise.resolve(answer());
+    const ks = keystore();
+    if (!ks) return Promise.resolve({ records: [], state: 'off' });
+    ensureChannel();
+    loading = ask(ks, { quiet: true }).finally(() => { loading = null; });
+    return loading;
+  }
+
   /** The list, waiting for a slow answer to the consent dialog. For a send or the settings page. */
   async function loadPatiently() {
     let result = await load();
@@ -202,8 +219,8 @@ export function createOsKeys(host) {
    * holds no timer, so it can't wait for the user. `onLate` runs once when the answer
    * arrives after all.
    */
-  async function loadWithin(ms, onLate) {
-    const running = load();
+  async function loadWithin(ms, onLate, { quiet = false } = {}) {
+    const running = quiet ? loadQuietly() : load();
     let timer;
     const first = await Promise.race([running, new Promise((resolve) => { timer = setTimeout(resolve, ms, null); })]);
     clearTimeout(timer);
@@ -244,34 +261,38 @@ export function createOsKeys(host) {
       usages: ['sign'],
       algorithm: { name, hash: { name: 'SHA-256' } },
       keystore: {
-        sign: (digest, hash) => tracked(
-          () => keystore().sign(record.osKeyId, digest, { scheme, hash }),
+        sign: (signedAttributes, hash) => tracked(
+          () => keystore().sign(record.osKeyId, signedAttributes, { scheme, hash }),
           () => signCancelled.add(record.id),
         ),
       },
     };
   }
 
-  function decryptionHandle(record) {
+  function decryptionHandle(record, quiet) {
+    const options = quiet ? [{ quiet: true }] : [];
     return {
       type: 'private',
       extractable: false,
       usages: ['decrypt'],
       algorithm: { name: record.keyType === 'ec' ? 'ECDH' : 'RSA-OAEP' },
       keystore: {
-        decrypt: (data, scheme) => tracked(() => keystore().decrypt(record.osKeyId, data, scheme)),
-        agree: (peerSpki) => tracked(() => keystore().agree(record.osKeyId, peerSpki)),
+        decrypt: (data, scheme) => tracked(() => keystore().decrypt(record.osKeyId, data, scheme, ...options)),
+        agree: (peerSpki) => tracked(() => keystore().agree(record.osKeyId, peerSpki, ...options)),
       },
     };
   }
 
-  /** session-keys.js' decrypt maps with the OS keys that can open mail added. */
-  function addDecryptKeys(maps, list) {
+  /**
+   * session-keys.js' decrypt maps with the OS keys that can open mail added. `quiet`:
+   * nobody asked for this, so a key that isn't allowed yet answers ask-first.
+   */
+  function addDecryptKeys(maps, list, { quiet = false } = {}) {
     const usable = list.filter((r) => r.capabilities.canEncrypt);
     return {
       ...maps,
       keyRecords: [...maps.keyRecords, ...usable],
-      keystoreKeys: new Map(usable.map((r) => [r.id, decryptionHandle(r)])),
+      keystoreKeys: new Map(usable.map((r) => [r.id, decryptionHandle(r, quiet)])),
     };
   }
 
@@ -282,6 +303,7 @@ export function createOsKeys(host) {
     /** There could be OS keys, but nobody has looked yet. */
     unasked: () => keystore() !== null && records === null,
     load,
+    loadQuietly,
     loadPatiently,
     loadWithin,
     refresh,

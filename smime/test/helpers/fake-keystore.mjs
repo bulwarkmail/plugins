@@ -1,11 +1,13 @@
 // What api.keystore does in the desktop app, backed by Node crypto with real keys.
 // It keeps the native helper's rules (repos/desktop/native/README.md): errors are
-// bare codes, SHA-1 signatures are refused, digests must fit the hash, v1.5 answers
-// only 16, 24 or 32 bytes, OAEP at most 64, and every failed unwrap reads the same.
+// bare codes, SHA-1 signatures are refused, v1.5 answers only 16, 24 or 32 bytes, OAEP at
+// most 64, and every failed unwrap reads the same. Like main it signs only a CMS message's
+// signed attributes, which it hashes itself (src/main/keystore-signed-attrs.ts there), and
+// a quiet call answers keystore:ask-first until a call that may ask has been allowed.
 //
 //   const ks = fakeKeystore([{ certificate: pem, key: pem }]);
 //   fakeApi({ hostFeatures: { keystore: true }, handlers: ks.handlers });
-//   ks.calls.sign, ks.refuse('sign', 'keystore:cancelled')
+//   ks.calls.sign, ks.refuse('sign', 'keystore:cancelled'), ks.nothingAllowed()
 import {
   constants, createHash, createPrivateKey, createPublicKey, diffieHellman, privateDecrypt, privateEncrypt, randomBytes, X509Certificate,
 } from 'node:crypto';
@@ -19,6 +21,15 @@ const DIGEST_INFO = {
   'SHA-512': '3051300d060960864801650304020305000440',
 };
 const CURVES = { 'P-256': 'p256', 'P-384': 'p384', 'P-521': 'p521' };
+// contentType, messageDigest and signingTime, as DER OIDs.
+const REQUIRED_ATTRIBUTES = ['2a864886f70d010903', '2a864886f70d010904', '2a864886f70d010905'];
+
+/** The short version of what main checks. The whole check has its tests there. */
+function isSignedAttributes(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes[0] !== 0x31 || bytes.length > 4096) return false;
+  const hex = Buffer.from(bytes).toString('hex');
+  return REQUIRED_ATTRIBUTES.every((oid) => hex.includes(`0609${oid}`));
+}
 
 function mgf1(seed, length, hash) {
   const out = [];
@@ -84,6 +95,12 @@ export function fakeKeystore(specs) {
   const entries = specs.map(entryFor);
   const calls = { list: [], sign: [], decrypt: [], agree: [] };
   const refusals = {};
+  // As if the user had long said yes, which is what most tests are about.
+  const allowed = { list: true, unwrap: true };
+  const quietly = (kind, options) => {
+    if (options?.quiet && !allowed[kind]) throw new Error('keystore:ask-first');
+    allowed[kind] = true;
+  };
   const entry = (id) => {
     const found = entries.find((e) => e.wire.id === id);
     if (!found) throw new Error('keystore:not-found');
@@ -97,17 +114,19 @@ export function fakeKeystore(specs) {
   };
 
   const api = {
-    list: async () => {
-      calls.list.push([]);
+    list: async (options) => {
+      calls.list.push([options]);
       await gate('list');
+      quietly('list', options);
       return entries.map((e) => e.wire);
     },
-    sign: async (id, digest, { scheme, hash }) => {
-      calls.sign.push({ id, digest, scheme: { scheme, hash } });
+    sign: async (id, signedAttributes, { scheme, hash }) => {
+      calls.sign.push({ id, signedAttributes, scheme: { scheme, hash } });
       await gate('sign');
       const { privateKey, curve, wire } = entry(id);
       if (hash === 'SHA-1') throw new Error('keystore:unsupported');
-      if (digest.length !== HASH_LENGTH[hash]) throw new Error('keystore:invalid');
+      if (!isSignedAttributes(signedAttributes) || !HASH_LENGTH[hash]) throw new Error('keystore:invalid');
+      const digest = createHash(NODE_HASH[hash]).update(signedAttributes).digest();
       if (!wire.signSchemes.includes(scheme)) throw new Error('keystore:unsupported');
       if (scheme === 'rsa-pkcs1') {
         const info = Buffer.concat([Buffer.from(DIGEST_INFO[hash], 'hex'), digest]);
@@ -122,9 +141,10 @@ export function fakeKeystore(specs) {
       const ec = new elliptic.ec(CURVES[curve]);
       return new Uint8Array(ec.keyFromPrivate(Buffer.from(d, 'base64url')).sign(Buffer.from(digest)).toDER());
     },
-    decrypt: async (id, data, scheme) => {
-      calls.decrypt.push({ id, data, scheme });
+    decrypt: async (id, data, scheme, options) => {
+      calls.decrypt.push({ id, data, scheme, options });
       await gate('decrypt');
+      quietly('unwrap', options);
       const { privateKey } = entry(id);
       let plain;
       try {
@@ -145,9 +165,10 @@ export function fakeKeystore(specs) {
       }
       return new Uint8Array(plain);
     },
-    agree: async (id, peerSpki) => {
-      calls.agree.push({ id, peerSpki });
+    agree: async (id, peerSpki, options) => {
+      calls.agree.push({ id, peerSpki, options });
       await gate('agree');
+      quietly('unwrap', options);
       const { privateKey, wire } = entry(id);
       if (!wire.canAgree) throw new Error('keystore:unsupported');
       const publicKey = createPublicKey({ key: Buffer.from(peerSpki), format: 'der', type: 'spki' });
@@ -163,5 +184,9 @@ export function fakeKeystore(specs) {
     id: (index = 0) => entries[index].wire.id,
     refuse: (method, refusal) => { refusals[method] = refusal; },
     allow: (method) => { delete refusals[method]; },
+    /** As after a start, a lock or 15 minutes: quiet calls answer keystore:ask-first. */
+    nothingAllowed: () => { allowed.list = false; allowed.unwrap = false; },
+    /** The list is allowed, and using a key isn't. */
+    onlyListAllowed: () => { allowed.list = true; allowed.unwrap = false; },
   };
 }

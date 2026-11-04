@@ -145,6 +145,9 @@ describe('sending', () => {
     expect(ks.calls.list).toHaveLength(1);
     expect(ks.calls.sign).toHaveLength(1);
     expect(ks.calls.sign[0].scheme).toEqual({ scheme: 'rsa-pkcs1', hash: 'SHA-256' });
+    // The DER of the signed attributes, as a SET, and no digest.
+    expect(ks.calls.sign[0].signedAttributes[0]).toBe(0x31);
+    expect(ks.calls.sign[0].signedAttributes.length).toBeGreaterThan(64);
     expect(sent).toHaveLength(1);
     const signed = extractDetachedSigned(sent[0].bytes);
     const { status } = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, FROM);
@@ -277,9 +280,10 @@ describe('sending', () => {
     expect(toasts(api, 'error')).toEqual([api.i18n.t('send.noKey', { email: FROM })]);
   });
 
-  it('mentions a restart for a Deny, in the sending and the reading message', () => {
-    expect(en['send.osCancelled']).toMatch(/restart/i);
-    expect(en['banner.osCancelled']).toMatch(/restart/i);
+  it('a Deny on a send says the next send asks, and one on a message that it holds for that message', () => {
+    expect(en['send.osCancelled']).not.toMatch(/restart/i);
+    expect(en['send.osCancelled']).toMatch(/send it again/i);
+    expect(en['banner.osCancelled']).toMatch(/this message/i);
     expect(en['send.osBusy']).toMatch(/card is missing or locked/);
     expect(en['banner.osBusy']).toMatch(/card is missing or locked/);
   });
@@ -397,6 +401,69 @@ describe('reading', () => {
     await api.storage.set('fresh:mail-1', true);
     const retried = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
     expect(retried.text).toContain(PLAINTEXT);
+  });
+
+  describe('opening a message asks nobody', () => {
+    const everyCall = (ks) => [...ks.calls.list.map(([o]) => o), ...ks.calls.decrypt.map((c) => c.options), ...ks.calls.agree.map((c) => c.options)];
+
+    it('with nothing allowed yet, it offers a button and leaves it at that', async () => {
+      const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+      ks.nothingAllowed();
+      const result = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+      expect(result).toMatchObject({ handledBy: 'smime', html: '', text: '' });
+      expect(result.verification.decryptionError).toBe('os-ask');
+      expect(everyCall(ks).every((options) => options?.quiet === true), 'nothing that could open a dialog').toBe(true);
+      expect(ks.calls.decrypt).toHaveLength(0);
+      expect(await bannerFor(api)).toMatchObject({ action: 'retry', actionLabel: 'banner.openWithSystem', tone: 'info', text: en['banner.osAsk'] });
+    });
+
+    it('a list that is allowed still does not unwrap without a word from the user', async () => {
+      const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+      ks.onlyListAllowed();
+      await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+      expect(ks.calls.decrypt).toHaveLength(1);
+      expect(ks.calls.decrypt[0].options).toEqual({ quiet: true });
+      expect((await bannerFor(api)).actionLabel).toBe('banner.openWithSystem');
+    });
+
+    it('the click may ask, and the message opens', async () => {
+      const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+      ks.nothingAllowed();
+      await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+      await api.storage.set('fresh:mail-1', true);
+      const opened = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+      expect(opened.text).toContain(PLAINTEXT);
+      expect(ks.calls.list.at(-1)[0], 'not quiet').toBeUndefined();
+      expect(ks.calls.decrypt.at(-1).options).toBeUndefined();
+    });
+
+    it('once allowed, the next message opens by itself, still without a call that can ask', async () => {
+      const { ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+      const opened = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+      expect(opened.text).toContain(PLAINTEXT);
+      expect(ks.calls.decrypt[0].options).toEqual({ quiet: true });
+    });
+
+    it('an imported key that needs unlocking keeps its banner while nobody has allowed the list', async () => {
+      const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+      await saveImported();
+      ks.nothingAllowed();
+      const result = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+      expect(result.verification.decryptionError).toBe('locked');
+      expect((await bannerFor(api)).action).toBe('unlock');
+    });
+
+    it('with both, the OS key that fits comes first, and a No still ends at the unlock banner', async () => {
+      const { api, ks, hooks } = plugin({ handlers: withMail('cbc.p7m') });
+      await saveImported();
+      ks.onlyListAllowed();
+      const quiet = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+      expect(quiet.verification.decryptionError).toBe('os-ask');
+      ks.refuse('decrypt', 'keystore:cancelled');
+      await api.storage.set('fresh:mail-1', true);
+      const refused = await hooks.onRenderEmailBody(bodyOf(), encryptedMail());
+      expect(refused.verification.decryptionError).toBe('locked');
+    });
   });
 
   it('shows a busy store the same way', async () => {

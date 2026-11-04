@@ -449,29 +449,35 @@ const RENDER_LIST_BUDGET_MS = 3500;
 // unlocked imported key fits, as the list may ask the user. listState 'pending' means
 // the consent dialog is up: the hook can't wait for it, so it renders again once it's
 // answered.
-async function decryptKeysFor(der, started) {
+//
+// Opening a message asks nobody: mail can come from anyone, and a dialog for each stranger's
+// message teaches people to click yes. Without `asked` all OS calls are quiet and work on
+// what's already allowed. The banner offers a button for the rest, which comes back with `asked`.
+async function decryptKeysFor(der, started, asked) {
   const keys = await unlockedDecryptMaps();
   if (!osKeys.available()) return { keys, listState: 'off' };
   const unlockedFits = findDecryptionCandidates(der, keys.keyRecords)
     .some((id) => keys.unlockedKeys.has(id) || keys.legacyUnlockedKeys.has(id));
-  if (unlockedFits) return { keys: osKeys.addDecryptKeys(keys, osKeys.known()), listState: 'ready' };
+  if (unlockedFits) return { keys: osKeys.addDecryptKeys(keys, osKeys.known(), { quiet: true }), listState: 'ready' };
   const { records, state } = await osKeys.loadWithin(
     Math.max(0, RENDER_LIST_BUDGET_MS - (Date.now() - started)),
     () => { void Promise.resolve(host.ui.rerenderEmail()).catch(() => {}); },
+    { quiet: !asked },
   );
-  return { keys: osKeys.addDecryptKeys(keys, records), listState: state };
+  return { keys: osKeys.addDecryptKeys(keys, records, { quiet: !asked }), listState: state };
 }
 
 // What the banner says when no key fits and the OS's list is why that may be. No key
 // fitting says nothing while the store couldn't be read.
-const LIST_FAILURES = { denied: 'os-list-denied', busy: 'os-busy', failed: 'os-busy' };
+const LIST_FAILURES = { denied: 'os-list-denied', busy: 'os-busy', failed: 'os-busy', 'ask-first': 'os-ask' };
 
 // A render can run twice for one opening: an older webmail renders again when mark-read
 // replaces the message object, and a conversation has a body of its own. Each run asks
 // the OS, which can be a dialog per use, and two PIN cancels in a row lock the key. So
 // a run shares the one in flight, and one that used the OS for a little after. What the
-// user asks for (Try again, Unlock) sets the fresh flag, which goes past this. Holds
-// plain text, so it's short and dropped on sign-out.
+// user asks for (Open, Try again, Unlock) sets the fresh flag, which goes past this and
+// is the only thing that may ask the OS. Holds plain text, so it's short and dropped on
+// sign-out.
 const RENDER_SHARE_MS = 15_000;
 const renderShares = new Map();
 
@@ -492,7 +498,7 @@ async function shareRender(key, ctx, run) {
 
   const share = {};
   share.promise = (async () => {
-    const { result, keep } = await run();
+    const { result, keep } = await run(wantsFresh);
     if (!keep) renderShares.delete(key);
     else setTimeout(() => { if (renderShares.get(key) === share) renderShares.delete(key); }, RENDER_SHARE_MS);
     return result;
@@ -505,7 +511,7 @@ function forgetRenders() {
   renderShares.clear();
 }
 
-async function renderEncrypted(body, ctx, blobId, fromEmail, started) {
+async function renderEncrypted(body, ctx, blobId, fromEmail, started, asked) {
   const failed = (decryptionError) => {
     const status = { isEncrypted: true, decryptionSuccess: false, decryptionError };
     return persistVerifyStatus(ctx.id, status).then(() => ({ ...body, handledBy: 'smime', html: '', text: '', attachments: [], verification: status }));
@@ -525,7 +531,7 @@ async function renderEncrypted(body, ctx, blobId, fromEmail, started) {
   }
 
   try {
-    const { keys, listState } = await decryptKeysFor(der, started);
+    const { keys, listState } = await decryptKeysFor(der, started, asked);
     if (listState === 'pending') return { result: await failed('os-pending'), keep: false };
 
     let result;
@@ -536,6 +542,7 @@ async function renderEncrypted(body, ctx, blobId, fromEmail, started) {
       // email-banner slot (which reads the persisted verification), and leave
       // the body empty rather than stacking a second in-body notice box.
       const code = keystoreCode(err);
+      if (code === 'ask-first') return { result: await failed('os-ask'), keep: false };
       if (code === 'cancelled') return { result: await failed('os-cancelled'), keep: true };
       if (code === 'locked') return { result: await failed('os-busy'), keep: true };
       if (err instanceof SmimeKeyLockedError) return { result: await failed('locked'), keep: false };
@@ -660,7 +667,7 @@ async function onRenderEmailBody(body, ctx) {
   if (!blobId) return undefined;
 
   if (detection.type === 'enveloped-data') {
-    return shareRender(`${ctx.id}|${blobId}`, ctx, () => renderEncrypted(body, ctx, blobId, fromEmail, started));
+    return shareRender(`${ctx.id}|${blobId}`, ctx, (asked) => renderEncrypted(body, ctx, blobId, fromEmail, started, asked));
   }
 
   try {

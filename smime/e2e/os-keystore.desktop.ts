@@ -112,6 +112,21 @@ async function expectBanner(page: Page, text: RegExp): Promise<void> {
   }, { timeout: 60_000, intervals: [500] }).toBe(true);
 }
 
+/** Opening a message asks nobody: the banner has a button for it. */
+async function clickOpenInBanner(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    for (const frame of page.frames()) {
+      if (!frame.url().includes('plugin-sandbox-privileged')) continue;
+      const button = frame.getByRole('button', { name: /^open$/i }).first();
+      if (await button.isVisible().catch(() => false)) {
+        await button.click();
+        return true;
+      }
+    }
+    return false;
+  }, { timeout: 60_000, intervals: [500] }).toBe(true);
+}
+
 test.describe('S/MIME with a key from CurrentUser\\My', () => {
   test.skip(process.platform !== 'win32', 'creates a certificate in CurrentUser\\My');
   test.skip(!PLUGIN_DIR, 'set BULWARK_SMIME_DIR to the unpacked plugin');
@@ -172,6 +187,7 @@ test.describe('S/MIME with a key from CurrentUser\\My', () => {
     const subject = `OS key encrypted ${run}`;
     await compose(page, subject, [/encrypt \(s\/mime\)/i]);
     await openMail(page, subject);
+    await clickOpenInBanner(page);
     await expectBanner(page, /^decrypted$/i);
     await expect(page.frameLocator('iframe[title="Email content"]').getByText(`Body of ${subject}`).first()).toBeVisible({ timeout: 30_000 });
   });
