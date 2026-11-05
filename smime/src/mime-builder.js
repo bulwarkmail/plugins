@@ -17,7 +17,9 @@ export function buildMimeMessage(input) {
 
 /** Build only the body entity (Content-* headers + body) — the part a detached signature covers. */
 export function buildMimeEntity(input) {
-  return new TextEncoder().encode(entityLines(input).join(CRLF));
+  const entity = entityLines(input, true).join(CRLF);
+  // Sign the terminal CRLF too; the wrapper adds a separate boundary CRLF.
+  return new TextEncoder().encode(entity.endsWith(CRLF) ? entity : entity + CRLF);
 }
 
 function messageHeaderLines(input) {
@@ -39,7 +41,7 @@ function messageHeaderLines(input) {
   return lines;
 }
 
-function entityLines(input) {
+function entityLines(input, terminateNestedMultiparts = false) {
   const boundary = generateBoundary();
   const lines = [];
 
@@ -92,6 +94,8 @@ function entityLines(input) {
       lines.push('');
       lines.push(quotedPrintableEncode(input.htmlBody));
       lines.push(`--${altBoundary}--`);
+      // Keep the nested entity's terminal CRLF separate from its parent boundary.
+      if (terminateNestedMultiparts) lines.push('');
     } else if (hasText) {
       lines.push(`--${boundary}`);
       lines.push('Content-Type: text/plain; charset=utf-8');
