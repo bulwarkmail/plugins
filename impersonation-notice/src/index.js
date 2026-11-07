@@ -12,6 +12,14 @@
  *   - The "Back to platform" button uses api.ui.openExternalUrl instead of
  *     window.open, and signs out through api.user.logout (auth:emit): the
  *     sandbox cannot call /api/auth/session itself.
+ *   - "Return to my account" (Bulwark 1.22 and later): when the host passes
+ *     `canReturn: true`, the server still holds the session the admin
+ *     opened the impersonation from, and api.user.returnToOwnAccount() ends
+ *     the impersonation and signs back in to it (or signs out when that
+ *     session is gone after all). Both need auth:impersonation-return, an
+ *     optional permission, so older hosts install the plugin without it and
+ *     never pass the prop. Holding it also tells the host to leave out its
+ *     own return strip, as this banner draws the button.
  *   - The username comes from the app-top-banner slot props, which the host
  *     only passes with account:read.
  *   - The strip is the app's info bar (src/lib/banner.js), coloured by the
@@ -59,7 +67,9 @@ function pickString(value, fallback) {
 
 function ImpersonationBanner(props) {
   const mailbox = parseImpersonatedMailbox(props);
+  const canReturnToAccount = props?.canReturn === true;
   const [busy, setBusy] = useState(false);
+  const [returningToAccount, setReturningToAccount] = useState(false);
   const [cfg, setCfg] = useState({
     returnUrl: pickString(props?.returnUrl, ''),
     returnLabel: DEFAULT_RETURN_LABEL,
@@ -92,7 +102,7 @@ function ImpersonationBanner(props) {
   if (!mailbox) return null;
 
   async function handleReturn() {
-    if (busy) return;
+    if (busy || returningToAccount) return;
     setBusy(true);
     // Open the platform first, while the click still counts as a user
     // gesture for the new tab, and before signing out tears this banner
@@ -112,6 +122,19 @@ function ImpersonationBanner(props) {
     }
   }
 
+  // The host ends the impersonation and reloads into the admin's own
+  // account; nothing about that account comes back here.
+  async function handleReturnToAccount() {
+    if (returningToAccount || busy) return;
+    setReturningToAccount(true);
+    try {
+      await slotApi.user.returnToOwnAccount();
+    } catch (err) {
+      slotApi.log.warn('impersonation-notice: returnToOwnAccount failed', err);
+      setReturningToAccount(false);
+    }
+  }
+
   return h(ImpersonationBar, {
     mailbox,
     actorRoleLabel: cfg.actorRoleLabel,
@@ -119,6 +142,9 @@ function ImpersonationBanner(props) {
     showReturn: !!cfg.returnUrl,
     busy,
     onReturn: handleReturn,
+    showReturnToAccount: canReturnToAccount,
+    returningToAccount,
+    onReturnToAccount: handleReturnToAccount,
   });
 }
 

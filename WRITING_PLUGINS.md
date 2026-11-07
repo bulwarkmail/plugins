@@ -382,6 +382,7 @@ that refuses the install there.
 | `security:read` | **See your account security.** See whether two-factor sign-in and encryption are on, without access to secrets. |  |
 | `auth:observe` | **Know when you sign in.** Be told when you sign in, switch accounts or your session is renewed. |  |
 | `auth:emit` | **Sign you out.** Sign you out of the webmail. |  |
+| `auth:impersonation-return` | **Take you back to your own account.** After an administrator opened a mailbox through impersonation, end that session and sign back in to the account it started from. |  |
 | `account:read` | **See your accounts.** See the accounts you added with their addresses and servers, and which mail accounts are team mailboxes. |  |
 | `directory:read` | **Look up people.** Look up people in your organisation's directory. |  |
 | `http:post` | **Use the webmail server for you.** Call these server endpoints with your login: | yes |
@@ -1269,7 +1270,7 @@ merged views of several accounts.
 
 | Surface | Kind | Permission | Props or context | Where |
 |---|---|---|---|---|
-| `app-top-banner` | frame | `ui:app-top-banner` | `username` (`account:read`), `serverUrl` (`account:read`), `impersonated` (`account:read`) | a banner across the top of every page; `impersonated` is true when an admin opened the mailbox through an impersonation handoff |
+| `app-top-banner` | frame | `ui:app-top-banner` | `username` (`account:read`), `serverUrl` (`account:read`), `impersonated` (`account:read`), `canReturn` (`auth:impersonation-return`) | a banner across the top of every page; `impersonated` is true when an admin opened the mailbox through an impersonation handoff, `canReturn` when api.user.returnToOwnAccount() can take them back to the account they started from |
 | `command-palette` | action | `ui:commands` |  | entries in the command palette (Ctrl+K) |
 | `app-side-panel` | frame | `ui:side-panel` | `view`, `context`, `focusRequest` | a side panel next to Calendar, Contacts, Files and Settings (desktop and tablet; phones and Settings below 1024 px have none: the toggle there asks the plugin for a dialog through onAction, surface `app-side-panel`, actionId `open`, context { view, context }); `view` names the view ("calendar" \| "contacts" \| "files" \| "settings"); `context` is what it shows: { event } (calendar:read), { contact, selectedCount } (contacts:read), { files, fileCount, folder } (files:read), { page: { id, label } }; `focusRequest` counts up when the panel opens on request |
 
@@ -2329,6 +2330,7 @@ await api.user.getMailAccounts()  // [{ accountId, name, kind: 'personal' | 'gro
 await api.user.findPeople({ text, ids, accountId })   // { people: [{ id, type, name, email }], complete }
 await api.user.getIdentities()    // the user's sender identities
 await api.user.logout()
+await api.user.returnToOwnAccount()   // 1.22, auth:impersonation-return: ends an impersonation and signs back in to the account that opened it
 await api.app.getInfo()           // { product: 'Bulwark Mail', name, version, edition: 'full' | 'lite', stalwartFeatures, demoMode }
 await api.app.searchSettings('undo send', { limit })   // [{ pageId, page, label, description }], in the user's language
 await api.app.getSettings()       // { mailLayout: 'focus', sendDelaySeconds: 10, markAsReadDelay: 0, theme, language, ... }
@@ -2626,6 +2628,7 @@ await api.keystore.decrypt(id, data, scheme, { quiet: true });
 | `api.app.searchSettings` | none |
 | `api.app.getSettings` | `settings:read` |
 | `api.user.logout` | `auth:emit` |
+| `api.user.returnToOwnAccount` | `auth:impersonation-return` |
 | `api.admin.getConfig` | `admin:config` |
 | `api.admin.getAllConfig` | `admin:config` |
 | `api.admin.setConfig` | `admin:config` |
