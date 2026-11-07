@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.0 (2026-11-07)
+
 ### Added
 - In the Bulwark desktop app, with Bulwark 1.21 or later, certificates from the system store and smart cards sign and decrypt without an import. They're listed under Your keys, marked as from the system store. The PKCS#12 import stays, and takes over where the system can't do the job
 - With a system certificate, the app asks before every signature, and a No stops only that send. Opening a message never brings up a dialog: when a system certificate could open it, the banner offers an Open button
