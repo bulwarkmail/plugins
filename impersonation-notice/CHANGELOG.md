@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.5.0 (2026-11-08)
+
+### Added
+- A "Return to my account" button in the banner. On Bulwark releases after 1.21.0 it ends the impersonation and signs the admin back in to the accounts they had open before, when the webmail still holds that session. Bulwark's own return strip then stays away, so the button isn't there twice. It needs the new optional `auth:impersonation-return` permission; older webmails install the plugin without it and show the banner as before. "Back to platform" still signs out.
+
 ## 1.4.2 (2026-10-31)
 
 ### Added
