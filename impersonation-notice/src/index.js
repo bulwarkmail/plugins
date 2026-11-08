@@ -12,7 +12,7 @@
  *   - The "Back to platform" button uses api.ui.openExternalUrl instead of
  *     window.open, and signs out through api.user.logout (auth:emit): the
  *     sandbox cannot call /api/auth/session itself.
- *   - "Return to my account" (Bulwark 1.22 and later): when the host passes
+ *   - "Return to my account" (Bulwark releases after 1.21.0): when the host passes
  *     `canReturn: true`, the server still holds the session the admin
  *     opened the impersonation from, and api.user.returnToOwnAccount() ends
  *     the impersonation and signs back in to it (or signs out when that

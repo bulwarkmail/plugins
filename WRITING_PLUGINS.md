@@ -2330,7 +2330,7 @@ await api.user.getMailAccounts()  // [{ accountId, name, kind: 'personal' | 'gro
 await api.user.findPeople({ text, ids, accountId })   // { people: [{ id, type, name, email }], complete }
 await api.user.getIdentities()    // the user's sender identities
 await api.user.logout()
-await api.user.returnToOwnAccount()   // 1.22, auth:impersonation-return: ends an impersonation and signs back in to the account that opened it
+await api.user.returnToOwnAccount()   // after 1.21.0, auth:impersonation-return: ends an impersonation and signs back in to the account that opened it
 await api.app.getInfo()           // { product: 'Bulwark Mail', name, version, edition: 'full' | 'lite', stalwartFeatures, demoMode }
 await api.app.searchSettings('undo send', { limit })   // [{ pageId, page, label, description }], in the user's language
 await api.app.getSettings()       // { mailLayout: 'focus', sendDelaySeconds: 10, markAsReadDelay: 0, theme, language, ... }
