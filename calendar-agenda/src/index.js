@@ -10,7 +10,8 @@
  *
  * In the left sidebar it is a `sidebar-section`: the host draws the header
  * (titled "Agenda" with api.ui.setSectionTitle) and remembers whether it is
- * folded, like Folders and Tags.
+ * folded, like Folders and Tags. In the side panel beside the mail it is a
+ * `side-panel`, with its title and calendar icon set with api.ui.setSidePanel.
  */
 
 const React = require('react');
@@ -58,10 +59,18 @@ export const hooks = {
 // ─── Activate ───────────────────────────────────────────────
 
 function setTitle(api) {
-  if (activeSlot !== 'sidebar-section') return;
-  Promise.resolve(api.ui.setSectionTitle(api.i18n.t('header.title'))).catch((err) => {
-    api.log.warn('calendar-agenda: setSectionTitle failed', err);
-  });
+  if (activeSlot === 'sidebar-section') {
+    Promise.resolve(api.ui.setSectionTitle(api.i18n.t('header.title'))).catch((err) => {
+      api.log.warn('calendar-agenda: setSectionTitle failed', err);
+    });
+  } else if (activeSlot === 'side-panel') {
+    Promise.resolve(api.ui.setSidePanel?.({
+      title: api.i18n.t('header.title'),
+      icon: 'calendar',
+    })).catch((err) => {
+      api.log.warn('calendar-agenda: setSidePanel failed', err);
+    });
+  }
 }
 
 export async function activate(api) {

@@ -21,6 +21,7 @@ export const POSITION_TO_SLOT = {
   'Left sidebar': 'sidebar-section',
   'Email reading pane': 'email-detail-sidebar',
   'Top banner': 'app-top-banner',
+  'Side panel': 'side-panel',
 };
 export const DEFAULT_SLOT = 'sidebar-section';
 
@@ -272,7 +273,10 @@ export function makeAgenda(React, api, { slot = DEFAULT_SLOT, now } = {}) {
           subtitle: [fmt.timeLabel(ev), ev.location].filter(Boolean).join(' · '),
         }))))));
     }
-    return h(Page, null, h(Stack, { gap: 3 }, h(Heading, { level: 3 }, t('header.title')), body));
+    return h(Page, null, h(Stack, { gap: 3 },
+      slot !== 'side-panel' ? h(Heading, { level: 3 }, t('header.title')) : null,
+      body,
+    ));
   }
 
   function BannerAgenda() {
@@ -284,7 +288,7 @@ export function makeAgenda(React, api, { slot = DEFAULT_SLOT, now } = {}) {
       !message && events.length > BANNER_EVENTS ? h(Text, { key: 'more', size: 'xs', tone: 'muted' }, `+${events.length - BANNER_EVENTS}`) : null);
   }
 
-  if (slot === 'email-detail-sidebar') return PanelAgenda;
+  if (slot === 'email-detail-sidebar' || slot === 'side-panel') return PanelAgenda;
   if (slot === 'app-top-banner') return BannerAgenda;
   return SidebarAgenda;
 }
