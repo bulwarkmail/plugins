@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 
 def extract(raw):
@@ -30,21 +31,17 @@ def smime(raw):
 
 
 def cms(signature, entity):
-    read_fd, write_fd = os.pipe()
-    try:
-        os.write(write_fd, entity)
-        os.close(write_fd)
-        write_fd = None
+    # A file, not a pipe on /dev/fd: Windows has neither that nor pass_fds.
+    with tempfile.TemporaryDirectory() as tmp:
+        content = os.path.join(tmp, 'entity')
+        with open(content, 'wb') as handle:
+            handle.write(entity)
         return subprocess.run(
             ['openssl', 'cms', '-verify', '-binary', '-noverify', '-inform', 'DER',
-             '-content', '/dev/fd/' + str(read_fd)],
-            input=signature, pass_fds=(read_fd,), stdout=subprocess.DEVNULL,
+             '-content', content],
+            input=signature, stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL, check=False,
         ).returncode == 0
-    finally:
-        os.close(read_fd)
-        if write_fd is not None:
-            os.close(write_fd)
 
 
 raw = base64.b64decode(json.load(sys.stdin)['message'])

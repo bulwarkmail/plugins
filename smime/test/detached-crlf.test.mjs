@@ -19,6 +19,18 @@ const base = {
 const helper = fileURLToPath(new URL('./helpers/detached-openssl.py', import.meta.url));
 let signer;
 
+function runs(command, args) {
+  try {
+    execFileSync(command, args, { stdio: 'ignore', timeout: 15_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+// `python3` on Windows is the Store stub, which only exits with an error.
+const python = ['python3', 'python'].find((command) => runs(command, ['-c', 'import email']));
+const oracle = Boolean(python) && runs('openssl', ['version']);
+
 beforeAll(async () => {
   const keys = await crypto.subtle.generateKey({
     name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048,
@@ -65,7 +77,12 @@ describe('detached signed-entity CRLF', () => {
     expect((await smimeVerifyDetached(signature, entity, FROM)).status.cryptoValid).toBe(true);
 
     // Python is an independent parser/serializer; its CMS check uses raw spans.
-    const result = JSON.parse(execFileSync('python3', [helper], {
+    // A machine without Python or OpenSSL stops here; CI has both and must.
+    if (!oracle) {
+      expect(process.env.CI, 'this check needs Python and OpenSSL in CI').toBeFalsy();
+      return;
+    }
+    const result = JSON.parse(execFileSync(python, [helper], {
       input: JSON.stringify({ message: Buffer.from(raw).toString('base64') }),
       encoding: 'utf8', timeout: 15_000,
     }));

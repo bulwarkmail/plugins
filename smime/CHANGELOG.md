@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- A detached signature stays valid when a mail server or list rewrites the message's MIME framing: the signed part now ends with a line break of its own
+
 ## 1.5.0 (2026-11-07)
 
 ### Added
