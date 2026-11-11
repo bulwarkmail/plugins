@@ -24,22 +24,21 @@ export function parseMime(bytes) {
   return out;
 }
 
-/** Find a multipart/signed part and return { entityBytes, signatureDer }, or null. */
-export function extractDetachedSigned(bytes) {
-  const node = findMultipartSigned(parseEntity(binaryString(bytes)));
-  if (!node || node.children.length < 2) return null;
-  const sig = node.children.find((c) => /^application\/(x-)?pkcs7-signature$/.test(c.type));
-  if (!sig) return null;
-  return { entityBytes: latin1Bytes(node.children[0].raw), signatureDer: decodeBody(sig) };
-}
+const PKCS7_SIGNATURE = /^application\/(x-)?pkcs7-signature$/;
 
-function findMultipartSigned(node) {
-  if (node.type === 'multipart/signed' && /pkcs7-signature/.test(node.params.protocol || '')) return node;
-  for (const child of node.children) {
-    const found = findMultipartSigned(child);
-    if (found) return found;
-  }
-  return null;
+/**
+ * The message's own signed entity and signature as { entityBytes, signatureDer },
+ * or null when the message is not signed as a whole: its top-level type has to be
+ * multipart/signed with a pkcs7 signature, holding exactly the signed entity and
+ * the signature (RFC 1847), so nothing in the message lies outside the signature.
+ */
+export function extractDetachedSigned(bytes) {
+  const node = parseEntity(binaryString(bytes));
+  if (node.type !== 'multipart/signed' || !PKCS7_SIGNATURE.test((node.params.protocol || '').toLowerCase())) return null;
+  if (node.children.length !== 2) return null;
+  const [entity, sig] = node.children;
+  if (!PKCS7_SIGNATURE.test(sig.type)) return null;
+  return { entityBytes: latin1Bytes(entity.raw), signatureDer: decodeBody(sig) };
 }
 
 function latin1Bytes(s) {

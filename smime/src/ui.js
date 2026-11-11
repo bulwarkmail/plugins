@@ -174,6 +174,8 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
       rows.push({ icon: 'shield-check', eyebrow, text: t('banner.signed'), tone: 'info' });
     }
   }
+  // Only a part below the top level is signed: unverified, and the rest of the message is outside it.
+  if (status.partlySigned) rows.push({ icon: 'alert-triangle', eyebrow: t('banner.signature'), text: t('banner.partlySigned'), tone: 'warning' });
   if (status.unsupportedReason) rows.push({ icon: 'info-circle', eyebrow: 'S/MIME', text: errorText(t, status.unsupportedReason), tone: 'info' });
   return rows;
 }

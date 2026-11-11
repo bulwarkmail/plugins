@@ -442,6 +442,20 @@ async function persistVerifyStatus(emailId, status) {
   try { await host.storage.set(VERIFY_PREFIX + emailId, { ...status, at: Date.now() }); } catch { /* ignore */ }
 }
 
+// For a message the plugin leaves alone: a verdict stored for it before must not stay
+// above it. It becomes an empty one first, so a banner already showing it stops
+// waiting, and goes the next time.
+async function clearVerifyStatus(emailId) {
+  if (!emailId) return;
+  const key = VERIFY_PREFIX + emailId;
+  try {
+    const stored = await host.storage.get(key);
+    if (!stored) return;
+    if (Object.keys(stored).some((k) => k !== 'at')) await persistVerifyStatus(emailId, {});
+    else await host.storage.remove(key);
+  } catch { /* ignore */ }
+}
+
 // Of the hook's 5 s. Listing holds no timer, so what's left here has to cover the rest of the hook.
 const RENDER_LIST_BUDGET_MS = 3500;
 
@@ -606,7 +620,17 @@ async function onRenderEmailBody(body, ctx) {
   if (!(await isCapable())) return undefined; // can't decrypt/verify without the privileged tier
 
   const detection = detectSmime(ctx.contentType, ctx.bodyStructure, ctx.attachments);
-  if (!detection.type) return undefined;
+  if (!detection.type) {
+    await clearVerifyStatus(ctx.id);
+    return undefined;
+  }
+
+  if (detection.type === 'partly-signed') {
+    // A signed part below the top level covers only itself: the message is shown as
+    // it is, with a note, and nothing from that part is verified or kept.
+    await persistVerifyStatus(ctx.id, { partlySigned: true });
+    return undefined;
+  }
 
   if (!detection.supported) {
     const status = {

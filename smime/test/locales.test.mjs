@@ -171,6 +171,7 @@ describe('S/MIME in another language', () => {
     [{ isSigned: true, signatureValid: true, selfSigned: true, signerEmailMatch: false, signerCert: { email: 'a@x.org' } }, '‹banner.signature›', '‹banner.validBy› a@x.org · ‹banner.selfSigned› · ‹banner.signerMismatch›'],
     [{ isSigned: true, signatureError: 'Signer certificate has expired' }, '‹banner.signature›', '‹banner.invalid› ‹error.signerExpired›'],
     [{ isSigned: true, signatureError: 'ASN.1 garbage' }, '‹banner.signature›', '‹banner.invalid› ASN.1 garbage'],
+    [{ partlySigned: true }, '‹banner.signature›', '‹banner.partlySigned›'],
     [{ unsupportedReason: 'Unsupported S/MIME type (compressed)' }, 'S/MIME', '‹banner.unsupported› compressed'],
   ])('words the reader bar for %j from the locale', (status, eyebrow, text) => {
     expect(bannerRows(status, { t })).toEqual([expect.objectContaining({ eyebrow, text })]);

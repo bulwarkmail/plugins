@@ -1,67 +1,48 @@
 /**
- * Detect S/MIME content in an email message. Ported from lib/smime/smime-detect.ts.
- * Checks Content-Type, JMAP bodyStructure, and attachment metadata.
+ * Whether an email message is S/MIME. Ported from lib/smime/smime-detect.ts.
+ *
+ * The message's own top-level Content-Type decides (the root of the JMAP
+ * bodyStructure when the header isn't at hand): the plugin takes a message
+ * over only when the S/MIME entity is the whole message, that is
+ * application/pkcs7-mime (or x-pkcs7-mime) or multipart/signed with a pkcs7
+ * signature. A signed part further down the tree reports 'partly-signed':
+ * the plugin neither verifies it nor shows the message as signed.
  *
  * AuthEnvelopedData reports as 'enveloped-data' too: both are encrypted
  * mail, and smime-decrypt.js tells them apart by their CMS content type.
  */
 
+const PKCS7_MIME = new Set(['application/pkcs7-mime', 'application/x-pkcs7-mime']);
+const PKCS7_SIGNATURE = new Set(['application/pkcs7-signature', 'application/x-pkcs7-signature']);
 // RFC 8551 calls it authEnveloped-data; Stalwart's encryption at rest
 // writes authenticated-enveloped-data.
-const AUTH_ENVELOPED = /smime-type="?(?:authenveloped-data|authenticated-enveloped-data)/;
-const isEnveloped = (lowerCt) => lowerCt.includes('smime-type=enveloped-data') || AUTH_ENVELOPED.test(lowerCt);
+const ENVELOPED = new Set(['enveloped-data', 'authenveloped-data', 'authenticated-enveloped-data']);
 
 export function detectSmime(contentType, bodyStructure, attachments) {
   const noResult = { type: null, supported: false };
+  const { media, params } = parseContentType(contentType || bodyStructure?.type);
 
-  if (contentType) {
-    const ct = contentType.toLowerCase();
-
-    if (ct.includes('application/pkcs7-mime') || ct.includes('application/x-pkcs7-mime')) {
-      if (isEnveloped(ct)) {
-        const part = findCmsPart(bodyStructure, 'enveloped-data');
-        return { type: 'enveloped-data', blobId: part?.blobId, partId: part?.partId, supported: true };
-      }
-      if (ct.includes('smime-type=signed-data')) {
-        const part = findCmsPart(bodyStructure, 'signed-data');
-        return { type: 'signed-data', blobId: part?.blobId, partId: part?.partId, supported: true };
-      }
-      const part = findCmsPart(bodyStructure, null);
-      if (part) {
-        const partType = inferSmimeTypeFromContentType(part.type || '');
-        return {
-          type: partType,
-          blobId: part.blobId,
-          partId: part.partId,
-          supported: partType === 'enveloped-data' || partType === 'signed-data',
-        };
-      }
-    }
-
-    if (ct.includes('multipart/signed') && ct.includes('pkcs7-signature')) {
-      return { type: 'detached-sig', supported: true };
-    }
+  if (PKCS7_MIME.has(media)) {
+    // The root part holds the CMS blob when the server reads the message the same way.
+    const part = PKCS7_MIME.has(parseContentType(bodyStructure?.type).media) ? bodyStructure : null;
+    const type = smimeType(params['smime-type']);
+    return { type, blobId: part?.blobId, partId: part?.partId, supported: type === 'enveloped-data' || type === 'signed-data' };
   }
 
-  if (bodyStructure) {
-    const result = walkBodyStructure(bodyStructure);
-    if (result) return result;
+  if (media === 'multipart/signed') {
+    const pkcs7 = contentType
+      ? PKCS7_SIGNATURE.has(params.protocol)
+      : !!bodyStructure.subParts?.some(isSignaturePart);
+    if (pkcs7) return { type: 'detached-sig', supported: true };
   }
+
+  if (bodyStructure && hasSignedPart(bodyStructure)) return { type: 'partly-signed', supported: false };
 
   if (attachments) {
     for (const att of attachments) {
-      const type = att.type?.toLowerCase() || '';
+      // A CMS part below the top level is not the message, whatever its name.
+      if (PKCS7_MIME.has(parseContentType(att.type).media)) continue;
       const name = att.name?.toLowerCase() || '';
-
-      if (type.includes('application/pkcs7-mime') || type.includes('application/x-pkcs7-mime')) {
-        const smimeType = inferSmimeTypeFromContentType(type);
-        return {
-          type: smimeType,
-          blobId: att.blobId,
-          partId: att.partId,
-          supported: smimeType === 'enveloped-data' || smimeType === 'signed-data',
-        };
-      }
       if (name.endsWith('.p7m')) {
         return { type: 'enveloped-data', blobId: att.blobId, partId: att.partId, supported: true };
       }
@@ -74,56 +55,31 @@ export function detectSmime(contentType, bodyStructure, attachments) {
   return noResult;
 }
 
-function walkBodyStructure(part) {
-  const type = part.type?.toLowerCase() || '';
-
-  if (type.includes('application/pkcs7-mime') || type.includes('application/x-pkcs7-mime')) {
-    const smimeType = inferSmimeTypeFromContentType(type);
-    return {
-      type: smimeType,
-      blobId: part.blobId,
-      partId: part.partId,
-      supported: smimeType === 'enveloped-data' || smimeType === 'signed-data',
-    };
+/** Media type and parameters of a Content-Type value, lowercased. */
+function parseContentType(value) {
+  const [media, ...rest] = String(value || '').split(';');
+  const params = {};
+  for (const param of rest) {
+    const eq = param.indexOf('=');
+    if (eq < 0) continue;
+    const v = param.slice(eq + 1).trim().toLowerCase();
+    params[param.slice(0, eq).trim().toLowerCase()] = v.length > 1 && v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v;
   }
-
-  if (type === 'multipart/signed') {
-    if (part.subParts?.some((sp) => sp.type?.toLowerCase().includes('pkcs7-signature'))) {
-      return { type: 'detached-sig', supported: true };
-    }
-  }
-
-  if (part.subParts) {
-    for (const sub of part.subParts) {
-      const result = walkBodyStructure(sub);
-      if (result) return result;
-    }
-  }
-
-  return null;
+  return { media: media.trim().toLowerCase(), params };
 }
 
-function findCmsPart(bodyStructure, _smimeType) {
-  if (!bodyStructure) return null;
-  const type = bodyStructure.type?.toLowerCase() || '';
-  if (type.includes('application/pkcs7-mime') || type.includes('application/x-pkcs7-mime')) {
-    return bodyStructure;
-  }
-  if (bodyStructure.subParts) {
-    for (const sub of bodyStructure.subParts) {
-      const found = findCmsPart(sub, _smimeType);
-      if (found) return found;
-    }
-  }
-  return null;
+function smimeType(value) {
+  // Older clients leave smime-type out of encrypted mail.
+  if (!value || ENVELOPED.has(value)) return 'enveloped-data';
+  return value;
 }
 
-function inferSmimeTypeFromContentType(ct) {
-  const lower = ct.toLowerCase();
-  if (isEnveloped(lower)) return 'enveloped-data';
-  if (lower.includes('smime-type=signed-data')) return 'signed-data';
-  if (lower.includes('application/pkcs7-mime') || lower.includes('application/x-pkcs7-mime')) {
-    return 'enveloped-data';
-  }
-  return null;
+const isSignaturePart = (part) => PKCS7_SIGNATURE.has(parseContentType(part.type).media);
+
+// A pkcs7 signed entity anywhere in the tree.
+function hasSignedPart(part) {
+  const { media, params } = parseContentType(part.type);
+  if (media === 'multipart/signed' && part.subParts?.some(isSignaturePart)) return true;
+  if (PKCS7_MIME.has(media) && params['smime-type'] === 'signed-data') return true;
+  return !!part.subParts?.some(hasSignedPart);
 }
