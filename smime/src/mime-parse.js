@@ -54,7 +54,11 @@ function binaryString(bytes) {
   return s;
 }
 
-function parseEntity(raw) {
+// Multiparts are read this many levels deep. A deeper one stays whole, as one
+// opaque leaf, so no level costs another walk over the rest of the message.
+const MAX_DEPTH = 32;
+
+function parseEntity(raw, depth = 1) {
   const sepMatch = raw.match(/\r?\n\r?\n/);
   const headerText = sepMatch ? raw.slice(0, sepMatch.index) : raw;
   const body = sepMatch ? raw.slice(sepMatch.index + sepMatch[0].length) : '';
@@ -68,7 +72,8 @@ function parseEntity(raw) {
   const node = { type, params, cte, disposition, headers, body, raw, children: [] };
 
   if (type.startsWith('multipart/') && params.boundary) {
-    node.children = splitMultipart(body, params.boundary).map(parseEntity);
+    if (depth <= MAX_DEPTH) node.children = splitMultipart(body, params.boundary).map((part) => parseEntity(part, depth + 1));
+    else node.opaque = true;
   }
   return node;
 }
@@ -101,18 +106,52 @@ function parseContentType(value) {
   return { type, params };
 }
 
+// The parts of a multipart body, found by walking its delimiter lines once. A delimiter
+// is a whole line: "--boundary" with optional blanks after it, or "--boundary--" to
+// close. A line that only starts with it (a longer boundary) is content. The line break
+// before a delimiter belongs to it. Without a closing delimiter the last part runs to
+// the end of the body.
 function splitMultipart(body, boundary) {
   const delim = `--${boundary}`;
   const parts = [];
-  const segments = body.split(delim);
-  for (let i = 1; i < segments.length; i++) {
-    let seg = segments[i];
-    if (seg.startsWith('--')) break; // closing delimiter
-    // Strip delimiter line padding and the CRLF owned by the next delimiter.
-    seg = seg.replace(/^[ \t]*\r?\n/, '').replace(/\r?\n$/, '');
-    parts.push(seg);
+  let start = -1; // where the open part's content begins
+  let from = 0;
+  for (;;) {
+    let line;
+    if (from === 0 && body.startsWith(delim)) line = 0;
+    else {
+      const hit = body.indexOf(`\n${delim}`, from);
+      if (hit < 0) break;
+      line = hit + 1;
+    }
+    const after = line + delim.length;
+    const eol = body.indexOf('\n', after);
+    const lineEnd = eol < 0 ? body.length : eol;
+    const closing = body.startsWith('--', after);
+    if (closing || onlyBlanks(body, after, lineEnd)) {
+      if (start >= 0) parts.push(body.slice(start, Math.max(start, lineBreakBefore(body, line))));
+      if (closing) return parts;
+      start = lineEnd + 1;
+    }
+    if (eol < 0) break;
+    from = eol;
   }
+  if (start >= 0) parts.push(body.slice(start, Math.max(start, lineBreakBefore(body, body.length))));
   return parts;
+}
+
+function onlyBlanks(s, from, to) {
+  for (let i = from; i < to; i++) {
+    const c = s.charCodeAt(i);
+    if (c !== 0x20 && c !== 0x09 && c !== 0x0d) return false;
+  }
+  return true;
+}
+
+// Where the line break that ends just before `at` begins (`at` itself when there is none).
+function lineBreakBefore(s, at) {
+  if (s[at - 1] !== '\n') return at;
+  return s[at - 2] === '\r' ? at - 2 : at - 1;
 }
 
 function decodeBody(node) {
@@ -178,7 +217,7 @@ function collect(node, out) {
   const isAttachment = disposition.includes('attachment') ||
     (!type.startsWith('text/') && !type.startsWith('multipart/'));
 
-  if (type.startsWith('multipart/')) {
+  if (type.startsWith('multipart/') && !node.opaque) {
     if (type === 'multipart/alternative') {
       // Prefer the richest alternative; collect text+html, last wins per type.
       for (const child of node.children) collect(child, out);
