@@ -26,7 +26,9 @@ import {
 import { smimeSign, smimeSignDetached } from './smime-sign.js';
 import { smimeEncrypt } from './smime-encrypt.js';
 import { smimeVerify, smimeVerifyDetached } from './smime-verify.js';
-import { smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, SmimeKeyLockedError, SmimeNoKeyError } from './smime-decrypt.js';
+import {
+  smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, isSignedData, SmimeKeyLockedError, SmimeNoKeyError,
+} from './smime-decrypt.js';
 import { detectSmime } from './smime-detect.js';
 import { parseMime, extractDetachedSigned } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
@@ -147,6 +149,12 @@ async function blobToBytes(blob) {
 }
 function bytesArrayBuffer(u8) {
   return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+}
+
+/** A blob of the message as DER CMS. */
+async function fetchCms(blobId) {
+  const raw = await host.jmap.fetchBlob(blobId);
+  return normalizeCmsBytes(bytesArrayBuffer(raw instanceof Uint8Array ? raw : new Uint8Array(raw)));
 }
 
 /** Wrap a CMS blob as a nested MIME entity (for sign-then-encrypt). */
@@ -525,7 +533,7 @@ function forgetRenders() {
   renderShares.clear();
 }
 
-async function renderEncrypted(body, ctx, blobId, fromEmail, started, asked) {
+async function renderEncrypted(body, ctx, loadCms, fromEmail, started, asked) {
   const failed = (decryptionError) => {
     const status = { isEncrypted: true, decryptionSuccess: false, decryptionError };
     return persistVerifyStatus(ctx.id, status).then(() => ({ ...body, handledBy: 'smime', html: '', text: '', attachments: [], verification: status }));
@@ -536,8 +544,7 @@ async function renderEncrypted(body, ctx, blobId, fromEmail, started, asked) {
 
   let der;
   try {
-    const raw = await host.jmap.fetchBlob(blobId);
-    der = normalizeCmsBytes(bytesArrayBuffer(raw instanceof Uint8Array ? raw : new Uint8Array(raw)));
+    der = await loadCms();
   } catch (err) {
     host.log.error('onRenderEmailBody failed', err);
     await persistVerifyStatus(ctx.id, { isEncrypted: true, decryptionSuccess: false, decryptionError: err && err.message ? err.message : String(err) });
@@ -619,7 +626,7 @@ async function onRenderEmailBody(body, ctx) {
   const started = Date.now();
   if (!(await isCapable())) return undefined; // can't decrypt/verify without the privileged tier
 
-  const detection = detectSmime(ctx.contentType, ctx.bodyStructure, ctx.attachments);
+  const detection = detectSmime(ctx.contentType, ctx.bodyStructure);
   if (!detection.type) {
     await clearVerifyStatus(ctx.id);
     return undefined;
@@ -690,15 +697,29 @@ async function onRenderEmailBody(body, ctx) {
   const blobId = detection.blobId || ctx.blobId;
   if (!blobId) return undefined;
 
-  if (detection.type === 'enveloped-data') {
-    return shareRender(`${ctx.id}|${blobId}`, ctx, (asked) => renderEncrypted(body, ctx, blobId, fromEmail, started, asked));
+  // Fetched once, for the look inside and for reading it.
+  let cms;
+  const loadCms = () => {
+    if (!cms) cms = fetchCms(blobId);
+    return cms;
+  };
+
+  let type = detection.type;
+  if (type === 'pkcs7-mime') {
+    // No smime-type parameter: the CMS content type inside says signed or encrypted.
+    let signedData = false;
+    try { signedData = isSignedData(await loadCms()); } catch { /* reported where the blob is read */ }
+    type = signedData ? 'signed-data' : 'enveloped-data';
+  }
+
+  if (type === 'enveloped-data') {
+    return shareRender(`${ctx.id}|${blobId}`, ctx, (asked) => renderEncrypted(body, ctx, loadCms, fromEmail, started, asked));
   }
 
   try {
-    const raw = await host.jmap.fetchBlob(blobId);
-    const der = normalizeCmsBytes(bytesArrayBuffer(raw instanceof Uint8Array ? raw : new Uint8Array(raw)));
+    const der = await loadCms();
 
-    if (detection.type === 'signed-data') {
+    if (type === 'signed-data') {
       const v = await smimeVerify(der, fromEmail);
       v.status.format = 'opaque';
       await maybeAutoImportSigner(v.status);

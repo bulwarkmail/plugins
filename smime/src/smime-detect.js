@@ -6,7 +6,8 @@
  * over only when the S/MIME entity is the whole message, that is
  * application/pkcs7-mime (or x-pkcs7-mime) or multipart/signed with a pkcs7
  * signature. A signed part further down the tree reports 'partly-signed':
- * the plugin neither verifies it nor shows the message as signed.
+ * the plugin neither verifies it nor shows the message as signed. Attachments
+ * decide nothing, whatever they are called (.p7m, .p7s).
  *
  * AuthEnvelopedData reports as 'enveloped-data' too: both are encrypted
  * mail, and smime-decrypt.js tells them apart by their CMS content type.
@@ -18,7 +19,7 @@ const PKCS7_SIGNATURE = new Set(['application/pkcs7-signature', 'application/x-p
 // writes authenticated-enveloped-data.
 const ENVELOPED = new Set(['enveloped-data', 'authenveloped-data', 'authenticated-enveloped-data']);
 
-export function detectSmime(contentType, bodyStructure, attachments) {
+export function detectSmime(contentType, bodyStructure) {
   const noResult = { type: null, supported: false };
   const { media, params } = parseContentType(contentType || bodyStructure?.type);
 
@@ -26,7 +27,7 @@ export function detectSmime(contentType, bodyStructure, attachments) {
     // The root part holds the CMS blob when the server reads the message the same way.
     const part = PKCS7_MIME.has(parseContentType(bodyStructure?.type).media) ? bodyStructure : null;
     const type = smimeType(params['smime-type']);
-    return { type, blobId: part?.blobId, partId: part?.partId, supported: type === 'enveloped-data' || type === 'signed-data' };
+    return { type, blobId: part?.blobId, partId: part?.partId, supported: ['enveloped-data', 'signed-data', 'pkcs7-mime'].includes(type) };
   }
 
   if (media === 'multipart/signed') {
@@ -37,20 +38,6 @@ export function detectSmime(contentType, bodyStructure, attachments) {
   }
 
   if (bodyStructure && hasSignedPart(bodyStructure)) return { type: 'partly-signed', supported: false };
-
-  if (attachments) {
-    for (const att of attachments) {
-      // A CMS part below the top level is not the message, whatever its name.
-      if (PKCS7_MIME.has(parseContentType(att.type).media)) continue;
-      const name = att.name?.toLowerCase() || '';
-      if (name.endsWith('.p7m')) {
-        return { type: 'enveloped-data', blobId: att.blobId, partId: att.partId, supported: true };
-      }
-      if (name.endsWith('.p7s')) {
-        return { type: 'detached-sig', blobId: att.blobId, partId: att.partId, supported: true };
-      }
-    }
-  }
 
   return noResult;
 }
@@ -68,9 +55,11 @@ function parseContentType(value) {
   return { media: media.trim().toLowerCase(), params };
 }
 
+// Without the parameter (older clients leave it out) it is 'pkcs7-mime': the CMS
+// content type inside the blob tells signed from encrypted.
 function smimeType(value) {
-  // Older clients leave smime-type out of encrypted mail.
-  if (!value || ENVELOPED.has(value)) return 'enveloped-data';
+  if (!value) return 'pkcs7-mime';
+  if (ENVELOPED.has(value)) return 'enveloped-data';
   return value;
 }
 

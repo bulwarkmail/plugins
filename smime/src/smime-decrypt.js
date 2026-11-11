@@ -17,6 +17,7 @@ import { keystoreCode } from './os-keys.js';
 export { UnsupportedAlgorithmError };
 
 const OID_ENVELOPED_DATA = '1.2.840.113549.1.7.3';
+const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';
 const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 
 // Content ciphers pkijs + webcrypto-liner decrypt in EnvelopedData. Anything
@@ -254,6 +255,15 @@ export function normalizeCmsBytes(raw) {
   } catch { /* not base64 */ }
 
   throw new Error('Invalid ASN.1 data - cannot parse CMS envelope');
+}
+
+/** Whether DER bytes are CMS SignedData (false for any other content type, or no CMS at all). */
+export function isSignedData(der) {
+  try {
+    return parseContentInfo(der).contentType === OID_SIGNED_DATA;
+  } catch {
+    return false;
+  }
 }
 
 function parseContentInfo(der) {

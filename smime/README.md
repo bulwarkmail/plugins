@@ -91,7 +91,7 @@ src/
   certificate-utils.js X.509 parse + metadata + capability classification
   mime-builder.js     deterministic CRLF MIME builder + CMS RFC822 wrapper
   mime-parse.js       inner-MIME parser for decrypted/verified content
-  smime-detect.js     detect CMS from Content-Type / bodyStructure / attachments
+  smime-detect.js     S/MIME or not, from the message's top-level Content-Type
   smime-sign.js       CMS SignedData (opaque or detached)
   smime-encrypt.js    CMS EnvelopedData
   smime-decrypt.js    CMS decrypt + blob normalisation + recipient matching
