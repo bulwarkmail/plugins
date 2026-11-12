@@ -55,11 +55,22 @@ async function make({ cn, email, issuer, publicKey, signingKey, extensions, notB
 
 /**
  * A certificate authority, self-signed unless `issuer` (another makeCa result) signs it.
- * `ca: false` leaves the CA flag out; `keyUsage` replaces keyCertSign + cRLSign.
+ * `ca: false` leaves the CA flag out; `keyUsage` replaces keyCertSign + cRLSign;
+ * `nameConstraints` (a domain) adds a non-critical name constraints extension permitting it.
  */
-export async function makeCa(cn, { issuer, ca = true, pathLen, keyUsage: bits = ['keyCertSign', 'cRLSign'], notBefore, notAfter } = {}) {
+export async function makeCa(cn, {
+  issuer, ca = true, pathLen, keyUsage: bits = ['keyCertSign', 'cRLSign'], notBefore, notAfter, nameConstraints,
+} = {}) {
   const key = await crypto.subtle.generateKey(EC, false, ['sign', 'verify']);
   const extensions = [basicConstraints(ca, pathLen), ...(bits ? [keyUsage(bits)] : [])];
+  if (nameConstraints) {
+    extensions.push(new pkijs.Extension({
+      extnID: '2.5.29.30',
+      extnValue: new pkijs.NameConstraints({
+        permittedSubtrees: [new pkijs.GeneralSubtree({ base: new pkijs.GeneralName({ type: 1, value: nameConstraints }) })],
+      }).toSchema().toBER(false),
+    }));
+  }
   const made = await make({
     cn, issuer, publicKey: key.publicKey, signingKey: issuer ? issuer.key.privateKey : key.privateKey, extensions, notBefore, notAfter,
   });

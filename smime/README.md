@@ -28,7 +28,13 @@ material ever leaves the device.
   recipient certificates the user imported by hand. A path from the signer to a
   trusted issuer is built from the certificates in the message; each link needs
   a valid signature, its validity dates, the CA flag and certificate signing in
-  its key usage (and a fitting path length). No root list is bundled, so mail
+  its key usage (and a fitting path length). A CA that carries name constraints,
+  critical or not, never counts: they aren't checked, and importing such a CA is
+  refused. The search is bounded: duplicates (same subject, issuer and key) are
+  dropped, a certificate that led nowhere isn't tried again, a path has at most
+  8 certificates, one verification makes at most 64 signature checks, and only
+  the first 32 certificates of a message are looked at; reaching a bound reads
+  "signer not verified" with the reason. No root list is bundled, so mail
   signed under a public CA reads "signer not verified" until the user or the
   admin adds that CA. Revocation is not checked (nothing is fetched), and the
   details say so.

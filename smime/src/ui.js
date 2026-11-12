@@ -79,6 +79,8 @@ export function signatureChecks(status, t, locale) {
   } else {
     checks.push({ tone: 'warn', text: t('check.issuerUntrusted') });
   }
+  if (reasons.includes('constraints')) checks.push({ tone: 'warn', text: t('check.nameConstraints') });
+  if (reasons.includes('limit')) checks.push({ tone: 'warn', text: t('check.pathLimit') });
   if (reasons.includes('usage')) checks.push({ tone: 'warn', text: t('check.usage') });
   if (reasons.includes('digest')) checks.push({ tone: 'warn', text: t('check.weakDigest') });
   checks.push({ tone: 'info', text: t('check.revocation') });
@@ -566,9 +568,13 @@ export function makeUi(host, deps) {
         const pem = deps.pemCertificates(new TextDecoder().decode(buf));
         const known = new Set(trusted.filter((r) => r.kind === 'issuer').map((r) => r.fingerprint));
         const added = [];
+        // A CA with name constraints is refused: they aren't checked, so it would vouch beyond them.
+        let constrained = false;
         for (const der of pem.length ? pem : [buf]) {
           const cert = deps.parseCertificatePemOrDer(der);
-          if (!deps.issuerCapabilities(cert).canIssue) continue;
+          const caps = deps.issuerCapabilities(cert);
+          if (caps.constrained && caps.isCa) constrained = true;
+          if (!caps.canIssue) continue;
           const bytes = cert.toSchema(true).toBER(false);
           const info = await deps.extractCertificateInfo(cert, bytes);
           added.push(commonName(info.subject));
@@ -586,7 +592,7 @@ export function makeUi(host, deps) {
             addedAt: Date.now(),
           });
         }
-        if (added.length === 0) throw new Error(t('issuers.notCa'));
+        if (added.length === 0) throw new Error(t(constrained ? 'issuers.nameConstraints' : 'issuers.notCa'));
         host.toast.success(t('issuers.added', { name: added.join(', ') }));
         await refresh();
       } catch (err) {

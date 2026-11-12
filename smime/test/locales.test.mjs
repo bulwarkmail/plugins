@@ -212,7 +212,10 @@ describe('S/MIME in another language', () => {
     expect(prompts[0]).toMatchObject({ title: '‹trust.title›', message: '‹trust.message› a@x.org ab', confirmLabel: '‹trust.confirm›' });
     cleanup();
 
-    for (const [reasons, key] of [[['issuer', 'usage'], 'check.usage'], [['issuer', 'digest'], 'check.weakDigest']]) {
+    for (const [reasons, key] of [
+      [['issuer', 'usage'], 'check.usage'], [['issuer', 'digest'], 'check.weakDigest'],
+      [['issuer', 'constraints'], 'check.nameConstraints'], [['issuer', 'limit'], 'check.pathLimit'],
+    ]) {
       const other = pseudoApi();
       await other.storage.set('verify:m2', {
         isSigned: true, signatureValid: true, cryptoValid: true, signerEmailMatch: true, fromEmail: 'a@x.org', signerVerified: false, trustReasons: reasons,

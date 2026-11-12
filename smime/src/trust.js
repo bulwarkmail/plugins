@@ -9,8 +9,9 @@
 // A signer is verified when the signature is intact and the certificate in its dates
 // (smime-verify.js checks both), and all of this holds:
 //  - a path leads from the signer certificate to a trusted issuer, each link with a
-//    valid signature, in its dates, a CA flag and certificate signing allowed, or the
-//    certificate itself is a trusted signer certificate;
+//    valid signature, in its dates, a CA flag and certificate signing allowed, and no
+//    name constraints (they are not checked here, so a CA that carries them can't
+//    vouch), or the certificate itself is a trusted signer certificate;
 //  - key usage allows signing and extended key usage allows mail, where present;
 //  - the mail signature is not made with SHA-1 or MD5 (nor is any certificate below the
 //    trusted issuer);
@@ -28,17 +29,22 @@ const WEAK_SIGNATURES = new Set([
   '1.2.840.113549.1.1.2', '1.2.840.113549.1.1.3', '1.2.840.113549.1.1.4', '1.2.840.113549.1.1.5',
   '1.2.840.10045.4.1', '1.2.840.10040.4.3', '1.3.14.3.2.29',
 ]);
-// Extensions a path may mark critical: the ones read here, and the policy ones (no policy
-// is required, so they restrict nothing).
+// Extensions a path may mark critical: the ones read here, the policy ones (no policy is
+// required, so they restrict nothing), and name constraints (a CA that carries them, critical
+// or not, can't issue: issuerCapabilities).
 const KNOWN_CRITICAL = new Set([
-  '2.5.29.14', '2.5.29.15', '2.5.29.17', '2.5.29.18', '2.5.29.19', '2.5.29.32', '2.5.29.35',
+  '2.5.29.14', '2.5.29.15', '2.5.29.17', '2.5.29.18', '2.5.29.19', '2.5.29.30', '2.5.29.32', '2.5.29.35',
   '2.5.29.36', '2.5.29.37', '2.5.29.54',
 ]);
-// Intermediate certificates between a signer and a trusted issuer.
-const MAX_INTERMEDIATES = 6;
+// Bounds on the path search. A message can carry many certificates, made so that each
+// verifies as the issuer of the others; the search drops duplicates, remembers which
+// certificates led nowhere, and stops at these. Reaching one reads "not verified".
+export const MAX_PATH = 8; // certificates in a path, the signer's and the trusted issuer's included
+export const MAX_CHECKS = 64; // signature checks for one certificate's path
+export const MAX_POOL = 32; // certificates of a message the search looks at (the first ones)
 
 /** Why a signer is not verified, as the details panel words it. */
-export const REASONS = ['issuer', 'self', 'usage', 'digest', 'from'];
+export const REASONS = ['issuer', 'self', 'constraints', 'limit', 'usage', 'digest', 'from'];
 
 /**
  * The trust a verification works with. `issuers` are certificate DERs, `pinned` are
@@ -66,31 +72,68 @@ const unknownCritical = (cert) => (cert.extensions || []).some((e) => e.critical
 
 const selfIssued = (cert) => cert.subject.isEqual(cert.issuer);
 
+const hex = (buffer) => Array.from(new Uint8Array(buffer), (b) => b.toString(16).padStart(2, '0')).join('');
+
+// Certificates with the same subject, issuer and key are interchangeable as links.
+const linkKey = (cert) => [
+  hex(cert.subject.toSchema().toBER(false)),
+  hex(cert.issuer.toSchema().toBER(false)),
+  hex(cert.subjectPublicKeyInfo.toSchema().toBER(false)),
+].join('|');
+
+// One certificate per subject, issuer and key, the first one in its dates where there is one.
+function distinct(certs, now) {
+  const kept = new Map();
+  for (const cert of certs) {
+    const key = linkKey(cert);
+    const earlier = kept.get(key);
+    if (!earlier || (!withinDates(earlier, now) && withinDates(cert, now))) kept.set(key, cert);
+  }
+  return [...kept.values()];
+}
+
 /**
- * The trusted issuer a path from `cert` ends at, or null. `pool` holds the other
- * certificates of the message. `below` counts the certificates under `cert` that use up
- * a pathLenConstraint (not self-issued ones, RFC 5280 6.1.4).
+ * The trusted issuer a path from `cert` ends at, or null. `path` is the path so far, from
+ * the signer to `cert`. `below` counts the certificates under `cert` that use up a
+ * pathLenConstraint (not self-issued ones, RFC 5280 6.1.4). `search` holds the anchors,
+ * the message's certificates, the signature checks made, the certificates that led
+ * nowhere (with the smallest `below` they were tried at) and the problems seen.
  */
-async function pathToAnchor(cert, pool, anchors, now, seen, below, problems) {
-  if (seen.length > MAX_INTERMEDIATES) return null;
-  const candidates = [...anchors.map((c) => [c, true]), ...pool.map((c) => [c, false])];
+async function pathToAnchor(cert, path, below, search) {
+  if (path.length >= MAX_PATH) return null;
+  const candidates = [...search.anchors.map((c) => [c, true]), ...search.pool.map((c) => [c, false])];
   for (const [issuer, isAnchor] of candidates) {
-    if (sameCert(issuer, cert) || seen.some((s) => sameCert(s, issuer))) continue;
+    if (path.some((p) => sameCert(p, issuer))) continue;
     if (!cert.issuer.isEqual(issuer.subject)) continue;
-    const { canIssue, pathLength } = issuerCapabilities(issuer);
-    if (!canIssue || !withinDates(issuer, now) || unknownCritical(issuer)) continue;
+    const next = below + (selfIssued(issuer) ? 0 : 1);
+    const key = linkKey(issuer);
+    if (!isAnchor && search.deadEnds.has(key) && search.deadEnds.get(key) <= next) continue;
+    // A CA with name constraints is checked like the others, so the details can say it was
+    // the one in the way, and then not used.
+    const { isCa, pathLength, constrained } = issuerCapabilities(issuer);
+    if (!isCa || !withinDates(issuer, search.now) || unknownCritical(issuer)) continue;
     if (pathLength !== undefined && below > pathLength) continue;
+    if (search.checks >= MAX_CHECKS) {
+      search.problems.add('limit');
+      return null;
+    }
+    search.checks++;
     let signed = false;
     try { signed = await cert.verify(issuer, nativeEngine()); } catch { signed = false; }
     if (!signed) continue;
+    if (constrained) {
+      search.problems.add('constraints');
+      continue;
+    }
     if (WEAK_SIGNATURES.has(cert.signatureAlgorithm.algorithmId)) {
-      problems.add('digest');
+      search.problems.add('digest');
       continue;
     }
     if (isAnchor) return issuer;
-    const next = below + (selfIssued(issuer) ? 0 : 1);
-    const found = await pathToAnchor(issuer, pool, anchors, now, [...seen, issuer], next, problems);
+    const found = await pathToAnchor(issuer, [...path, issuer], next, search);
     if (found) return found;
+    if (search.problems.has('limit')) return null;
+    search.deadEnds.set(key, Math.min(search.deadEnds.get(key) ?? Infinity, next));
   }
   return null;
 }
@@ -99,17 +142,25 @@ async function pathToAnchor(cert, pool, anchors, now, seen, below, problems) {
  * Who vouches for `cert`: { via: 'signer' } when its fingerprint is a trusted signer
  * certificate, { via: 'issuer', anchor } when a path from it leads to a trusted issuer
  * (`pool`: other certificates that may be intermediates), else { reasons } with 'self'
- * or 'issuer' (and 'digest' when a link was signed with SHA-1 or MD5).
+ * or 'issuer', and 'constraints' when a CA on the way carries name constraints, 'limit'
+ * when the search stopped at one of its bounds, 'digest' when a link was signed with
+ * SHA-1 or MD5. Of `pool` only the first MAX_POOL distinct certificates are used.
  */
 export async function vouchedFor(cert, { fingerprint, pool = [], trust, now = new Date() }) {
   if (trust && trust.pinned.has(String(fingerprint).toLowerCase())) return { via: 'signer', reasons: [] };
-  const problems = new Set();
-  const others = pool.filter((c) => c && c.tbsView && !sameCert(c, cert));
-  const anchor = trust && trust.anchors.length && !unknownCritical(cert)
-    ? await pathToAnchor(cert, others, trust.anchors, now, [], 0, problems)
-    : null;
+  const others = distinct(pool.filter((c) => c && c.tbsView && !sameCert(c, cert)), now);
+  const search = {
+    anchors: distinct(trust ? trust.anchors : [], now),
+    pool: others.slice(0, MAX_POOL),
+    now,
+    checks: 0,
+    deadEnds: new Map(),
+    problems: new Set(),
+  };
+  const anchor = search.anchors.length && !unknownCritical(cert) ? await pathToAnchor(cert, [cert], 0, search) : null;
   if (anchor) return { via: 'issuer', anchor, reasons: [] };
-  return { reasons: [selfIssued(cert) ? 'self' : 'issuer', ...problems] };
+  if (others.length > MAX_POOL) search.problems.add('limit');
+  return { reasons: [selfIssued(cert) ? 'self' : 'issuer', ...search.problems] };
 }
 
 /**

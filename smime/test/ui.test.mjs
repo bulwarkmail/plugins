@@ -232,6 +232,17 @@ describe('trusted issuers and certificates', () => {
     expect(api.calls('toast.error')[0].args[0]).toMatch(/^Couldn’t add the issuer: This certificate can’t issue certificates/);
   });
 
+  it('refuses a certificate authority with name constraints, and says why', async () => {
+    const ca = await makeCa('Corp Constrained CA', { nameConstraints: 'corp.example' });
+    const api = fakeApi();
+    const { d, saved } = certDeps();
+    const { SettingsSection } = makeUi(api, d);
+    await act(async () => { render(React.createElement(SettingsSection)); });
+    await pickFile('Issuer certificate file', pem(ca.der));
+    expect(saved).toEqual([]);
+    expect(api.calls('toast.error')[0].args[0]).toMatch(/^Couldn’t add the issuer: This certificate authority limits which addresses it may vouch for \(name constraints\)/);
+  });
+
   it('lists the issuers the admin set, without a way to remove them', async () => {
     const ca = await makeCa('Admin Root');
     const { d } = certDeps({ adminIssuers: async () => [ca.der.buffer.slice(0)] });
