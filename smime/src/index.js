@@ -30,7 +30,7 @@ import {
   smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, isSignedData, SmimeKeyLockedError, SmimeNoKeyError,
 } from './smime-decrypt.js';
 import { detectSmime } from './smime-detect.js';
-import { parseMime, extractDetachedSigned } from './mime-parse.js';
+import { parseMime, extractDetachedSigned, opaqueBody } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
 import { parseCertificatePemOrDer, extractCertificateInfo } from './certificate-utils.js';
 import { generateUUID } from './util.js';
@@ -151,10 +151,27 @@ function bytesArrayBuffer(u8) {
   return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
 }
 
-/** A blob of the message as DER CMS. */
+// What the banner shows for a signed message whose structure the plugin can't rely on
+// (i18n.js translates it).
+const MALFORMED_SIGNED = 'Malformed multipart/signed message';
+
+class MalformedMessageError extends Error {
+  constructor() {
+    super(MALFORMED_SIGNED);
+    this.name = 'MalformedMessageError';
+  }
+}
+
+/**
+ * The CMS of a message that is application/pkcs7-mime as a whole, as DER. It is read
+ * from the raw message, whose header has to read one way and say pkcs7-mime; throws
+ * MalformedMessageError when it doesn't.
+ */
 async function fetchCms(blobId) {
   const raw = await host.jmap.fetchBlob(blobId);
-  return normalizeCmsBytes(bytesArrayBuffer(raw instanceof Uint8Array ? raw : new Uint8Array(raw)));
+  const body = opaqueBody(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
+  if (!body) throw new MalformedMessageError();
+  return normalizeCmsBytes(bytesArrayBuffer(body));
 }
 
 /** Wrap a CMS blob as a nested MIME entity (for sign-then-encrypt). */
@@ -671,7 +688,7 @@ async function onRenderEmailBody(body, ctx) {
     try {
       const signed = extractDetachedSigned(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
       if (!signed) {
-        await invalid('Malformed multipart/signed message');
+        await invalid(MALFORMED_SIGNED);
         return undefined;
       }
       const v = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, fromEmail);
@@ -694,7 +711,8 @@ async function onRenderEmailBody(body, ctx) {
     }
   }
 
-  const blobId = detection.blobId || ctx.blobId;
+  // The raw message: its own header decides, as for a detached signature.
+  const blobId = ctx.blobId;
   if (!blobId) return undefined;
 
   // Fetched once, for the look inside and for reading it.
@@ -736,6 +754,9 @@ async function onRenderEmailBody(body, ctx) {
     }
   } catch (err) {
     host.log.error('onRenderEmailBody failed', err);
+    if (err instanceof MalformedMessageError) {
+      await persistVerifyStatus(ctx.id, { isSigned: true, isEncrypted: false, signatureValid: false, signatureError: MALFORMED_SIGNED });
+    }
     return undefined; // fall back to host rendering on unexpected failure
   }
 

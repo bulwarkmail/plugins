@@ -25,20 +25,135 @@ export function parseMime(bytes) {
 }
 
 const PKCS7_SIGNATURE = /^application\/(x-)?pkcs7-signature$/;
+const PKCS7_MIME = /^application\/(x-)?pkcs7-mime$/;
 
 /**
  * The message's own signed entity and signature as { entityBytes, signatureDer },
  * or null when the message is not signed as a whole: its top-level type has to be
  * multipart/signed with a pkcs7 signature, holding exactly the signed entity and
  * the signature (RFC 1847), so nothing in the message lies outside the signature.
+ * The headers this relies on (the message's, the entity's and the signature's
+ * Content-Type) have to read one way (see readsOneWay).
  */
 export function extractDetachedSigned(bytes) {
   const node = parseEntity(binaryString(bytes));
+  if (!readsOneWay(node, true)) return null;
   if (node.type !== 'multipart/signed' || !PKCS7_SIGNATURE.test((node.params.protocol || '').toLowerCase())) return null;
   if (node.children.length !== 2) return null;
   const [entity, sig] = node.children;
+  if (!readsOneWay(entity, false) || !readsOneWay(sig, true)) return null;
   if (!PKCS7_SIGNATURE.test(sig.type)) return null;
   return { entityBytes: latin1Bytes(entity.raw), signatureDer: decodeBody(sig) };
+}
+
+/**
+ * The body of a message that is application/pkcs7-mime as a whole, as bytes, or null
+ * when it is not, or when its header doesn't read one way (see readsOneWay).
+ */
+export function opaqueBody(bytes) {
+  const node = parseEntity(binaryString(bytes));
+  if (!readsOneWay(node, true) || !PKCS7_MIME.test(node.type)) return null;
+  return latin1Bytes(node.body);
+}
+
+/**
+ * Whether an entity's header block reads the same way in every parser, as far as its
+ * Content-Type goes. Mail servers and clients differ on duplicate fields (first or
+ * last wins), duplicate parameters, blanks in field names and odd line breaks, so the
+ * plugin only relies on a header block where none of that occurs:
+ * - one kind of line break, no lone CR, no NUL, no line of only blanks, every line a
+ *   field or the continuation of one;
+ * - exactly one Content-Type field (or none, where `required` is false), counting
+ *   every spelling of the name a parser might take for it (any case, blanks or tabs
+ *   inside it or before the colon), and spelled the way this reader knows it;
+ * - in that field no 8-bit byte, each parameter at most once (RFC 2231 sections and
+ *   encoded forms count as that parameter), and the media type and the parameters
+ *   this reader uses as a strict reading of the field gives them.
+ */
+function readsOneWay(node, required) {
+  const text = node.headerText;
+  const sep = node.headerEnd;
+  if (text.includes('\0') || /\r(?!\n)/.test(text)) return false;
+  const crlf = sep ? sep === '\r\n\r\n' : text.includes('\r\n');
+  if (sep && !crlf && sep !== '\n\n') return false;
+  if (crlf ? /(^|[^\r])\n/.test(text) : text.includes('\r')) return false;
+
+  const fields = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (/^[ \t]/.test(line)) {
+      if (!fields.length || !line.trim()) return false;
+      fields[fields.length - 1] += line;
+    } else if (line.indexOf(':') > 0) {
+      fields.push(line);
+    } else {
+      return false;
+    }
+  }
+  const named = fields.filter((f) => f.slice(0, f.indexOf(':')).toLowerCase().replace(/[^a-z0-9-]/g, '') === 'content-type');
+  if (named.length !== 1) return named.length === 0 && !required;
+  const colon = named[0].indexOf(':');
+  if (named[0].slice(0, colon).trim().toLowerCase() !== 'content-type') return false;
+  const value = named[0].slice(colon + 1);
+  if (/[^\x00-\x7f]/.test(value)) return false;
+  const strict = strictContentType(value);
+  return !!strict && strict.type === node.type
+    && ['boundary', 'protocol', 'smime-type'].every((k) => strict.params[k] === node.params[k]);
+}
+
+// A Content-Type value read by the rules: ';' only outside quoted strings, a media type
+// of two tokens, and each parameter name once.
+function strictContentType(value) {
+  const parts = [];
+  let current = '';
+  let quoted = false;
+  for (let i = 0; i < value.length; i++) {
+    const c = value[i];
+    if (quoted && c === '\\') {
+      current += value.slice(i, i + 2);
+      i++;
+    } else if (c === ';' && !quoted) {
+      parts.push(current);
+      current = '';
+    } else {
+      if (c === '"') quoted = !quoted;
+      current += c;
+    }
+  }
+  if (quoted) return null;
+  parts.push(current);
+
+  const type = parts[0].trim().toLowerCase();
+  if (!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(type)) return null;
+  const params = {};
+  const counts = new Map();
+  const sections = new Map();
+  for (const part of parts.slice(1)) {
+    if (!part.trim()) continue;
+    const eq = part.indexOf('=');
+    if (eq < 0) return null;
+    const name = part.slice(0, eq).toLowerCase().replace(/[ \t\r\n]/g, '');
+    const m = name.match(/^([a-z0-9!#$&^_.+-]+?)(?:\*(\d+))?\*?$/);
+    if (!m) return null;
+    const [, base, section] = m;
+    let count = counts.get(base) ?? 0;
+    if (section === undefined) {
+      count++;
+    } else {
+      // RFC 2231 sections of one value count once; the same section twice is a second value.
+      const seen = sections.get(base) ?? new Set();
+      if (seen.has(section)) return null;
+      if (seen.size === 0) count++;
+      seen.add(section);
+      sections.set(base, seen);
+    }
+    if (count > 1) return null;
+    counts.set(base, count);
+    if (name === base) {
+      const v = part.slice(eq + 1).trim();
+      params[base] = v.length > 1 && v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v;
+    }
+  }
+  return { type, params };
 }
 
 function latin1Bytes(s) {
@@ -69,7 +184,8 @@ function parseEntity(raw, depth = 1) {
   const cte = (headers['content-transfer-encoding'] || '7bit').trim().toLowerCase();
   const disposition = (headers['content-disposition'] || '').toLowerCase();
 
-  const node = { type, params, cte, disposition, headers, body, raw, children: [] };
+  const headerEnd = sepMatch ? sepMatch[0] : '';
+  const node = { type, params, cte, disposition, headers, headerText, headerEnd, body, raw, children: [] };
 
   if (type.startsWith('multipart/') && params.boundary) {
     if (depth <= MAX_DEPTH) node.children = splitMultipart(body, params.boundary).map((part) => parseEntity(part, depth + 1));

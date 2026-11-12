@@ -151,7 +151,10 @@ describe('what makes a mail S/MIME mail', () => {
   });
 
   it('verifies such a mail when the CMS inside is signed data', async () => {
-    const { hooks } = plugin(await signedDocument('Content-Type: text/plain; charset=utf-8\r\n\r\nSigned, without an smime-type.\r\n'));
+    const cms = await signedDocument('Content-Type: text/plain; charset=utf-8\r\n\r\nSigned, without an smime-type.\r\n');
+    const message = 'MIME-Version: 1.0\r\nContent-Type: application/pkcs7-mime; name="smime.p7m"\r\nContent-Transfer-Encoding: base64\r\n\r\n'
+      + `${Buffer.from(cms).toString('base64').replace(/(.{76})/g, '$1\r\n')}\r\n`;
+    const { hooks } = plugin(bytes(message));
     const result = await hooks.onRenderEmailBody({ html: '', text: '' }, withoutSmimeType());
     expect(result.text).toContain('Signed, without an smime-type.');
     expect(result.verification.isEncrypted).not.toBe(true);

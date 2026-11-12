@@ -7,7 +7,9 @@
  * application/pkcs7-mime (or x-pkcs7-mime) or multipart/signed with a pkcs7
  * signature. A signed part further down the tree reports 'partly-signed':
  * the plugin neither verifies it nor shows the message as signed. Attachments
- * decide nothing, whatever they are called (.p7m, .p7s).
+ * decide nothing, whatever they are called (.p7m, .p7s). What is verified or
+ * decrypted is read from the raw message, whose own header has to agree
+ * (mime-parse.js).
  *
  * AuthEnvelopedData reports as 'enveloped-data' too: both are encrypted
  * mail, and smime-decrypt.js tells them apart by their CMS content type.
@@ -24,10 +26,8 @@ export function detectSmime(contentType, bodyStructure) {
   const { media, params } = parseContentType(contentType || bodyStructure?.type);
 
   if (PKCS7_MIME.has(media)) {
-    // The root part holds the CMS blob when the server reads the message the same way.
-    const part = PKCS7_MIME.has(parseContentType(bodyStructure?.type).media) ? bodyStructure : null;
     const type = smimeType(params['smime-type']);
-    return { type, blobId: part?.blobId, partId: part?.partId, supported: ['enveloped-data', 'signed-data', 'pkcs7-mime'].includes(type) };
+    return { type, supported: ['enveloped-data', 'signed-data', 'pkcs7-mime'].includes(type) };
   }
 
   if (media === 'multipart/signed') {
