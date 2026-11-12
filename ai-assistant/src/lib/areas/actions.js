@@ -1049,15 +1049,19 @@ const listOf = (value, max) => (value === undefined ? undefined : (Array.isArray
 
 const digits = (value) => String(value ?? '').replace(/\D/g, '');
 
+/** Addresses in a text, whole (the same pattern as knownRecipient in ../actions.js). */
+const ADDRESS_IN_TEXT = /[^\s@<>"',;()]+@[^\s@<>"',;()]+\.[^\s@<>"',;().]+/g;
+
 /**
  * Whether the user typed this address or number in the chat themselves
- * (ctx.userText). One the model took from a message could send the user's
- * future mail to someone else, so the card points it out.
+ * (ctx.userText). An address counts only whole: "ann@example.org" is not in
+ * "joann@example.org". One the model took from a message could send the
+ * user's future mail to someone else, so the card points it out.
  */
 export function typedByUser(ctx, value) {
   const typed = String(ctx?.userText ?? '');
   if (!typed) return false;
-  if (value.includes('@')) return typed.toLowerCase().includes(value.toLowerCase());
+  if (value.includes('@')) return (typed.match(ADDRESS_IN_TEXT) ?? []).some((a) => a.toLowerCase() === value.toLowerCase());
   const d = digits(value);
   return d.length > 0 && digits(typed).includes(d);
 }
