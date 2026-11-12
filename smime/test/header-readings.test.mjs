@@ -5,7 +5,7 @@
 // not vouch for the mail: otherwise the reader shows the signed text, a valid signature, and attachments
 // only the server sees.
 //
-// mail-parser 0.11.9 (Stalwart 1.0): the LAST Content-Type header builds the structure, the FIRST
+// mail-parser 0.11.9 (Stalwart 0.16): the LAST Content-Type header builds the structure, the FIRST
 // boundary parameter wins, and blanks inside a header name are dropped ("Content - Type" is
 // Content-Type). The webmail hands the hook the FIRST Content-Type header. The plugin's MIME reader
 // takes the media type of the first header and the last value of each parameter. So the plugin relies

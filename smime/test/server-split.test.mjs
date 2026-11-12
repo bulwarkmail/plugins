@@ -12,7 +12,7 @@
 // with the entity's names and sizes, and every attachment the server lists has to be one of its
 // leaves. Refused mail reads as a damaged signed message and is shown the way the server reads it.
 //
-// The server views below are what mail-parser 0.11.9 (Stalwart 1.0) gives for these bytes (partId =
+// The server views below are what mail-parser 0.11.9 (Stalwart 0.16) gives for these bytes (partId =
 // index in its part list), from a local build of the crate. Sizes of signature parts are left out:
 // the signatures here are made afresh on every run.
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';

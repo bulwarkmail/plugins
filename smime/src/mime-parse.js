@@ -45,7 +45,7 @@ export function extractDetachedSigned(bytes) {
   const [entity, sig] = node.children;
   if (!readsOneWay(entity, false) || !readsOneWay(sig, true)) return null;
   if (!PKCS7_SIGNATURE.test(sig.type)) return null;
-  if (!boundaryOnlyOnDelimiters(node, entity)) return null;
+  if (!nestedMultipartsReadOneWay(entity) || !boundaryOnlyOnDelimiters(node, entity)) return null;
   return { entityBytes: latin1Bytes(entity.raw), signatureDer: decodeBody(sig), entity: shapeOf(entity) };
 }
 
@@ -78,6 +78,13 @@ function boundaryOnlyOnDelimiters(node, entity) {
     if (!allowed.has(node.bodyStart + at)) return false;
   }
   return true;
+}
+
+// The multiparts inside the signed entity: where their delimiter lines start with the
+// message's boundary, those lines count as delimiters (see above), so their headers, and
+// their boundaries above all, have to read one way too.
+function nestedMultipartsReadOneWay(node) {
+  return node.children.every((child) => (!child.type.startsWith('multipart/') || readsOneWay(child, true)) && nestedMultipartsReadOneWay(child));
 }
 
 function addDelimiters(node, into) {
@@ -207,9 +214,9 @@ function textOf(bytes, charset = 'utf-8') {
  * - in that field each parameter at most once (RFC 2231 sections and encoded forms
  *   count as that parameter), no 8-bit byte in the media type, the boundary, the
  *   protocol or the smime-type (servers read such bytes as UTF-8, this reader byte by
- *   byte; elsewhere in the field, a file name for one, they change nothing), and the
- *   media type and the parameters this reader uses as a strict reading of the field
- *   gives them.
+ *   byte; elsewhere in the field, a file name for one, they change nothing), the
+ *   boundary of a multipart written plainly (see plainBoundary), and the media type and
+ *   the parameters this reader uses as a strict reading of the field gives them.
  */
 function readsOneWay(node, required) {
   const text = node.headerText;
@@ -232,8 +239,9 @@ function readsOneWay(node, required) {
   if (named[0].slice(0, colon).trim().toLowerCase() !== 'content-type') return false;
   const strict = strictContentType(named[0].slice(colon + 1));
   // strictContentType takes no 8-bit byte into a media type.
-  return !!strict && strict.type === node.type
-    && ['boundary', 'protocol', 'smime-type'].every((k) => strict.params[k] === node.params[k] && !/[^\x00-\x7f]/.test(strict.params[k] ?? ''));
+  if (!strict || strict.type !== node.type) return false;
+  if (strict.type.startsWith('multipart/') && !plainBoundary(strict.written.boundary)) return false;
+  return ['boundary', 'protocol', 'smime-type'].every((k) => strict.params[k] === node.params[k] && !/[^\x00-\x7f]/.test(strict.params[k] ?? ''));
 }
 
 // A header value split at each ';' outside quoted strings, or null when a quote is left open.
@@ -260,7 +268,8 @@ function splitParams(value) {
 }
 
 // A Content-Type value read by the rules: ';' only outside quoted strings, a media type
-// of two tokens, and each parameter name once.
+// of two tokens, and each parameter name once. `written` holds each value as it stands,
+// quotes and all.
 function strictContentType(value) {
   const parts = splitParams(value);
   if (!parts) return null;
@@ -268,6 +277,7 @@ function strictContentType(value) {
   const type = parts[0].trim().toLowerCase();
   if (!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(type)) return null;
   const params = {};
+  const written = {};
   const counts = new Map();
   const sections = new Map();
   for (const part of parts.slice(1)) {
@@ -293,10 +303,32 @@ function strictContentType(value) {
     counts.set(base, count);
     if (name === base) {
       const v = part.slice(eq + 1).trim();
+      written[base] = v;
       params[base] = v.length > 1 && v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v;
     }
   }
-  return { type, params };
+  return { type, params, written };
+}
+
+// RFC 2046 boundary characters: digits, letters and '()+_,-./:=? and the blank; 1 to 70 of
+// them, the last no blank.
+const BOUNDARY = /^[0-9A-Za-z'()+_,\-./:=? ]{0,69}[0-9A-Za-z'()+_,\-./:=?]$/;
+
+/**
+ * Whether a boundary parameter, as written, means the same string to every parser: a bare
+ * token, or a quoted string with nothing before or after the quotes, of RFC 2046 boundary
+ * characters. mail-parser, which Stalwart uses, undoes a backslash (quoted pair), drops a
+ * comment in parentheses outside the quotes and whatever follows the closing quote, and
+ * decodes an RFC 2047 encoded word (=?...?=) even inside the quotes, before it looks for
+ * the boundary in the body; this reader keeps the value as written. So none of those may
+ * occur: no backslash (not a boundary character), no =? anywhere, and parentheses and
+ * blanks only inside the quotes, where mail-parser reads them as written.
+ */
+function plainBoundary(written) {
+  if (written === undefined) return false;
+  const quoted = written.length > 1 && written.startsWith('"') && written.endsWith('"');
+  const value = quoted ? written.slice(1, -1) : written;
+  return BOUNDARY.test(value) && !value.includes('=?') && (quoted || !/[() ]/.test(value));
 }
 
 function latin1Bytes(s) {
