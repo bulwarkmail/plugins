@@ -223,7 +223,7 @@ describe('where the boundary may appear in a signed mail', () => {
     const invite = (summary) => 'Content-Type: multipart/alternative; boundary="M"\r\n\r\n'
       + '--M\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nSee the invitation.\r\n'
       + `--M\r\nContent-Type: text/calendar; method=REQUEST; charset=utf-8\r\n\r\nBEGIN:VCALENDAR\r\nMETHOD:REQUEST\r\nBEGIN:VEVENT\r\nUID:7@victim.example\r\nSUMMARY:${summary}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n--M--`;
-    const raw = `${head}${senderStructure('x', `${invite('Payment approval')}\r\n`)}${await signedOver(invite('Quarterly review'))}`;
+    const raw = `${head}${senderStructure('x', `${invite('Payment approval')}\r\n`)}${await signedOver(invite('Quarterly planning'))}`;
     const o = await open(raw, {
       bodyStructure: { partId: '0', type: 'multipart/signed', subParts: [
         { partId: '1', type: 'multipart/alternative', subParts: [{ partId: '2', type: 'text/plain', size: 19 }, { partId: '3', type: 'text/calendar', size: 120 }] }, signature('4')] },
