@@ -165,7 +165,10 @@ ask the model for them: moving a message to the trash or junk folder,
 moving or archiving any message other than the one you have open (in the
 composer, every message), adding a contact whose address you didn't type
 in the chat and that isn't the sender or a recipient of the open
-message, and opening a new message to such an address.
+message, and opening a new message to such an address. Only what you type
+into the chat counts as typed: not a subject or a sender's name, a passage
+you highlighted, a quick action or a saved prompt. A Reply-To address
+counts only when it is also the sender or a recipient.
 
 Actions are off until a user turns them on. The administrator decides
 how far users may go (off, ask first, or automatic) in the plugin's
