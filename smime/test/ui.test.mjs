@@ -202,10 +202,13 @@ describe('trusted issuers and certificates', () => {
       }),
     };
   };
-  const pickFile = async (label, text) => {
+  // The import reads and checks the file asynchronously and ends with a toast either way;
+  // assertions before that toast would race it (they lost on Linux).
+  const pickFile = async (api, label, text) => {
     const input = screen.getByLabelText(label);
     Object.defineProperty(input, 'files', { value: [{ name: 'ca.pem', arrayBuffer: async () => new TextEncoder().encode(text).buffer }], configurable: true });
     await act(async () => { fireEvent.change(input); });
+    await waitFor(() => expect(api.calls('toast.success').length + api.calls('toast.error').length).toBeGreaterThan(0));
   };
 
   it('imports a certificate authority from a PEM file as a trusted issuer', async () => {
@@ -214,7 +217,7 @@ describe('trusted issuers and certificates', () => {
     const { d, saved } = certDeps();
     const { SettingsSection } = makeUi(api, d);
     await act(async () => { render(React.createElement(SettingsSection)); });
-    await pickFile('Issuer certificate file', pem(ca.der));
+    await pickFile(api, 'Issuer certificate file', pem(ca.der));
     expect(saved).toEqual([expect.objectContaining({ kind: 'issuer', subject: 'CN=Example Corp Mail CA' })]);
     expect(new Uint8Array(saved[0].certificate)).toEqual(ca.der);
     expect(api.calls('toast.success')[0].args[0]).toBe('Trusted issuer added: Example Corp Mail CA');
@@ -227,7 +230,7 @@ describe('trusted issuers and certificates', () => {
     const { d, saved } = certDeps();
     const { SettingsSection } = makeUi(api, d);
     await act(async () => { render(React.createElement(SettingsSection)); });
-    await pickFile('Issuer certificate file', pem(leaf.der));
+    await pickFile(api, 'Issuer certificate file', pem(leaf.der));
     expect(saved).toEqual([]);
     expect(api.calls('toast.error')[0].args[0]).toMatch(/^Couldn’t add the issuer: This certificate can’t issue certificates/);
   });
@@ -238,7 +241,7 @@ describe('trusted issuers and certificates', () => {
     const { d, saved } = certDeps();
     const { SettingsSection } = makeUi(api, d);
     await act(async () => { render(React.createElement(SettingsSection)); });
-    await pickFile('Issuer certificate file', pem(ca.der));
+    await pickFile(api, 'Issuer certificate file', pem(ca.der));
     expect(saved).toEqual([]);
     expect(api.calls('toast.error')[0].args[0]).toMatch(/^Couldn’t add the issuer: This certificate authority limits which addresses it may vouch for \(name constraints\)/);
   });
