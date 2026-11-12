@@ -244,6 +244,20 @@ export async function saveChoice(email, fingerprint, among) {
   await putOwned(db, CHOICES_STORE, { id, email: String(email).toLowerCase(), fingerprint, among, at: Date.now() });
 }
 
+// { id, accountId, email, fingerprint, accepted, at }: the user's answer, for one address
+// and one certificate, on using a certificate that doesn't name that address.
+
+export async function getAddressAnswer(email, fingerprint) {
+  const db = await openTrustDB();
+  return getOwned(db, CHOICES_STORE, `${await choiceId(email)}\n${String(fingerprint).toLowerCase()}`);
+}
+
+export async function saveAddressAnswer(email, fingerprint, accepted) {
+  const db = await openTrustDB();
+  const id = `${await choiceId(email)}\n${String(fingerprint).toLowerCase()}`;
+  await putOwned(db, CHOICES_STORE, { id, email: String(email).toLowerCase(), fingerprint, accepted, at: Date.now() });
+}
+
 // ── Session (unlocked) key CRUD ─────────────────────────────────────
 // Each entry: { id, format, usedAt, signingKey, decryptionKey?, sealedPkcs8? }
 // sealedPkcs8 is { key, iv, data }, set for RSA keys (session-keys.js).

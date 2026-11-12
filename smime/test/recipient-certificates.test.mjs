@@ -325,3 +325,71 @@ describe('encrypting to oneself', () => {
     expect(recipientsOf(sent[0])).toEqual([]);
   });
 });
+
+describe('a stored certificate that does not name the recipient', () => {
+  // Stored for Bob, but it names Carol only (as a shared store an older version left may hold one).
+  let carols;
+  beforeAll(async () => { carols = await makeLeaf(null, { cn: 'Carol', emails: [CAROL] }); });
+
+  it('imported by hand: the user is asked once, with the addresses it names, and the answer is kept', async () => {
+    await store(carols, BOB, 'manual');
+    const first = plugin({ answers: [true] });
+    await expect(encryptTo(first.hooks, BOB)).resolves.toBe(false);
+    expect(first.confirms).toHaveLength(1);
+    expect(first.confirms[0].message).toContain(`This certificate was imported for ${BOB}, but it names other addresses: ${CAROL}.`);
+    expect(first.confirms[0].message).toContain(await computeFingerprint(carols.der));
+    expect(recipientsOf(first.sent[0])).toEqual([serialOf(carols)]);
+
+    const again = plugin();
+    await expect(encryptTo(again.hooks, BOB)).resolves.toBe(false);
+    expect(again.confirms).toEqual([]);
+  });
+
+  it('imported by hand and refused: nothing is sent, now or later, and nobody asks again', async () => {
+    await store(carols, BOB, 'manual');
+    const first = plugin({ answers: [false] });
+    await expect(encryptTo(first.hooks, BOB)).resolves.toEqual(ABORT);
+    expect(first.sent).toHaveLength(0);
+    expect(first.api.calls('toast.error').at(-1).args[0]).toBe(en['send.noUsableCertificate'].replace('{emails}', BOB));
+    const again = plugin({ answers: [true] });
+    await expect(encryptTo(again.hooks, BOB)).resolves.toEqual(ABORT);
+    expect(again.confirms).toEqual([]);
+  });
+
+  it('imported by hand and refused: a certificate that names the recipient is still used', async () => {
+    await store(carols, BOB, 'manual');
+    await store(imported, BOB, 'manual');
+    const { hooks, sent, confirms } = plugin({ answers: [false, true] });
+    await expect(encryptTo(hooks, BOB)).resolves.toBe(false);
+    expect(confirms[0].message).toContain('names other addresses');
+    expect(recipientsOf(sent[0])).toEqual([serialOf(imported)]);
+  });
+
+  it('asks again for another address', async () => {
+    await store(carols, BOB, 'manual');
+    await store(carols, 'dan@example.org', 'manual');
+    const p = plugin({ answers: [true, true] });
+    await expect(encryptTo(p.hooks, BOB)).resolves.toBe(false);
+    await expect(encryptTo(p.hooks, 'dan@example.org')).resolves.toBe(false);
+    expect(p.confirms).toHaveLength(2);
+  });
+
+  it('from a signed message: never used, and nobody is asked', async () => {
+    await trustCa();
+    const carolUnderCa = await makeLeaf(ca, { cn: 'Carol', emails: [CAROL] });
+    await store(carolUnderCa, BOB, 'signed-email');
+    const { hooks, sent, confirms } = plugin({ answers: [true] });
+    await expect(encryptTo(hooks, BOB)).resolves.toEqual(ABORT);
+    expect(sent).toHaveLength(0);
+    expect(confirms).toEqual([]);
+  });
+
+  it('names the recipient among several addresses: used without a question (control)', async () => {
+    const both = await makeLeaf(null, { cn: 'Bob', emails: [CAROL, BOB] });
+    await store(both, BOB, 'manual');
+    const { hooks, sent, confirms } = plugin();
+    await expect(encryptTo(hooks, BOB)).resolves.toBe(false);
+    expect(confirms).toEqual([]);
+    expect(recipientsOf(sent[0])).toEqual([serialOf(both)]);
+  });
+});

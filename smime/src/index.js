@@ -36,7 +36,7 @@ import { parseMime, extractDetachedSigned, opaqueBody } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
 import {
   parseCertificatePemOrDer, parseCertificateDer, extractCertificateInfo, computeFingerprint, issuerCapabilities,
-  pemCertificates, classifyCapabilities, rdnToString,
+  pemCertificates, classifyCapabilities, rdnToString, certificateAddresses,
 } from './certificate-utils.js';
 import { makeTrust, vouchedFor } from './trust.js';
 import { generateUUID } from './util.js';
@@ -50,7 +50,7 @@ import {
   saveKeyRecord, listKeyRecords, deleteKeyRecord,
   savePublicCert, listPublicCerts, deletePublicCert,
   saveSessionKeys, getSessionKeys, deleteSessionKeys, clearSessionKeys, markSessionKeysUsed, lockIdleSessionKeys,
-  saveTrusted, listTrusted, deleteTrusted, getChoice, saveChoice, setAccountResolver,
+  saveTrusted, listTrusted, deleteTrusted, getChoice, saveChoice, setAccountResolver, getAddressAnswer, saveAddressAnswer,
 } from './key-storage.js';
 import { unlockedDecryptMaps, forgetRebuiltKeys } from './session-keys.js';
 import { certValidNow, createOsKeys, keystoreCode, keystoreStops, senderKeys } from './os-keys.js';
@@ -352,9 +352,11 @@ async function withSigningKey(records, sign) {
 
 /**
  * A stored recipient certificate as the send path needs it: parsed, with its
- * fingerprint, and whether it may be used today (in its dates, may encrypt and, when it
- * came from a signed message, a trusted issuer or a certificate the user trusts vouches
- * for it now). Null when it doesn't parse.
+ * fingerprint, and whether it may be used today: in its dates, may encrypt, names the
+ * record's address among all its addresses, and, when it came from a signed message, a
+ * trusted issuer or a certificate the user trusts vouches for it now. A certificate the
+ * user imported that names other addresses only is usable after the user agreed for this
+ * address (`mismatch`). Null when it doesn't parse.
  */
 async function describeRecipientCert(record, trust) {
   try {
@@ -367,12 +369,17 @@ async function describeRecipientCert(record, trust) {
       const pool = (record.chain || []).map((der) => { try { return parseCertificateDer(der); } catch { return null; } }).filter(Boolean);
       vouched = !!(await vouchedFor(cert, { fingerprint, pool, trust, now })).via;
     }
+    const addresses = certificateAddresses(cert);
+    const named = addresses.includes(String(record.email || '').toLowerCase());
     return {
       record,
       fingerprint,
+      addresses,
+      mismatch: !named,
       issuer: rdnToString(cert.issuer),
       notAfter: cert.notAfter.value.toISOString(),
-      usable: inDates && classifyCapabilities(cert).canEncrypt && vouched,
+      usable: inDates && classifyCapabilities(cert).canEncrypt && vouched
+        && (named || (!fromSignedMail(record) && addresses.length > 0)),
       vouched,
     };
   } catch {
@@ -449,11 +456,19 @@ async function recipientCertsFor(emails, ownAddresses) {
     if (ownAddresses.has(email)) continue;
     const stored = certs.filter((c) => String(c.email || '').toLowerCase() === email);
     if (stored.length === 0) { missing.push(email); continue; }
-    const usable = (await Promise.all(stored.map((c) => describeRecipientCert(c, trust)))).filter((d) => d && d.usable);
+    const usable = [];
+    for (const d of await Promise.all(stored.map((c) => describeRecipientCert(c, trust)))) {
+      if (!d || !d.usable) continue;
+      if (d.mismatch) {
+        // The user answered for this address and certificate before.
+        const answer = await getAddressAnswer(email, d.fingerprint).catch(() => null);
+        if (answer && answer.accepted === false) continue;
+        if (answer && answer.accepted === true) d.mismatch = false;
+      }
+      usable.push(d);
+    }
     if (usable.length === 0) { unusable.push(email); continue; }
-    // A certificate the user imported always comes before one from a signed message.
-    const imported = usable.filter((d) => !fromSignedMail(d.record));
-    pending.push([email, imported.length ? imported : usable]);
+    pending.push([email, usable]);
   }
   if (missing.length > 0) {
     host.toast.error(t('send.missingCertificates', { emails: missing.join(', ') }));
@@ -464,8 +479,29 @@ async function recipientCertsFor(emails, ownAddresses) {
     return null;
   }
   const found = [];
-  for (const [email, candidates] of pending) {
-    const picked = await pickRecipientCert(email, candidates);
+  for (const [email, usable] of pending) {
+    // A certificate imported for this address that names other addresses only: the user
+    // says once, seeing the addresses it names, whether it may be used for this one.
+    const agreed = [];
+    for (const d of usable) {
+      if (d.mismatch) {
+        const yes = await host.ui.confirm({
+          title: t('send.chooseTitle', { email }),
+          message: `${t('send.addressMismatch', { email, addresses: d.addresses.join(', ') })}\n\n${certDetails(d)}`,
+          confirmLabel: t('send.chooseConfirm'),
+        });
+        await saveAddressAnswer(email, d.fingerprint, !!yes).catch((err) => host.log.warn('saving the certificate answer failed', err));
+        if (!yes) continue;
+      }
+      agreed.push(d);
+    }
+    if (agreed.length === 0) {
+      host.toast.error(t('send.noUsableCertificate', { emails: email }));
+      return null;
+    }
+    // A certificate the user imported always comes before one from a signed message.
+    const imported = agreed.filter((d) => !fromSignedMail(d.record));
+    const picked = await pickRecipientCert(email, imported.length ? imported : agreed);
     if (!picked) {
       host.toast.error(t('send.notChosen', { email }));
       return null;

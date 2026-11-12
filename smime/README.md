@@ -47,7 +47,10 @@ material ever leaves the device.
   certificate the user imported comes before one from a signed message, and an
   expired one, one that may not encrypt, or one from a signed message that no
   trusted issuer or trusted certificate vouches for today is not used: the send
-  stops and names the recipient. With more than one candidate, or the first time
+  stops and names the recipient. A certificate counts only for an address it
+  names (any of its addresses); one the user imported for an address it doesn't
+  name is used only after the user agrees once, seeing the addresses it does
+  name. With more than one candidate, or the first time
   a certificate from a signed message is used, the user chooses, with issuer,
   fingerprint, validity and source shown; the answer is kept per address until
   another candidate turns up. Certificates versions 1.0 to 1.5 stored from

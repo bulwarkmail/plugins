@@ -178,6 +178,11 @@ function extractEmailAddresses(cert) {
   return emails;
 }
 
+/** Every address the certificate names (subject and alternative names), in lower case, once each. */
+export function certificateAddresses(cert) {
+  return [...new Set(extractEmailAddresses(cert).map((e) => String(e).toLowerCase()))];
+}
+
 /**
  * Whether the certificate may issue certificates: basicConstraints with cA, keyCertSign
  * when a keyUsage extension is there, and no name constraints extension, critical or
