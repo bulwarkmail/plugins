@@ -695,11 +695,17 @@ describe('integrity of what was decrypted', () => {
     expect(result.integrity).toBe(integrity);
   });
 
-  it('counts AES-GCM in EnvelopedData, as this plugin sends it', async () => {
+  // What this plugin sends is AES-CBC in EnvelopedData, the RFC 8551 baseline
+  // every receiving client can open. CBC carries no integrity of its own, so
+  // the banner has to say so; for a signed message the signature answers for
+  // the plaintext. Mail already sent with AES-GCM in EnvelopedData still reads,
+  // and still counts as protected, see the case above.
+  it('reports no integrity of its own for what this plugin sends', async () => {
     const { osKeys, records } = await setup([RSA]);
     const blob = await smimeEncrypt(new TextEncoder().encode(PLAINTEXT), [], records[0].certificate);
     const result = await smimeDecrypt({ cmsBytes: await blob.arrayBuffer(), ...osKeys.addDecryptKeys(emptyMaps(), records) });
-    expect(result.integrity).toBe(true);
+    expect(new TextDecoder().decode(result.mimeBytes)).toContain(PLAINTEXT);
+    expect(result.integrity).toBe(false);
   });
 });
 

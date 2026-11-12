@@ -179,7 +179,9 @@ function ensureLiner() {
       typeof liner.nativeCrypto?.getRandomValues !== 'function' &&
       typeof globalThis.crypto?.subtle !== 'undefined'
     ) {
-      liner.setCrypto(globalThis.crypto.subtle);
+      // setCrypto takes the Crypto object and reads .subtle off it itself;
+      // handing it subtle leaves liner without getRandomValues.
+      liner.setCrypto(globalThis.crypto);
     }
     linerCryptoInstance = new liner.Crypto();
   }

@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Fixed
+- Encrypted mail can be opened by other mail programs again: the message body is encrypted with AES-CBC and the content key is wrapped with RSAES-PKCS1-v1_5, the pairing S/MIME requires. Until now both were chosen in a combination that stopped most clients at the cipher, and they reported it as a missing recipient
 - A detached signature stays valid when a mail server or list rewrites the message's MIME framing: the signed part now ends with a line break of its own
 
 ## 1.5.0 (2026-11-07)
