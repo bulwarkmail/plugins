@@ -165,6 +165,7 @@ describe('S/MIME in another language', () => {
     [{ isEncrypted: true, decryptionSuccess: true }, '‹banner.encryption›', '‹banner.decrypted›'],
     [{ isEncrypted: true, decryptionError: 'locked' }, '‹banner.encryption›', '‹banner.locked›'],
     [{ isEncrypted: true, decryptionError: 'no key' }, '‹banner.encryption›', '‹banner.undecryptable›'],
+    [{ isEncrypted: true, decryptionError: 'damaged' }, '‹banner.encryption›', '‹banner.encryptedDamaged›'],
     [{ isEncrypted: true }, '‹banner.encryption›', '‹banner.encrypted›'],
     [{ isSigned: true }, '‹banner.signature›', '‹banner.signed›'],
     [{ isSigned: true, signatureValid: true }, '‹banner.signature›', '‹banner.valid›'],

@@ -143,6 +143,8 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
     else if (status.decryptionError === 'os-ask') rows.push({ icon: 'lock', eyebrow, text: t('banner.osAsk'), tone: 'info', action: 'retry', actionLabel: 'banner.openWithSystem' });
     else if (OS_DECRYPT_BANNERS[status.decryptionError]) rows.push({ icon: 'lock', eyebrow, text: t(OS_DECRYPT_BANNERS[status.decryptionError]), tone: 'warning', action: 'retry' });
     else if (status.decryptionError === 'os-list-denied') rows.push({ icon: 'lock', eyebrow, text: t('banner.osListDenied'), tone: 'warning' });
+    // Not opened because its structure can't be relied on: no key would have helped.
+    else if (status.decryptionError === 'damaged') rows.push({ icon: 'lock', eyebrow, text: t('banner.encryptedDamaged'), tone: 'destructive' });
     else if (status.decryptionError) {
       // As smime-decrypt.js UnsupportedAlgorithmError words it.
       const algorithm = String(status.decryptionError).match(/^Unsupported encryption algorithm (.+)$/)?.[1];

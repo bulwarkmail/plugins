@@ -580,7 +580,10 @@ async function renderEncrypted(body, ctx, loadCms, fromEmail, started, asked) {
     der = await loadCms();
   } catch (err) {
     host.log.error('onRenderEmailBody failed', err);
-    await persistVerifyStatus(ctx.id, { isEncrypted: true, decryptionSuccess: false, decryptionError: err && err.message ? err.message : String(err) });
+    // A message whose structure can't be relied on is not opened, and the banner says it is
+    // damaged rather than sending the reader to look for a key that fits.
+    const decryptionError = err instanceof MalformedMessageError ? 'damaged' : err && err.message ? err.message : String(err);
+    await persistVerifyStatus(ctx.id, { isEncrypted: true, decryptionSuccess: false, decryptionError });
     return { result: undefined, keep: false }; // fall back to host rendering on unexpected failure
   }
 
