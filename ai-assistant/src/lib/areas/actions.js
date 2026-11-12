@@ -420,9 +420,11 @@ const updateEvent = {
       if (event.duration) before.duration = event.duration;
       if (!wasAllDay && event.timeZone) before.timeZone = event.timeZone;
     }
-    // A description other people read (the event has other participants)
-    // is the user's words to them: that always asks first.
-    const others = 'description' in patch ? await hasOtherPeople(api, event) : false;
+    // An event other people take part in always asks first, whichever field
+    // changes: they read its title, place and description, and a new time
+    // moves the meeting in their calendars. An event of the user alone
+    // follows the mode.
+    const others = await hasOtherPeople(api, event);
     return { summary, plan: { id: event.id, title: patch.title ?? event.title ?? '', patch, before }, alwaysAsk: others };
   },
   async perform(api, plan) {

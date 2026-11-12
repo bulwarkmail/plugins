@@ -87,7 +87,7 @@
   "do.settings.invitations": "Odpovedať na pozvania",
   "do.settings.invitations_hint": "Vždy sa najprv opýta. Vaša odpoveď ide organizátorovi.",
   "do.settings.events": "Meniť a odstraňovať udalosti",
-  "do.settings.events_hint": "Pred odstránením sa vždy opýta. Nikdy nemení, kto je pozvaný.",
+  "do.settings.events_hint": "Pred odstránením a pred zmenou udalosti, na ktorej sa zúčastňujú ďalší ľudia, sa vždy opýta. Nikdy nemení, kto je pozvaný.",
   "do.settings.tags": "Označovať správy štítkami",
   "do.settings.tags_hint": "Pridáva a odoberá vaše štítky.",
   "do.settings.vacation": "Odpoveď v neprítomnosti",

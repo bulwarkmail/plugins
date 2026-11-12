@@ -87,7 +87,7 @@
   "do.settings.invitations": "Responder invitaciones",
   "do.settings.invitations_hint": "Siempre pregunta antes. Tu respuesta va al organizador.",
   "do.settings.events": "Cambiar y borrar eventos",
-  "do.settings.events_hint": "Siempre pregunta antes de borrar. Nunca cambia a quién se invita.",
+  "do.settings.events_hint": "Siempre pregunta antes de borrar y antes de cambiar un evento en el que participan otras personas. Nunca cambia a quién se invita.",
   "do.settings.tags": "Etiquetar mensajes",
   "do.settings.tags_hint": "Añade y quita tus etiquetas.",
   "do.settings.vacation": "Respuesta de ausencia",

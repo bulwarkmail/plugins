@@ -87,7 +87,7 @@
   "do.settings.invitations": "招待への回答",
   "do.settings.invitations_hint": "必ず先に確認します。回答は主催者に送信されます。",
   "do.settings.events": "予定の変更と削除",
-  "do.settings.events_hint": "削除の前には必ず確認します。招待する人は変更しません。",
+  "do.settings.events_hint": "削除の前と、ほかの人が参加する予定を変更する前には必ず確認します。招待する人は変更しません。",
   "do.settings.tags": "メッセージへのタグ付け",
   "do.settings.tags_hint": "タグを付けたり外したりします。",
   "do.settings.vacation": "不在通知",

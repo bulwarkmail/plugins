@@ -87,7 +87,7 @@
   "do.settings.invitations": "Uitnodigingen beantwoorden",
   "do.settings.invitations_hint": "Vraagt altijd eerst. Uw antwoord gaat naar de organisator.",
   "do.settings.events": "Afspraken wijzigen en verwijderen",
-  "do.settings.events_hint": "Vraagt altijd eerst voor het verwijderen. Wijzigt nooit wie er is uitgenodigd.",
+  "do.settings.events_hint": "Vraagt altijd eerst voor het verwijderen en voor het wijzigen van een afspraak waaraan anderen deelnemen. Wijzigt nooit wie er is uitgenodigd.",
   "do.settings.tags": "Berichten taggen",
   "do.settings.tags_hint": "Voegt uw tags toe en verwijdert ze.",
   "do.settings.vacation": "Afwezigheidsbericht",

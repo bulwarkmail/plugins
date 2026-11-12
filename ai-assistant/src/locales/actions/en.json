@@ -87,7 +87,7 @@
   "do.settings.invitations": "Answer invitations",
   "do.settings.invitations_hint": "Always asks first. Your answer goes to the organiser.",
   "do.settings.events": "Change and delete events",
-  "do.settings.events_hint": "Deleting always asks first. It never changes who is invited.",
+  "do.settings.events_hint": "Deleting an event, and changing one that other people take part in, always asks first. It never changes who is invited.",
   "do.settings.tags": "Tag messages",
   "do.settings.tags_hint": "Adds and removes your tags.",
   "do.settings.vacation": "Out-of-office reply",
