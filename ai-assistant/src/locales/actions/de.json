@@ -87,7 +87,7 @@
   "do.settings.invitations": "Auf Einladungen antworten",
   "do.settings.invitations_hint": "Fragt immer zuerst. Ihre Antwort geht an den Organisator.",
   "do.settings.events": "Termine ändern und löschen",
-  "do.settings.events_hint": "Fragt vor dem Löschen und vor dem Ändern eines Termins mit weiteren Teilnehmern immer zuerst. Ändert nie, wer eingeladen ist.",
+  "do.settings.events_hint": "Fragt vor dem Löschen eines Termins immer zuerst, ebenso vor dem Ändern eines Termins mit weiteren Teilnehmern, in einem Kalender, den jemand mit Ihnen teilt, oder zu dem Sie eingeladen wurden. Ändert nie, wer eingeladen ist.",
   "do.settings.tags": "Nachrichten mit Tags versehen",
   "do.settings.tags_hint": "Fügt Ihre Tags hinzu und entfernt sie.",
   "do.settings.vacation": "Abwesenheitsnotiz",

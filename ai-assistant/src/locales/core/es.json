@@ -227,6 +227,8 @@
   "action.create_contact": "Añadir {who} a tus contactos",
   "action.draft_reply": "Abrir una respuesta a «{subject}» con el borrador",
   "action.draft_reply_all": "Abrir una respuesta a todos a «{subject}» con el borrador",
+  "action.reply_to": "La respuesta va a {to}",
+  "action.reply_to_unknown": "Este mensaje no muestra adónde iría una respuesta",
   "action.draft_email": "Abrir un mensaje nuevo para {to}: «{subject}»",
   "action.approve": "Hacerlo",
   "action.skip": "Omitir",

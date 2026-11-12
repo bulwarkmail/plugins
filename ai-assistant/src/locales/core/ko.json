@@ -227,6 +227,8 @@
   "action.create_contact": "{who}을(를) 연락처에 추가",
   "action.draft_reply": "초안으로 \"{subject}\"에 대한 답장 열기",
   "action.draft_reply_all": "초안으로 \"{subject}\"에 대한 전체 답장 열기",
+  "action.reply_to": "답장 받는 사람: {to}",
+  "action.reply_to_unknown": "이 메시지에서는 답장이 어디로 갈지 알 수 없습니다",
   "action.draft_email": "{to}에게 새 메시지 열기: \"{subject}\"",
   "action.approve": "실행",
   "action.skip": "건너뛰기",

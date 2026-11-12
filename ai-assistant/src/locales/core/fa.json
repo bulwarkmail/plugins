@@ -227,6 +227,8 @@
   "action.create_contact": "افزودن {who} به مخاطبین",
   "action.draft_reply": "باز کردن پاسخ به «{subject}» با پیش‌نویس",
   "action.draft_reply_all": "باز کردن پاسخ به همه برای «{subject}» با پیش‌نویس",
+  "action.reply_to": "پاسخ به {to} می‌رود",
+  "action.reply_to_unknown": "این پیام نشان نمی‌دهد پاسخ به کجا می‌رود",
   "action.draft_email": "باز کردن پیام جدید به {to}: «{subject}»",
   "action.approve": "انجام بده",
   "action.skip": "رد کردن",

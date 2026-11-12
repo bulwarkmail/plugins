@@ -227,6 +227,8 @@
   "action.create_contact": "Додати {who} до контактів",
   "action.draft_reply": "Відкрити відповідь на «{subject}» з чернеткою",
   "action.draft_reply_all": "Відкрити відповідь усім на «{subject}» з чернеткою",
+  "action.reply_to": "Відповідь піде на {to}",
+  "action.reply_to_unknown": "З цього листа не видно, куди піде відповідь",
   "action.draft_email": "Відкрити новий лист до {to}: «{subject}»",
   "action.approve": "Виконати",
   "action.skip": "Пропустити",

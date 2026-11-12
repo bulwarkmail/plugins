@@ -227,6 +227,8 @@
   "action.create_contact": "{who} を連絡先に追加",
   "action.draft_reply": "下書きを入れて「{subject}」への返信を開く",
   "action.draft_reply_all": "下書きを入れて「{subject}」への全員に返信を開く",
+  "action.reply_to": "返信の宛先: {to}",
+  "action.reply_to_unknown": "このメッセージからは返信の宛先がわかりません",
   "action.draft_email": "{to} 宛ての新規メッセージを開く: 「{subject}」",
   "action.approve": "実行",
   "action.skip": "スキップ",

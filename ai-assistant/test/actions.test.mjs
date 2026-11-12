@@ -153,7 +153,9 @@ describe('carrying out and taking back', () => {
   it('opens a reply or a new message in the composer and sends nothing', async () => {
     const api = apiWith({ 'compose.reply': async () => true, 'compose.open': async () => 'opened' });
     const reply = await describeAction(api, 'draft_reply', { text: 'Thanks, paid.', all: true }, { openEmailId: 'M1' });
-    expect(reply.summary).toBe('Open a reply to all for “Invoice 42” with the drafted text');
+    // This message view has no headers, so where the reply goes can't be told: the card says so and asks.
+    expect(reply.summary).toBe('Open a reply to all for “Invoice 42” with the drafted text\nThis message doesn\'t show where a reply would go');
+    expect(reply.alwaysAsk).toBe(true);
     const done = await performAction(api, reply.plan);
     expect(done.undo).toBeNull();
     expect(api.calls('compose.reply')[0].args).toEqual(['M1', { text: 'Thanks, paid.', all: true }]);

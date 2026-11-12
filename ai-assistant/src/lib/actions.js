@@ -11,25 +11,92 @@
 //
 // Most of them follow the user's mode. These always ask first, since the
 // user would hardly notice them otherwise and the model may act on what a
-// message it reads says: a move to Trash or Junk, moving or archiving any
-// message other than the open one, and a new contact or a new message whose
-// address the user didn't name.
+// message it reads says: a move to Trash or Junk or out of Junk, moving or
+// archiving any message other than the open one, and a new contact, a new
+// message or a reply whose address the user didn't name.
 
 import { areaAction, areaActions, offered } from './areas/index.js';
 
 const ADDRESS_IN_TEXT = /[^\s@<>"',;()]+@[^\s@<>"',;()]+\.[^\s@<>"',;().]+/g;
 
+/** The addresses the user typed in the chat (ctx.userTyped), lower case. */
+const typedAddresses = (ctx = {}) => (String(ctx.userTyped ?? '').match(ADDRESS_IN_TEXT) ?? []).map((a) => a.toLowerCase());
+
 /** Whether the user named `address`: typed in the chat (ctx.userTyped) or a participant of the open message (ctx.participants). */
 export function knownRecipient(address, ctx = {}) {
   const wanted = String(address ?? '').trim().toLowerCase();
   if (!wanted) return false;
-  const typed = (String(ctx.userTyped ?? '').match(ADDRESS_IN_TEXT) ?? []).map((a) => a.toLowerCase());
   const people = (ctx.participants ?? []).map((a) => String(a).toLowerCase());
-  return typed.includes(wanted) || people.includes(wanted);
+  return typedAddresses(ctx).includes(wanted) || people.includes(wanted);
+}
+
+/** A display name as compared: no surrounding quotes, one space, any case. */
+const plainName = (name) => String(name ?? '').normalize('NFKC').replace(/^["'\s]+|["'\s]+$/g, '').replace(/\s+/g, ' ').toLowerCase();
+
+/**
+ * The Reply-To addresses of a message view: [] without a Reply-To, null when
+ * the view can't tell. The webmail's view carries the raw headers by name
+ * (a Reply-To value may be in several headers and hold several addresses);
+ * a `replyTo` list is read where a view has one.
+ */
+export function replyToOf(email) {
+  if (Array.isArray(email?.replyTo)) return email.replyTo.map((r) => String(typeof r === 'string' ? r : r?.email ?? '').trim()).filter(Boolean);
+  let headers = email?.headers;
+  if (Array.isArray(headers)) headers = Object.fromEntries(headers.filter((h) => h?.name).map((h) => [h.name, h.value]));
+  if (!headers || typeof headers !== 'object') return null;
+  const names = Object.keys(headers).filter((name) => name.toLowerCase() === 'reply-to');
+  if (!names.length) return [];
+  const raw = names.flatMap((name) => [headers[name]].flat()).join(', ');
+  const found = [...new Set(raw.match(ADDRESS_IN_TEXT) ?? [])];
+  return found.length ? found : null;
+}
+
+/** The user's own addresses (identities and accounts), lower case; empty when they can't be read. */
+async function ownAddresses(api) {
+  const safe = async (call) => { try { return (await call()) ?? []; } catch { return []; } };
+  const [identities, accounts] = await Promise.all([safe(() => api.user.getIdentities()), safe(() => api.user.getAccounts())]);
+  return new Set([...identities, ...accounts].map((x) => String(x?.email ?? '').trim().toLowerCase()).filter(Boolean));
+}
+
+/**
+ * Where a reply to `email` goes, as the webmail addresses it: the Reply-To,
+ * else the sender; reply to all adds To and Cc without the user's own
+ * addresses; a reply to the user's own message goes to its recipients.
+ * null when the message view can't tell.
+ */
+async function replyRecipients(api, email, all) {
+  const replyTo = replyToOf(email);
+  if (replyTo === null) return null;
+  const own = await ownAddresses(api);
+  const isOwn = (a) => own.has(a.toLowerCase());
+  const list = (key) => (Array.isArray(email[key]) ? email[key] : []).map((p) => String(p?.email ?? '').trim()).filter(Boolean);
+  const [from, to, cc] = [list('from'), list('to'), list('cc')];
+  let out;
+  if (!replyTo.some((a) => !isOwn(a)) && from[0] && isOwn(from[0]) && to.length) {
+    out = all ? [...to, ...cc] : to;
+  } else {
+    const target = replyTo.length ? replyTo : from.slice(0, 1);
+    out = all ? [...target, ...to.filter((a) => !isOwn(a)), ...cc.filter((a) => !isOwn(a))] : target;
+  }
+  const seen = new Set();
+  return out.filter((a) => !seen.has(a.toLowerCase()) && seen.add(a.toLowerCase()));
 }
 
 /** Folders a move to always asks first: what lands there is out of the user's sight. */
 const ASK_FOLDER_ROLES = new Set(['trash', 'junk']);
+
+/**
+ * Whether `email` is in the junk folder (by role). A move out of it puts a
+ * message back in sight that the server or the user put away, so it asks
+ * first; a message whose folders the view doesn't name counts as in it.
+ */
+function inJunk(email, mailboxes) {
+  const raw = email?.mailboxIds;
+  if (!raw || typeof raw !== 'object') return true;
+  const ids = Array.isArray(raw) ? raw : Object.keys(raw).filter((id) => raw[id]);
+  const junk = new Set((mailboxes ?? []).filter((m) => m?.role === 'junk').map((m) => m.id));
+  return ids.some((id) => junk.has(id));
+}
 
 /** Whether `email` is the message open next to the panel (the composer has none). */
 const isOpenMessage = (email, ctx = {}) => !!ctx.openEmailId && String(email?.id) === String(ctx.openEmailId);
@@ -219,22 +286,27 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
     return { summary, plan: { ...plan, name, area: area.area }, alwaysAsk };
   }
   const t = api.i18n.t;
-  // (archive, move, contacts and draft_email set alwaysAsk where they need
-  // it; the other core actions follow the mode.)
+  // (archive, move, contacts, draft_reply and draft_email set alwaysAsk
+  // where they need it; the other core actions follow the mode.)
   const locale = api.i18n?.getLocale?.() ?? 'en';
   switch (name) {
     case 'archive_message': {
       const email = await messageFor(api, args.id);
-      // Only the open message follows the mode: the user doesn't see another one go.
-      return { summary: t('action.archive', { subject: email.subject || '…' }), plan: { name, email }, alwaysAsk: !isOpenMessage(email, ctx) };
+      // Only the open message follows the mode: the user doesn't see another
+      // one go. Out of the junk folder always asks (also when the folders
+      // can't be read).
+      let fromJunk;
+      try { fromJunk = inJunk(email, (await api.mailboxes.list()) ?? []); } catch { fromJunk = true; }
+      return { summary: t('action.archive', { subject: email.subject || '…' }), plan: { name, email }, alwaysAsk: fromJunk || !isOpenMessage(email, ctx) };
     }
     case 'move_message': {
       const email = await messageFor(api, args.id);
       const mailboxes = (await api.mailboxes.list()) ?? [];
       const folder = findFolder(mailboxes, args.folder);
       if (!folder) throw new Error(`no folder "${text(args.folder, 100)}"; the folders are: ${mailboxes.map((m) => m.name).join(', ')}`);
-      // By the folder's role, whatever it is called ("Spam", "Papierkorb").
-      const alwaysAsk = ASK_FOLDER_ROLES.has(folder.role) || !isOpenMessage(email, ctx);
+      // By the folder's role, whatever it is called ("Spam", "Papierkorb"):
+      // into Trash or Junk, or out of Junk.
+      const alwaysAsk = ASK_FOLDER_ROLES.has(folder.role) || inJunk(email, mailboxes) || !isOpenMessage(email, ctx);
       return { summary: t('action.move', { subject: email.subject || '…', folder: folder.name }), plan: { name, email, folder }, alwaysAsk };
     }
     case 'mark_message': {
@@ -305,7 +377,13 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
       // A contact is where the user's future mail goes: one whose address the
       // user didn't name (typed in the chat, or a participant of the open
       // message) asks first, and so does one without an address to check.
-      const alwaysAsk = !email || !knownRecipient(email, ctx);
+      // A participant's address saved under another name than the message
+      // shows for it (ctx.people) asks too; one the user typed doesn't.
+      let alwaysAsk = !email || !knownRecipient(email, ctx);
+      if (!alwaysAsk && !typedAddresses(ctx).includes(email.toLowerCase())) {
+        const shown = (ctx.people ?? []).filter((p) => String(p?.email ?? '').toLowerCase() === email.toLowerCase()).map((p) => plainName(p.name)).filter(Boolean);
+        if (shown.length && !shown.includes(plainName(fullName))) alwaysAsk = true;
+      }
       return { summary: t('action.create_contact', { who: email ? `${fullName} <${email}>` : fullName }), plan: { name, card }, alwaysAsk };
     }
     case 'draft_reply': {
@@ -314,7 +392,17 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
       const body = text(args.text, 20000);
       if (!body) throw new Error('text is empty');
       const all = args.all === true;
-      return { summary: t(all ? 'action.draft_reply_all' : 'action.draft_reply', { subject: email.subject || '…' }), plan: { name, email, text: body, all } };
+      // The card says where the reply goes. It asks first when that is an
+      // address the message chose (a Reply-To that is neither the sender nor
+      // a recipient) and the user didn't type, or when it can't be told.
+      const recipients = await replyRecipients(api, email, all);
+      const inMessage = ['from', 'to', 'cc'].flatMap((key) => (Array.isArray(email[key]) ? email[key] : []).map((p) => p?.email).filter(Boolean));
+      const known = { ...ctx, participants: [...(ctx.participants ?? []), ...inMessage] };
+      const alwaysAsk = recipients === null || recipients.some((a) => !knownRecipient(a, known));
+      const lines = [t(all ? 'action.draft_reply_all' : 'action.draft_reply', { subject: email.subject || '…' })];
+      if (recipients === null) lines.push(t('action.reply_to_unknown'));
+      else if (recipients.length) lines.push(t('action.reply_to', { to: recipients.join(', ') }));
+      return { summary: lines.join('\n'), plan: { name, email, text: body, all }, alwaysAsk };
     }
     case 'draft_email': {
       const to = (Array.isArray(args.to) ? args.to : String(args.to ?? '').split(/[,;]/)).map((a) => text(a, 200)).filter(Boolean).slice(0, 20);

@@ -87,7 +87,7 @@
   "do.settings.invitations": "答复邀请",
   "do.settings.invitations_hint": "总是先问你。你的答复会发送给组织者。",
   "do.settings.events": "更改和删除日程",
-  "do.settings.events_hint": "删除前，以及更改有其他人参与的日程前，总是先问你。不会更改受邀人员。",
+  "do.settings.events_hint": "删除日程前总是先问你；更改有其他人参与、位于别人与你共享的日历，或你受邀参加的日程前也一样。不会更改受邀人员。",
   "do.settings.tags": "为邮件添加标签",
   "do.settings.tags_hint": "添加和移除你的标签。",
   "do.settings.vacation": "外出自动回复",

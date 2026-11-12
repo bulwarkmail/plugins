@@ -87,7 +87,7 @@
   "do.settings.invitations": "Rispondere agli inviti",
   "do.settings.invitations_hint": "Chiede sempre prima. La tua risposta va all'organizzatore.",
   "do.settings.events": "Modificare ed eliminare eventi",
-  "do.settings.events_hint": "Prima di eliminare un evento, e prima di modificarne uno a cui partecipano altre persone, chiede sempre. Non cambia mai chi è invitato.",
+  "do.settings.events_hint": "Chiede sempre prima di eliminare un evento, e anche prima di modificarne uno a cui partecipano altre persone, che si trova in un calendario che qualcuno ha condiviso con te o a cui hai ricevuto un invito. Non cambia mai chi è invitato.",
   "do.settings.tags": "Aggiungere etichette ai messaggi",
   "do.settings.tags_hint": "Aggiunge e toglie le tue etichette.",
   "do.settings.vacation": "Risposta automatica di assenza",

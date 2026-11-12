@@ -87,7 +87,7 @@
   "do.settings.invitations": "Răspunde la invitații",
   "do.settings.invitations_hint": "Întreabă întotdeauna mai întâi. Răspunsul dvs. ajunge la organizator.",
   "do.settings.events": "Modifică și șterge evenimente",
-  "do.settings.events_hint": "Întreabă întotdeauna înainte de ștergere și înainte de a modifica un eveniment la care participă și alte persoane. Nu schimbă niciodată cine este invitat.",
+  "do.settings.events_hint": "Întreabă întotdeauna înainte de a șterge un eveniment, precum și înainte de a modifica un eveniment la care participă și alte persoane, aflat într-un calendar pe care cineva l-a partajat cu dvs. sau la care ați primit o invitație. Nu schimbă niciodată cine este invitat.",
   "do.settings.tags": "Etichetează mesaje",
   "do.settings.tags_hint": "Adaugă și scoate etichetele dvs.",
   "do.settings.vacation": "Răspuns de absență",

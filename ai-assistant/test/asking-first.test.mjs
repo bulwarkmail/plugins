@@ -199,11 +199,12 @@ describe('a new contact, in automatic mode', () => {
     expect(await outcome(api, 'create_contact', 'contacts.create')).toBe('done');
   });
 
+  // Under the name the message shows for them (the Cc has none): contact-names.test.mjs has the other names.
   it.each([
-    ['the sender', 'billing@shop.example'],
-    ['a recipient on Cc', 'accounts@shop.example'],
-  ])('for %s of the open message is added without a question (control)', async (_who, email) => {
-    const api = makeApi({ turns: [toolCall('create_contact', { name: 'Shop', email })] });
+    ['the sender', 'Billing', 'billing@shop.example'],
+    ['a recipient on Cc', 'Shop', 'accounts@shop.example'],
+  ])('for %s of the open message is added without a question (control)', async (_who, name, email) => {
+    const api = makeApi({ turns: [toolCall('create_contact', { name, email })] });
     await ask(await mount(api), 'Add them to my contacts.');
     expect(await outcome(api, 'create_contact', 'contacts.create')).toBe('done');
   });

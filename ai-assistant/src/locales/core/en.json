@@ -227,6 +227,8 @@
   "action.create_contact": "Add {who} to your contacts",
   "action.draft_reply": "Open a reply to “{subject}” with the drafted text",
   "action.draft_reply_all": "Open a reply to all for “{subject}” with the drafted text",
+  "action.reply_to": "The reply goes to {to}",
+  "action.reply_to_unknown": "This message doesn't show where a reply would go",
   "action.draft_email": "Open a new message to {to}: “{subject}”",
   "action.approve": "Do it",
   "action.skip": "Skip",

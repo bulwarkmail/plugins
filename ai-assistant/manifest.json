@@ -186,7 +186,7 @@
     "allowMoreActions": {
       "type": "boolean",
       "label": "More actions",
-      "description": "Let the assistant answer invitations, change and delete events, tag messages, set the out-of-office reply, create filters and act on many messages at once. Each of these asks the user first.",
+      "description": "Let the assistant answer invitations, change and delete events, tag messages, set the out-of-office reply, create filters, act on many messages at once and change contacts. All of these ask the user first, except tags and changes to events that are the user's alone (nobody else in them, in the user's own calendar).",
       "default": true
     },
     "batchLimit": {

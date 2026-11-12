@@ -87,7 +87,7 @@
   "do.settings.invitations": "Respondre invitacions",
   "do.settings.invitations_hint": "Sempre pregunta abans. La teva resposta va a l'organitzador.",
   "do.settings.events": "Canviar i esborrar esdeveniments",
-  "do.settings.events_hint": "Sempre pregunta abans d'esborrar i abans de canviar un esdeveniment amb altres participants. Mai canvia qui hi està convidat.",
+  "do.settings.events_hint": "Sempre pregunta abans d'esborrar un esdeveniment, i també abans de canviar-ne un amb altres participants, d'un calendari que algú ha compartit amb tu o al qual t'han convidat. Mai canvia qui hi està convidat.",
   "do.settings.tags": "Etiquetar missatges",
   "do.settings.tags_hint": "Afegeix i treu les teves etiquetes.",
   "do.settings.vacation": "Resposta d'absència",

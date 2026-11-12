@@ -2,7 +2,8 @@
 // headings, bullet and numbered lists, quotes, code, bold, italic and links.
 // It builds React elements only (never HTML), so an answer can't inject
 // markup into the frame. Links open in a new tab through the host; a link
-// whose text is not its own address shows the host it leads to next to it.
+// whose text is not its own address, or whose address could mislead, shows
+// the host it leads to next to it.
 
 import { Fragment } from 'react';
 
@@ -104,20 +105,40 @@ export function parseBlocks(text) {
 
 const INLINE_RE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(\b_[^_\n]+_\b)|(~~[^~\n]+~~)|(\[[^\]\n]+\]\((https?:\/\/[^)\s]+)\))|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
 
+/** Characters that change the direction text is shown in; a link's text drops them. */
+const DIRECTION_CONTROLS = /[؜‎‏‪-‮⁦-⁩]/g;
+/** Something in brackets that looks like a host ("(bank.example)"). */
+const BRACKETED_HOST = String.raw`[(\[（［]\s*[^\s()\[\]（）［］]+\.[^\s()\[\]（）［］]+\s*[)\]）］]`;
+const ENDS_IN_HOST = new RegExp(`${BRACKETED_HOST}\\s*$`);
+const STARTS_WITH_HOST = new RegExp(`^\\s*${BRACKETED_HOST}`);
+
 /**
- * The host a link leads to, for showing next to its text; '' when the text
+ * The host a link leads to, for showing next to its text. '' when the text
  * is the link's own address (scheme, case and a closing slash aside), which
- * already says where it goes.
+ * already says where it goes, unless that address could mislead: a user
+ * part before the host ("https://bank.example@other.example/"), a host in
+ * punycode or other than ASCII letters (shown as the browser reads it), or
+ * bracketed text that looks like a host at the end of the link's text or
+ * right after the link (`after`).
  */
-export function linkHost(label, href) {
-  const bare = (value) => String(value ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
-  if (bare(label) === bare(href)) return '';
+export function linkHost(label, href, after = '') {
+  let url;
   try {
-    return new URL(href).host || String(href);
+    url = new URL(href);
   } catch {
     return String(href);
   }
+  const host = url.host || String(href);
+  const bare = (value) => String(value ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  if (bare(label) !== bare(href)) return host;
+  const misleading = url.username !== '' || url.password !== ''
+    || url.hostname.split('.').some((part) => part.startsWith('xn--'))
+    || ENDS_IN_HOST.test(label) || STARTS_WITH_HOST.test(after);
+  return misleading ? host : '';
 }
+
+/** The host next to a link, isolated so text around it can't turn it around. */
+const hostOf = (host) => <>{' '}<bdi dir="ltr" data-link-host style={styles.host}>({host})</bdi></>;
 
 /** Inline Markdown as React nodes. `open(url)` handles links. */
 export function renderInline(text, open, keyBase = 'i') {
@@ -128,21 +149,30 @@ export function renderInline(text, open, keyBase = 'i') {
   for (const m of String(text ?? '').matchAll(INLINE_RE)) {
     if (m.index > last) push(text.slice(last, m.index));
     const [whole, code, bold, bold2, em, em2, strike, link, href, bare] = m;
+    const after = text.slice(m.index + whole.length);
     if (code) push(<code style={styles.code}>{whole.slice(1, -1)}</code>);
     else if (bold || bold2) push(<strong>{renderInline(whole.slice(2, -2), open, `${keyBase}${n}b`)}</strong>);
     else if (em || em2) push(<em>{renderInline(whole.slice(1, -1), open, `${keyBase}${n}e`)}</em>);
     else if (strike) push(<del>{whole.slice(2, -2)}</del>);
     else if (link) {
-      const label = whole.slice(1, whole.indexOf(']('));
-      const host = linkHost(label, href);
+      const label = whole.slice(1, whole.indexOf('](')).replace(DIRECTION_CONTROLS, '');
+      const host = linkHost(label, href, after);
       push(
         <>
           <button type="button" style={styles.link} onClick={() => open?.(href)} title={href}>{label}</button>
-          {host && <>{' '}<span data-link-host style={styles.host}>({host})</span></>}
+          {host && hostOf(host)}
+        </>,
+      );
+    } else if (bare) {
+      const label = bare.replace(DIRECTION_CONTROLS, '');
+      const host = linkHost(label, bare, after);
+      push(
+        <>
+          <button type="button" style={styles.link} onClick={() => open?.(bare)} title={bare}>{label}</button>
+          {host && hostOf(host)}
         </>,
       );
     }
-    else if (bare) push(<button type="button" style={styles.link} onClick={() => open?.(bare)} title={bare}>{bare}</button>);
     last = m.index + whole.length;
   }
   if (last < text.length) push(text.slice(last));

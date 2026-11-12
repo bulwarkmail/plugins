@@ -227,6 +227,8 @@
   "action.create_contact": "Přidat {who} do kontaktů",
   "action.draft_reply": "Otevřít odpověď na „{subject}“ s návrhem",
   "action.draft_reply_all": "Otevřít odpověď všem na „{subject}“ s návrhem",
+  "action.reply_to": "Odpověď půjde na {to}",
+  "action.reply_to_unknown": "Tato zpráva neukazuje, kam by odpověď šla",
   "action.draft_email": "Otevřít novou zprávu pro {to}: „{subject}“",
   "action.approve": "Provést",
   "action.skip": "Přeskočit",

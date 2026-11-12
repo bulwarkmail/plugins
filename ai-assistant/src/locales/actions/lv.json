@@ -87,7 +87,7 @@
   "do.settings.invitations": "Atbildēt uz uzaicinājumiem",
   "do.settings.invitations_hint": "Vienmēr vispirms jautā. Jūsu atbilde aiziet organizatoram.",
   "do.settings.events": "Mainīt un dzēst notikumus",
-  "do.settings.events_hint": "Pirms dzēšanas un pirms tāda notikuma maiņas, kurā piedalās citi, vienmēr jautā. Nekad nemaina uzaicinātos.",
+  "do.settings.events_hint": "Pirms notikuma dzēšanas vienmēr jautā, tāpat pirms tāda notikuma maiņas, kurā piedalās citi, kas ir kalendārā, ko kāds ar jums kopīgoja, vai uz kuru jūs uzaicināja. Nekad nemaina uzaicinātos.",
   "do.settings.tags": "Pievienot ziņām tagus",
   "do.settings.tags_hint": "Pievieno un noņem jūsu tagus.",
   "do.settings.vacation": "Prombūtnes atbilde",

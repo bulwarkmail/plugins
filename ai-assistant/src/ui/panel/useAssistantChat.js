@@ -277,7 +277,9 @@ export function useAssistantChat(props) {
           // counts only as the sender or a recipient: a reply would go there
           // without the user having seen it.
           userTyped: userText,
-          participants: mode === 'reader' && contextEmail ? ['from', 'to', 'cc'].flatMap((k) => (contextEmail[k] ?? []).map((p) => p?.email).filter(Boolean)) : [] };
+          participants: mode === 'reader' && contextEmail ? ['from', 'to', 'cc'].flatMap((k) => (contextEmail[k] ?? []).map((p) => p?.email).filter(Boolean)) : [],
+          // The same people with the names the message shows for them (create_contact).
+          people: mode === 'reader' && contextEmail ? ['from', 'to', 'cc'].flatMap((k) => (contextEmail[k] ?? []).filter((p) => p?.email).map((p) => ({ email: p.email, name: p.name ?? '' }))) : [] };
         const tools = [...toolsFor(ctx), ...actionToolsFor(ctx)];
         let autoActions = 0;
         // Lookups run straight away; an action is shown first, then waits for

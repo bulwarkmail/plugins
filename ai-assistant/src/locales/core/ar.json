@@ -227,6 +227,8 @@
   "action.create_contact": "إضافة {who} إلى جهات الاتصال",
   "action.draft_reply": "فتح رد على \"{subject}\" بالمسودة",
   "action.draft_reply_all": "فتح رد على الكل على \"{subject}\" بالمسودة",
+  "action.reply_to": "يُرسَل الرد إلى {to}",
+  "action.reply_to_unknown": "لا تُظهر هذه الرسالة إلى أين سيذهب الرد",
   "action.draft_email": "فتح رسالة جديدة إلى {to}: \"{subject}\"",
   "action.approve": "نفّذ",
   "action.skip": "تخطَّ",

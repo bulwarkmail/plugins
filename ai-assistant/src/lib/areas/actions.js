@@ -347,6 +347,25 @@ async function ownsEvent(api, event) {
   return (await userAddresses(api)).has(String(owner.email).toLowerCase());
 }
 
+/**
+ * The event is in a calendar of another account: one someone shared with
+ * the user or gave them access to. The webmail's view marks those only by
+ * the "<accountId>:" in front of the event's and the calendar's ids.
+ */
+const inOtherAccount = (event) => event?.isShared === true || String(event?.id ?? '').includes(':') || String(event?.calendarId ?? '').includes(':');
+
+/**
+ * The event is the user's alone: in the user's own calendars, nobody else
+ * listed, and the user its owner when anyone is listed. False whenever the
+ * view can't tell (no participant list, the user's addresses unreadable, no
+ * owner among the people listed).
+ */
+async function ownsAlone(api, event) {
+  if (inOtherAccount(event) || !Array.isArray(event.participants)) return false;
+  if (await hasOtherPeople(api, event)) return false;
+  return ownsEvent(api, event);
+}
+
 const updateEvent = {
   name: 'update_event',
   description: 'Change an event in the user\'s calendar: title, start, end, place, description or all day. Times are the user\'s local time, YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all-day events. It never changes the people invited.',
@@ -420,12 +439,14 @@ const updateEvent = {
       if (event.duration) before.duration = event.duration;
       if (!wasAllDay && event.timeZone) before.timeZone = event.timeZone;
     }
-    // An event other people take part in always asks first, whichever field
-    // changes: they read its title, place and description, and a new time
-    // moves the meeting in their calendars. An event of the user alone
-    // follows the mode.
-    const others = await hasOtherPeople(api, event);
-    return { summary, plan: { id: event.id, title: patch.title ?? event.title ?? '', patch, before }, alwaysAsk: others };
+    // An event that isn't the user's alone always asks first, whichever field
+    // changes: other people take part in it (they read its title, place and
+    // description, and a new time moves the meeting in their calendars), it
+    // is in a calendar someone shared, the user is listed but not as its
+    // owner, or the view can't tell. An event of the user alone follows the
+    // mode.
+    const alwaysAsk = !(await ownsAlone(api, event));
+    return { summary, plan: { id: event.id, title: patch.title ?? event.title ?? '', patch, before }, alwaysAsk };
   },
   async perform(api, plan) {
     await api.calendar.updateEvent(plan.id, plan.patch);
@@ -1028,15 +1049,19 @@ const listOf = (value, max) => (value === undefined ? undefined : (Array.isArray
 
 const digits = (value) => String(value ?? '').replace(/\D/g, '');
 
+/** Addresses in a text, whole (the same pattern as knownRecipient in ../actions.js). */
+const ADDRESS_IN_TEXT = /[^\s@<>"',;()]+@[^\s@<>"',;()]+\.[^\s@<>"',;().]+/g;
+
 /**
  * Whether the user typed this address or number in the chat themselves
- * (ctx.userText). One the model took from a message could send the user's
- * future mail to someone else, so the card points it out.
+ * (ctx.userText). An address counts only whole: "ann@example.org" is not in
+ * "joann@example.org". One the model took from a message could send the
+ * user's future mail to someone else, so the card points it out.
  */
 export function typedByUser(ctx, value) {
   const typed = String(ctx?.userText ?? '');
   if (!typed) return false;
-  if (value.includes('@')) return typed.toLowerCase().includes(value.toLowerCase());
+  if (value.includes('@')) return (typed.match(ADDRESS_IN_TEXT) ?? []).some((a) => a.toLowerCase() === value.toLowerCase());
   const d = digits(value);
   return d.length > 0 && digits(typed).includes(d);
 }

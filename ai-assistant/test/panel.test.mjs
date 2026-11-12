@@ -869,7 +869,8 @@ describe('a failed action', () => {
     let n = 0;
     const api = makeApi({ handlers: {
       'proxy.fetch': async () => streamResponse(n++ === 0 ? [call] : anthropicSse(['It is gone.'])),
-      'email.get': async () => EMAIL,
+      // With its folder, as the webmail's view has it (a message whose folders aren't known asks first).
+      'email.get': async () => ({ ...EMAIL, mailboxIds: ['inbox'] }),
       'email.archive': async () => { throw new Error('email.archive: The tool failed: notFound'); },
     } });
     await api.storage.set('prefs', { actions: 'auto' });

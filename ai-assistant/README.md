@@ -161,14 +161,19 @@ Actions has two modes:
   first anyway.
 
 Some actions ask first in both modes, because text in a message could
-ask the model for them: moving a message to the trash or junk folder,
-moving or archiving any message other than the one you have open (in the
+ask the model for them: moving a message to the trash or junk folder or
+out of the junk folder (also archiving it from there), moving or
+archiving any message other than the one you have open (in the
 composer, every message), adding a contact whose address you didn't type
 in the chat and that isn't the sender or a recipient of the open
 message, and opening a new message to such an address. Only what you type
 into the chat counts as typed: not a subject or a sender's name, a passage
 you highlighted, a quick action or a saved prompt. A Reply-To address
-counts only when it is also the sender or a recipient.
+counts only when it is also the sender or a recipient. A reply card says
+where the reply goes; it asks first when that is such a Reply-To, or when
+the message doesn't show where a reply would go. A contact for the sender
+or a recipient also asks first when it would be saved under another name
+than the one the message shows for that address.
 
 Actions are off until a user turns them on. The administrator decides
 how far users may go (off, ask first, or automatic) in the plugin's
@@ -206,7 +211,9 @@ needs them.
 Answering an invitation, deleting an event, the out-of-office reply,
 filters, many messages at once, settings and contacts **always ask you
 first**, even in automatic mode, and so does any change to an event that
-other people take part in. The card says what will happen
+isn't yours alone: other people take part in it, it is in a calendar
+someone shared with you, or you are listed in it but not as its
+organiser. The card says what will happen
 ("Archive 12 messages?" with the first five subjects, "Change Time
 format: 12-hour → 24-hour?", the filter in plain words). Undo puts things
 back: the event, the filter, the messages, the setting and the contact
@@ -250,7 +257,10 @@ switches the whole group off with **Files**.
 
 Answers come as formatted text (bullet lists, bold, small tables, links
 that open in a new tab). A link whose text isn't its own address shows the
-site it leads to next to it. The assistant can add cards to an answer: quick
+site it leads to next to it, and so does an address that could mislead: one
+with a name before an @ in front of the site, a site name with letters
+outside the Latin alphabet or in punycode, or one followed by a site name
+in brackets. The assistant can add cards to an answer: quick
 replies to click, time slots to put into the message or answer with, a
 checklist, people, a table. In the composer a card's text goes into the
 message where the cursor is.
@@ -322,7 +332,7 @@ settings. Set up one or both services:
 | Let users connect their own API key | Off by default |
 | More context | Attachments and images of the open message, the whole conversation, the messages selected in the list, and @-mentioned messages, contacts and files. On by default |
 | Anthropic: images, OpenAI-compatible: images | Whether that service's model gets images. Automatic: yes for Anthropic and api.openai.com (apart from text-only models), no for other servers such as Ollama. Without images the model gets the file name only |
-| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once, contacts. On by default. All but changing an event and tags always ask the user first; changing an event asks first when other people take part in it |
+| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once, contacts. On by default. All but changing an event and tags always ask the user first; changing an event asks first unless it is the user's alone (nobody else in it, in the user's own calendar) |
 | Most messages per batch | 1 to 200, default 50 |
 | Change settings | Let users allow the assistant to change their app settings (appearance, reading, composing, list, notifications, calendar view). Off by default |
 | Files | Find, read and attach the user's files, save attachments to Files, create files and folders. Never deletes or shares. On by default |

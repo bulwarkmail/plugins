@@ -227,6 +227,8 @@
   "action.create_contact": "{who} kişilerine ekle",
   "action.draft_reply": "\"{subject}\" için taslakla bir yanıt aç",
   "action.draft_reply_all": "\"{subject}\" için taslakla tümünü yanıtla aç",
+  "action.reply_to": "Yanıt şu adrese gider: {to}",
+  "action.reply_to_unknown": "Bu iletiden yanıtın nereye gideceği görünmüyor",
   "action.draft_email": "{to} için yeni ileti aç: \"{subject}\"",
   "action.approve": "Yap",
   "action.skip": "Atla",
