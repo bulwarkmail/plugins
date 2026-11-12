@@ -197,22 +197,23 @@ function textOf(bytes, charset = 'utf-8') {
  * Content-Type goes. Mail servers and clients differ on duplicate fields (first or
  * last wins), duplicate parameters, blanks in field names and odd line breaks, so the
  * plugin only relies on a header block where none of that occurs:
- * - one kind of line break, no lone CR, no NUL, no line of only blanks, every line a
- *   field or the continuation of one;
+ * - no lone CR, no NUL, no line of only blanks, every line a field or the continuation
+ *   of one. CRLF and LF line breaks may be mixed (a gateway adds LF lines, Stalwart's
+ *   encryption at rest adds CRLF lines to a message that came with LF): servers take
+ *   both for a line break, as this reader does;
  * - exactly one Content-Type field (or none, where `required` is false), counting
  *   every spelling of the name a parser might take for it (any case, blanks or tabs
  *   inside it or before the colon), and spelled the way this reader knows it;
- * - in that field no 8-bit byte, each parameter at most once (RFC 2231 sections and
- *   encoded forms count as that parameter), and the media type and the parameters
- *   this reader uses as a strict reading of the field gives them.
+ * - in that field each parameter at most once (RFC 2231 sections and encoded forms
+ *   count as that parameter), no 8-bit byte in the media type, the boundary, the
+ *   protocol or the smime-type (servers read such bytes as UTF-8, this reader byte by
+ *   byte; elsewhere in the field, a file name for one, they change nothing), and the
+ *   media type and the parameters this reader uses as a strict reading of the field
+ *   gives them.
  */
 function readsOneWay(node, required) {
   const text = node.headerText;
-  const sep = node.headerEnd;
   if (text.includes('\0') || /\r(?!\n)/.test(text)) return false;
-  const crlf = sep ? sep === '\r\n\r\n' : text.includes('\r\n');
-  if (sep && !crlf && sep !== '\n\n') return false;
-  if (crlf ? /(^|[^\r])\n/.test(text) : text.includes('\r')) return false;
 
   const fields = [];
   for (const line of text.split(/\r?\n/)) {
@@ -229,11 +230,10 @@ function readsOneWay(node, required) {
   if (named.length !== 1) return named.length === 0 && !required;
   const colon = named[0].indexOf(':');
   if (named[0].slice(0, colon).trim().toLowerCase() !== 'content-type') return false;
-  const value = named[0].slice(colon + 1);
-  if (/[^\x00-\x7f]/.test(value)) return false;
-  const strict = strictContentType(value);
+  const strict = strictContentType(named[0].slice(colon + 1));
+  // strictContentType takes no 8-bit byte into a media type.
   return !!strict && strict.type === node.type
-    && ['boundary', 'protocol', 'smime-type'].every((k) => strict.params[k] === node.params[k]);
+    && ['boundary', 'protocol', 'smime-type'].every((k) => strict.params[k] === node.params[k] && !/[^\x00-\x7f]/.test(strict.params[k] ?? ''));
 }
 
 // A header value split at each ';' outside quoted strings, or null when a quote is left open.
@@ -332,9 +332,8 @@ function parseEntity(raw, depth = 1, base = 0) {
   const cte = (headers['content-transfer-encoding'] || '7bit').trim().toLowerCase();
   const disposition = (headers['content-disposition'] || '').toLowerCase();
 
-  const headerEnd = sepMatch ? sepMatch[0] : '';
   const bodyStart = base + raw.length - body.length;
-  const node = { type, params, cte, disposition, headers, headerText, headerEnd, body, bodyStart, raw, children: [], delimiters: [] };
+  const node = { type, params, cte, disposition, headers, headerText, body, bodyStart, raw, children: [], delimiters: [] };
 
   if (type.startsWith('multipart/') && params.boundary) {
     if (depth <= MAX_DEPTH) {

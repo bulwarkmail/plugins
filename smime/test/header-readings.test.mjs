@@ -224,11 +224,10 @@ describe('a header block the plugin relies on reads one way', () => {
     ['the boundary again as an RFC 2231 section', `Content-Type: ${SIGNED_CT}; boundary*0="Y"`],
     ['the boundary again in RFC 2231 encoded form', `Content-Type: ${SIGNED_CT}; boundary*=utf-8''Y`],
     ['the protocol given twice', `Content-Type: ${SIGNED_CT}; protocol="application/pkcs7-signature"`],
-    ['an 8-bit byte in the Content-Type field', `Content-Type: ${SIGNED_CT}; x="é"`],
+    ['an 8-bit byte in the boundary', `Content-Type: ${SIGNED_CT.replace('"inner"', '"inneré"')}`, signedBody().replace(/--inner/g, '--inneré')],
     ['a NUL in the header block', `X-Note: a\u0000b\r\nContent-Type: ${SIGNED_CT}`],
-    ['a header block that ends in a mixed line break', `Content-Type: ${SIGNED_CT}\n`],
-  ])('is not shown as signed with %s', async (_, lines) => {
-    const o = await open(withHeader(lines), agreeing);
+  ])('is not shown as signed with %s', async (_, lines, body) => {
+    const o = await open(withHeader(lines, body), agreeing);
     expect(o.result).toBeUndefined();
     expect(o.rows).toEqual([damaged]);
   });
@@ -236,6 +235,9 @@ describe('a header block the plugin relies on reads one way', () => {
   it.each([
     ['a Content-Type folded over several lines', `Content-Type: multipart/signed;\r\n\tprotocol="application/pkcs7-signature";\r\n\tmicalg=sha-256;\r\n\tboundary="inner"`],
     ['upper-case names and values', 'CONTENT-TYPE: Multipart/Signed; Protocol="Application/PKCS7-Signature"; Micalg=SHA-256; Boundary="inner"'],
+    // Servers read both line breaks and 8-bit bytes outside the parameters the split depends on as this reader does.
+    ['an 8-bit byte in another parameter of the Content-Type field', `Content-Type: ${SIGNED_CT}; x="é"`],
+    ['a header block that ends in a mixed line break', `Content-Type: ${SIGNED_CT}\n`],
   ])('still verifies a mail with %s (control)', async (_, lines) => {
     const o = await open(withHeader(lines), agreeing);
     expect(takenOver(o.result)).toBe(true);
