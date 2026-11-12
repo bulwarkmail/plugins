@@ -49,7 +49,7 @@ import {
 import {
   saveKeyRecord, listKeyRecords, deleteKeyRecord,
   savePublicCert, listPublicCerts, deletePublicCert,
-  saveSessionKeys, getSessionKeys, deleteSessionKeys, clearSessionKeys,
+  saveSessionKeys, getSessionKeys, deleteSessionKeys, clearSessionKeys, markSessionKeysUsed, lockIdleSessionKeys,
   saveTrusted, listTrusted, deleteTrusted, getChoice, saveChoice, setAccountResolver,
 } from './key-storage.js';
 import { unlockedDecryptMaps, forgetRebuiltKeys } from './session-keys.js';
@@ -329,6 +329,7 @@ async function withSigningKey(records, sign) {
     }
     try {
       const signed = await sign(session.signingKey, record);
+      if (record.source !== 'os') await markSessionKeysUsed(record.id).catch(() => {});
       if (!certValidNow(record)) host.toast.warning(t('send.signingCertInvalid'));
       // Not the key this send would have asked for first: say why.
       if (record.source !== 'os' && records.some((r) => r.source === 'os' && osKeys.signCancelled(r.id))) {
@@ -811,6 +812,8 @@ async function renderEncrypted(body, ctx, loadCms, fromEmail, started, asked) {
       return { result: await failed(err && err.message ? err.message : String(err)), keep: false };
     }
 
+    if (result.keyRecordId) await markSessionKeysUsed(result.keyRecordId).catch(() => {});
+
     // Decrypted inner content may itself be a signed CMS — either nested as a
     // MIME entity (RFC 8551 sign-then-encrypt, the Outlook/Thunderbird form)
     // or, more rarely, raw CMS DER. Detect both.
@@ -1107,6 +1110,32 @@ export const slots = {
   'settings-section': { component: SettingsSection, order: 100 },
 };
 
+// Unlocked keys sit in a store on disk (key-storage.js), so they don't outlive the page:
+// the store is wiped when the page goes away (closing the tab, reloading, leaving), and a
+// key nobody used for 30 minutes is locked, also while the page just stays open. Runs in
+// the background instance only (activate), not in each slot frame, which come and go
+// with the page's views. The store is shared by the webmail's tabs, so closing one tab
+// locks the keys in the others too.
+const IDLE_SWEEP_MS = 60_000;
+let sessionKept = false;
+
+function keepSessionShort(api) {
+  if (sessionKept) return;
+  sessionKept = true;
+  if (typeof globalThis.addEventListener === 'function') {
+    globalThis.addEventListener('pagehide', () => {
+      forgetRebuiltKeys();
+      void clearSessionKeys().catch(() => {});
+    });
+  }
+  const timer = setInterval(() => {
+    void lockIdleSessionKeys()
+      .then((locked) => { if (locked > 0) forgetRebuiltKeys(); })
+      .catch((err) => api.log.warn('S/MIME: locking idle keys failed', err));
+  }, IDLE_SWEEP_MS);
+  timer?.unref?.();
+}
+
 export async function activate(api) {
   // Bail out gracefully if we're not in the privileged (same-origin) tier — do
   // NOT throw, or the circuit breaker disables the plugin after a raw IDB error.
@@ -1119,6 +1148,7 @@ export async function activate(api) {
   // app session at boot (mirrors the native "in-memory, cleared on reload").
   forgetRebuiltKeys();
   try { await clearSessionKeys(); } catch (err) { api.log.warn('S/MIME: clearSessionKeys failed', err); }
+  keepSessionShort(api);
   let keyCount = 0;
   try { keyCount = (await listKeyRecords()).length; } catch (err) { api.log.warn('S/MIME: listKeyRecords failed', err); }
   try { await publishComposeActions(api, composeDeps); } catch (err) { api.log.warn('S/MIME: setActions failed', err); }

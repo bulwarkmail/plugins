@@ -245,23 +245,59 @@ export async function saveChoice(email, fingerprint, among) {
 }
 
 // ── Session (unlocked) key CRUD ─────────────────────────────────────
-// Each entry: { id, format, signingKey, decryptionKey?, sealedPkcs8? }
+// Each entry: { id, format, usedAt, signingKey, decryptionKey?, sealedPkcs8? }
 // sealedPkcs8 is { key, iv, data }, set for RSA keys (session-keys.js).
+//
+// The store is on disk with the browser profile, and for an RSA key it holds
+// what rebuilds the key, so an unlocked key is protected by the device, not by
+// its passphrase. It is kept short: an entry not used for SESSION_IDLE_MS is
+// locked (deleted) when it is next read or swept, and index.js wipes the store
+// when the page goes away, at sign-out, account switch and start.
 
 // Older versions wrote entries without a format, holding a webcrypto-liner
 // key that doesn't survive the store. Those count as locked, so the user gets
-// the unlock prompt instead of a decrypt error.
+// the unlock prompt instead of a decrypt error. An entry without `usedAt`
+// counts as idle.
 const SESSION_FORMAT = 2;
+export const SESSION_IDLE_MS = 30 * 60_000;
+
+const idle = (entry) => typeof entry.usedAt !== 'number' || Date.now() - entry.usedAt > SESSION_IDLE_MS;
 
 export async function saveSessionKeys(entry) {
   const db = await openDB();
-  await txPromise(db, SESSION_KEYS_STORE, 'readwrite', (s) => s.put({ ...entry, format: SESSION_FORMAT }));
+  await txPromise(db, SESSION_KEYS_STORE, 'readwrite', (s) => s.put({ ...entry, format: SESSION_FORMAT, usedAt: Date.now() }));
 }
 
 export async function getSessionKeys(id) {
   const db = await openDB();
   const entry = await txPromise(db, SESSION_KEYS_STORE, 'readonly', (s) => s.get(id));
-  return entry && entry.format === SESSION_FORMAT ? entry : undefined;
+  if (!entry || entry.format !== SESSION_FORMAT) return undefined;
+  if (idle(entry)) {
+    await txPromise(db, SESSION_KEYS_STORE, 'readwrite', (s) => s.delete(id));
+    return undefined;
+  }
+  return entry;
+}
+
+/** A sign or decrypt used the key: the idle time starts again. */
+export async function markSessionKeysUsed(id) {
+  const entry = await getSessionKeys(id);
+  if (!entry) return;
+  const db = await openDB();
+  await txPromise(db, SESSION_KEYS_STORE, 'readwrite', (s) => s.put({ ...entry, usedAt: Date.now() }));
+}
+
+/** Deletes every entry that is idle too long (or locked anyway). Returns how many. */
+export async function lockIdleSessionKeys() {
+  const db = await openDB();
+  let locked = 0;
+  for (const entry of await txPromise(db, SESSION_KEYS_STORE, 'readonly', (s) => s.getAll())) {
+    if (entry && (entry.format !== SESSION_FORMAT || idle(entry))) {
+      await txPromise(db, SESSION_KEYS_STORE, 'readwrite', (s) => s.delete(entry.id));
+      locked++;
+    }
+  }
+  return locked;
 }
 
 export async function listSessionKeyIds() {

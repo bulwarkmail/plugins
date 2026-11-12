@@ -260,7 +260,7 @@ describe('S/MIME in another language', () => {
     }));
     await act(async () => { render(React.createElement(SettingsSection)); });
     const text = document.body.textContent;
-    for (const key of ['keys.title', 'keys.description', 'keys.import', 'keys.valid', 'keys.canSign', 'keys.canEncrypt', 'badge.expired', 'badge.unlocked', 'keys.lock',
+    for (const key of ['keys.title', 'keys.description', 'keys.sessionNote', 'keys.import', 'keys.valid', 'keys.canSign', 'keys.canEncrypt', 'badge.expired', 'badge.unlocked', 'keys.lock',
       'certificates.title', 'certificates.description', 'certificates.import', 'certificates.sourceManual', 'certificates.sourceSignedEmail', 'certificates.expires',
       'certificates.sourceUnverified', 'certificates.removeUnverified',
       'defaults.title', 'defaults.sign', 'defaults.signHelp', 'defaults.encrypt', 'defaults.encryptHelp']) {

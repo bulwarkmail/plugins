@@ -644,6 +644,7 @@ export function makeUi(host, deps) {
       },
       picker(fileRef, '.p12,.pfx', importKeyFile, t('keys.file')),
       deps.osKeys?.available() && h(Text, { tone: 'muted' }, t('keys.systemHint')),
+      h(Text, { tone: 'muted' }, t('keys.sessionNote')),
       h(Row, null,
         h(Button, { icon: 'upload', busy, onClick: () => fileRef.current && fileRef.current.click() }, t('keys.import')),
         deps.osKeys?.available() && h(Button, {

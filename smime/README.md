@@ -62,9 +62,13 @@ material ever leaves the device.
 - **Keys in use.** Unlocking imports the key as a **non-extractable**
   `CryptoKey`. Because the background (hooks) iframe and the visible slot
   iframes are same-origin, the unlocked handle is shared through a session
-  IndexedDB store. It stays non-extractable and is **wiped on app boot and on
-  logout / account switch** (configurable), mirroring the former native
-  "in-memory, cleared on reload" behaviour.
+  IndexedDB store. It stays non-extractable and is **wiped on app boot, when
+  the page goes away (`pagehide`: closing the tab, reloading, leaving), and on
+  logout / account switch** (the last two configurable). A key not used for
+  30 minutes locks, also while the page stays open. The store is shared by the
+  webmail's tabs, so closing one tab locks the keys in the others too. An
+  unlocked key is protected by the device, not by its passphrase; the settings
+  page says so.
 - **RSA PKCS#1 v1.5.** WebCrypto can't decrypt RSAES-PKCS1-v1_5, so that runs
   in JavaScript (webcrypto-liner) and needs the key bytes. For RSA keys the
   session entry also holds the PKCS#8 key, encrypted with a fresh
