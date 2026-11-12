@@ -29,7 +29,7 @@ import { smimeVerify, smimeVerifyDetached } from './smime-verify.js';
 import {
   smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, isSignedData, SmimeKeyLockedError, SmimeNoKeyError,
 } from './smime-decrypt.js';
-import { detectSmime } from './smime-detect.js';
+import { detectSmime, serverReadsSignedWhole, serverReadsPkcs7Mime } from './smime-detect.js';
 import { parseMime, extractDetachedSigned, opaqueBody } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
 import { parseCertificatePemOrDer, extractCertificateInfo } from './certificate-utils.js';
@@ -671,13 +671,6 @@ async function onRenderEmailBody(body, ctx) {
   if (detection.type === 'detached-sig') {
     // Verify against the raw message — the host's decoded parts are not byte-exact.
     if (!ctx.blobId) return undefined;
-    let raw;
-    try {
-      raw = await host.jmap.fetchBlob(ctx.blobId);
-    } catch (err) {
-      host.log.error('failed to fetch the signed message', err);
-      return undefined; // transient; don't record a verdict
-    }
     // A broken signature must read as invalid, not as a neutral "Signed message".
     const invalid = (signatureError) => persistVerifyStatus(ctx.id, {
       isSigned: true,
@@ -685,6 +678,17 @@ async function onRenderEmailBody(body, ctx) {
       signatureValid: false,
       signatureError,
     });
+    if (!serverReadsSignedWhole(ctx.bodyStructure, ctx.attachments)) {
+      await invalid(MALFORMED_SIGNED);
+      return undefined;
+    }
+    let raw;
+    try {
+      raw = await host.jmap.fetchBlob(ctx.blobId);
+    } catch (err) {
+      host.log.error('failed to fetch the signed message', err);
+      return undefined; // transient; don't record a verdict
+    }
     try {
       const signed = extractDetachedSigned(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
       if (!signed) {
@@ -715,10 +719,15 @@ async function onRenderEmailBody(body, ctx) {
   const blobId = ctx.blobId;
   if (!blobId) return undefined;
 
-  // Fetched once, for the look inside and for reading it.
+  // Fetched once, for the look inside and for reading it, and only when the server
+  // reads the message as one pkcs7-mime part too.
   let cms;
   const loadCms = () => {
-    if (!cms) cms = fetchCms(blobId);
+    if (!cms) {
+      cms = serverReadsPkcs7Mime(ctx.bodyStructure, ctx.attachments)
+        ? fetchCms(blobId)
+        : Promise.reject(new MalformedMessageError());
+    }
     return cms;
   };
 

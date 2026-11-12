@@ -168,7 +168,8 @@ describe('a header block the plugin relies on reads one way', () => {
   // The server reads the mail as signed as a whole here, so only the raw header decides.
   const agreeing = { contentType: SIGNED_CT, bodyStructure: signedTree, attachments: [] };
   const withHeader = (lines, body = signedBody()) => `${head}${lines}\r\n\r\n${body}`;
-  const mixedY = 'multipart/mixed; boundary="Y"';
+  // A reader that joins the fields and lets the last parameter win still finds "inner" here.
+  const mixedY = 'multipart/mixed; boundary="Y"; boundary="inner"';
 
   it.each([
     ['the Content-Type field twice with the same value', `Content-Type: ${SIGNED_CT}\r\nContent-Type: ${SIGNED_CT}`],
@@ -211,6 +212,31 @@ describe('a header block the plugin relies on reads one way', () => {
       + `Content-Transfer-Encoding: base64\r\n\r\n${signature}\r\n--inner--\r\n`;
   }
 
+  describe('and the server reads the mail the same way', () => {
+    const raw = () => withHeader(`Content-Type: ${SIGNED_CT}`);
+    const signature = { type: 'application/pkcs7-signature', name: 'smime.p7s', partId: '2' };
+
+    it.each([
+      ['a body structure of three parts', { type: 'multipart/signed', subParts: [{ type: 'text/plain', partId: '1' }, invoice, signature] }, [invoice]],
+      ['a second part that is no signature', { type: 'multipart/signed', subParts: [{ type: 'text/plain', partId: '1' }, { ...invoice, partId: '2' }] }, []],
+      ['an attachment listed that lies outside the signed part', signedTree, [{ ...invoice, partId: '3' }]],
+      ['an attachment listed without a part id or blob id', signedTree, [{ type: 'text/html', name: 'invoice.html' }]],
+      ['no body structure, and an attachment listed', undefined, [invoice]],
+    ])('is not shown as signed with %s', async (_, bodyStructure, attachments) => {
+      const o = await open(raw(), { contentType: SIGNED_CT, bodyStructure, attachments });
+      expect(o.result).toBeUndefined();
+      expect(o.rows).toEqual([damaged]);
+    });
+
+    it.each([
+      ['the signature listed as an attachment', signedTree, [signature]],
+      ['no body structure, and only the signature listed', undefined, [signature]],
+    ])('still verifies a mail with %s (control)', async (_, bodyStructure, attachments) => {
+      const o = await open(raw(), { contentType: SIGNED_CT, bodyStructure, attachments });
+      expect(takenOver(o.result)).toBe(true);
+    });
+  });
+
   it('is not shown as signed when the signed entity has two Content-Type fields', async () => {
     const entity = `Content-Type: text/plain; charset=utf-8\r\nContent-Type: ${mixedY}\r\n\r\n${SIGNED_TEXT}. Regards, the CEO`;
     const o = await open(withHeader(`Content-Type: ${SIGNED_CT}`, await signedOver(entity)), agreeing);
@@ -250,6 +276,21 @@ describe('a header block the plugin relies on reads one way', () => {
       const o = await open(raw, { contentType: opaqueCt, bodyStructure: leaf, attachments: [leaf] });
       expect(o.result).toBeUndefined();
       expect(o.rows).toEqual([damaged]);
+    });
+
+    it('does not verify or decrypt one the server reads as something else', async () => {
+      const other = { type: 'multipart/mixed', partId: '0', subParts: [invoice, { ...leaf, partId: '2' }] };
+      const o = await open(await opaque(`Content-Type: ${opaqueCt}`), { contentType: opaqueCt, bodyStructure: other, attachments: [invoice] });
+      expect(o.result).toBeUndefined();
+      expect(o.rows).toEqual([damaged]);
+      const listed = await open(await opaque(`Content-Type: ${opaqueCt}`), { contentType: opaqueCt, bodyStructure: leaf, attachments: [leaf, { ...invoice, partId: '3' }] });
+      expect(listed.result).toBeUndefined();
+      expect(listed.rows).toEqual([damaged]);
+      const encrypted = await open(fixture('cbc.p7m').toString('latin1'), {
+        contentType: 'application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"', bodyStructure: other, attachments: [invoice],
+      });
+      expect(encrypted.result).toBeUndefined();
+      expect(encrypted.status).toMatchObject({ isEncrypted: true, decryptionSuccess: false });
     });
 
     it('does not decrypt one with a second Content-Type field', async () => {

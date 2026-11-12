@@ -166,7 +166,6 @@ describe('a signed part inside an unsigned mail', () => {
 
 describe('what counts as a mail signed as a whole', () => {
   const en = manifest.locales.en;
-  const signedText = 'Please see the attached document';
   const entity = 'Content-Type: text/plain; charset=utf-8\r\n\r\nPlease see the attached document. Regards, the CEO';
   const signedCt = 'multipart/signed; protocol="application/pkcs7-signature"; micalg=sha-256; boundary="inner"';
   const warning = { icon: 'alert-triangle', tone: 'warning', text: en['banner.partlySigned'] };
@@ -234,14 +233,16 @@ describe('what counts as a mail signed as a whole', () => {
     expect(whole.rows).not.toContainEqual(warning);
   });
 
-  it('goes by the raw message when the body structure from the server disagrees with it (control)', async () => {
+  it('leaves a mail alone when the body structure from the server disagrees with the raw message', async () => {
     const opened = await open(`${head}Content-Type: ${signedPart.contentType}\r\n\r\n${signedPart.body}`, {
       contentType: signedPart.contentType,
       bodyStructure: { type: 'multipart/mixed', subParts: [{ type: 'text/plain', partId: '1' }, attachment] },
       attachments: [attachment],
     });
-    expect(opened.result.text).toContain(signedText);
-    expect(opened.rows.length).toBeGreaterThan(0);
+    // The webmail would list the server's attachment under the plugin's verdict.
+    expect(opened.result).toBeUndefined();
+    expect(opened.rows).toEqual([{ icon: 'shield-exclamation', tone: 'destructive', text: en['banner.invalid'].replace('{error}', en['error.malformedSigned']) }]);
+    expect(await keptFor(SIGNER)).toEqual([]);
   });
 
   it('does not show a mail as signed whose header says multipart/signed when the raw message is not', async () => {

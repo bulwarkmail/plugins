@@ -65,6 +65,44 @@ function smimeType(value) {
 
 const isSignaturePart = (part) => PKCS7_SIGNATURE.has(parseContentType(part.type).media);
 
+// The webmail lists the server's attachments wherever the plugin returns none, so the
+// plugin vouches for a message only where the server reads its structure the same way.
+// Without a body structure from the host, only S/MIME parts may be listed.
+
+/**
+ * Whether the server reads the message as signed as a whole: its body structure is
+ * multipart/signed with exactly the signed part and a pkcs7 signature, and every
+ * attachment it lists other than the signature lies inside the signed part.
+ */
+export function serverReadsSignedWhole(bodyStructure, attachments) {
+  const listed = attachments || [];
+  if (!bodyStructure) return listed.every(isSignaturePart);
+  if (parseContentType(bodyStructure.type).media !== 'multipart/signed') return false;
+  const parts = bodyStructure.subParts || [];
+  if (parts.length !== 2 || !isSignaturePart(parts[1])) return false;
+  const known = partKeys(parts[0], partKeys(parts[1]));
+  return listed.every((att) => known.has(keyOf(att)));
+}
+
+/** Whether the server reads the message as one application/pkcs7-mime part, and lists nothing else. */
+export function serverReadsPkcs7Mime(bodyStructure, attachments) {
+  const listed = attachments || [];
+  if (!bodyStructure) return listed.every((att) => PKCS7_MIME.has(parseContentType(att.type).media));
+  if (!PKCS7_MIME.has(parseContentType(bodyStructure.type).media) || bodyStructure.subParts?.length) return false;
+  const known = partKeys(bodyStructure);
+  return listed.every((att) => known.has(keyOf(att)));
+}
+
+// A part is known by its partId, or by its blobId where the host gives no partId.
+const keyOf = (part) => (part.partId != null ? `part:${part.partId}` : part.blobId != null ? `blob:${part.blobId}` : null);
+
+function partKeys(part, keys = new Set()) {
+  if (part.partId != null) keys.add(`part:${part.partId}`);
+  if (part.blobId != null) keys.add(`blob:${part.blobId}`);
+  for (const sub of part.subParts || []) partKeys(sub, keys);
+  return keys;
+}
+
 // A pkcs7 signed entity anywhere in the tree.
 function hasSignedPart(part) {
   const { media, params } = parseContentType(part.type);
