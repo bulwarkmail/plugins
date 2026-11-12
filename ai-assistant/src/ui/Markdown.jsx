@@ -1,7 +1,8 @@
 // A small Markdown renderer for the assistant's answers: paragraphs,
 // headings, bullet and numbered lists, quotes, code, bold, italic and links.
 // It builds React elements only (never HTML), so an answer can't inject
-// markup into the frame. Links open in a new tab through the host.
+// markup into the frame. Links open in a new tab through the host; a link
+// whose text is not its own address shows the host it leads to next to it.
 
 import { Fragment } from 'react';
 
@@ -21,6 +22,7 @@ const styles = {
   code: { padding: '1px 4px', background: 'var(--color-muted)', borderRadius: 4, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.9em' },
   hr: { border: 0, borderTop: '1px solid var(--color-border)', margin: `${GAP}px 0` },
   link: { color: 'var(--color-primary)', textDecoration: 'underline', background: 'none', border: 0, padding: 0, font: 'inherit', cursor: 'pointer' },
+  host: { color: 'var(--color-muted-foreground)', fontSize: '0.9em' },
   table: { borderCollapse: 'collapse', margin: `0 0 ${GAP}px`, fontSize: '0.95em' },
   cell: { border: '1px solid var(--color-border)', padding: '4px 8px', verticalAlign: 'top' },
 };
@@ -102,6 +104,21 @@ export function parseBlocks(text) {
 
 const INLINE_RE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(\b_[^_\n]+_\b)|(~~[^~\n]+~~)|(\[[^\]\n]+\]\((https?:\/\/[^)\s]+)\))|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
 
+/**
+ * The host a link leads to, for showing next to its text; '' when the text
+ * is the link's own address (scheme, case and a closing slash aside), which
+ * already says where it goes.
+ */
+export function linkHost(label, href) {
+  const bare = (value) => String(value ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  if (bare(label) === bare(href)) return '';
+  try {
+    return new URL(href).host || String(href);
+  } catch {
+    return String(href);
+  }
+}
+
 /** Inline Markdown as React nodes. `open(url)` handles links. */
 export function renderInline(text, open, keyBase = 'i') {
   const out = [];
@@ -115,7 +132,16 @@ export function renderInline(text, open, keyBase = 'i') {
     else if (bold || bold2) push(<strong>{renderInline(whole.slice(2, -2), open, `${keyBase}${n}b`)}</strong>);
     else if (em || em2) push(<em>{renderInline(whole.slice(1, -1), open, `${keyBase}${n}e`)}</em>);
     else if (strike) push(<del>{whole.slice(2, -2)}</del>);
-    else if (link) push(<button type="button" style={styles.link} onClick={() => open?.(href)} title={href}>{whole.slice(1, whole.indexOf(']('))}</button>);
+    else if (link) {
+      const label = whole.slice(1, whole.indexOf(']('));
+      const host = linkHost(label, href);
+      push(
+        <>
+          <button type="button" style={styles.link} onClick={() => open?.(href)} title={href}>{label}</button>
+          {host && <>{' '}<span data-link-host style={styles.host}>({host})</span></>}
+        </>,
+      );
+    }
     else if (bare) push(<button type="button" style={styles.link} onClick={() => open?.(bare)} title={bare}>{bare}</button>);
     last = m.index + whole.length;
   }

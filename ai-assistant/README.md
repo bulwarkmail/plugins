@@ -160,6 +160,13 @@ Actions has two modes:
   deleted again). After five actions in one answer the assistant asks
   first anyway.
 
+Some actions ask first in both modes, because text in a message could
+ask the model for them: moving a message to the trash or junk folder,
+moving or archiving any message other than the one you have open (in the
+composer, every message), adding a contact whose address you didn't type
+in the chat and that isn't the sender or a recipient of the open
+message, and opening a new message to such an address.
+
 Actions are off until a user turns them on. The administrator decides
 how far users may go (off, ask first, or automatic) in the plugin's
 admin settings. The model is told to act only when you ask or agree,
@@ -238,7 +245,8 @@ switches the whole group off with **Files**.
 ## Answers, cards and what the assistant knows
 
 Answers come as formatted text (bullet lists, bold, small tables, links
-that open in a new tab). The assistant can add cards to an answer: quick
+that open in a new tab). A link whose text isn't its own address shows the
+site it leads to next to it. The assistant can add cards to an answer: quick
 replies to click, time slots to put into the message or answer with, a
 checklist, people, a table. In the composer a card's text goes into the
 message where the cursor is.

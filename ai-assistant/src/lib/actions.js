@@ -8,6 +8,12 @@
 // message's subject, the folder) and returns a plan with a summary in the
 // user's language; performAction() carries the plan out and returns the text
 // for the model and, where it can be taken back, how to undo it.
+//
+// Most of them follow the user's mode. These always ask first, since the
+// user would hardly notice them otherwise and the model may act on what a
+// message it reads says: a move to Trash or Junk, moving or archiving any
+// message other than the open one, and a new contact or a new message whose
+// address the user didn't name.
 
 import { areaAction, areaActions, offered } from './areas/index.js';
 
@@ -21,6 +27,12 @@ export function knownRecipient(address, ctx = {}) {
   const people = (ctx.participants ?? []).map((a) => String(a).toLowerCase());
   return typed.includes(wanted) || people.includes(wanted);
 }
+
+/** Folders a move to always asks first: what lands there is out of the user's sight. */
+const ASK_FOLDER_ROLES = new Set(['trash', 'junk']);
+
+/** Whether `email` is the message open next to the panel (the composer has none). */
+const isOpenMessage = (email, ctx = {}) => !!ctx.openEmailId && String(email?.id) === String(ctx.openEmailId);
 
 /** Most actions one answer may take without asking, in automatic mode. */
 export const MAX_AUTO_ACTIONS = 5;
@@ -207,19 +219,23 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
     return { summary, plan: { ...plan, name, area: area.area }, alwaysAsk };
   }
   const t = api.i18n.t;
-  // (draft_email sets alwaysAsk itself; the other core actions follow the mode.)
+  // (archive, move, contacts and draft_email set alwaysAsk where they need
+  // it; the other core actions follow the mode.)
   const locale = api.i18n?.getLocale?.() ?? 'en';
   switch (name) {
     case 'archive_message': {
       const email = await messageFor(api, args.id);
-      return { summary: t('action.archive', { subject: email.subject || '…' }), plan: { name, email } };
+      // Only the open message follows the mode: the user doesn't see another one go.
+      return { summary: t('action.archive', { subject: email.subject || '…' }), plan: { name, email }, alwaysAsk: !isOpenMessage(email, ctx) };
     }
     case 'move_message': {
       const email = await messageFor(api, args.id);
       const mailboxes = (await api.mailboxes.list()) ?? [];
       const folder = findFolder(mailboxes, args.folder);
       if (!folder) throw new Error(`no folder "${text(args.folder, 100)}"; the folders are: ${mailboxes.map((m) => m.name).join(', ')}`);
-      return { summary: t('action.move', { subject: email.subject || '…', folder: folder.name }), plan: { name, email, folder } };
+      // By the folder's role, whatever it is called ("Spam", "Papierkorb").
+      const alwaysAsk = ASK_FOLDER_ROLES.has(folder.role) || !isOpenMessage(email, ctx);
+      return { summary: t('action.move', { subject: email.subject || '…', folder: folder.name }), plan: { name, email, folder }, alwaysAsk };
     }
     case 'mark_message': {
       const email = await messageFor(api, args.id);
@@ -286,7 +302,11 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
         ...(phone ? { phones: { p1: { number: phone } } } : {}),
         ...(company ? { organizations: { o1: { name: company } } } : {}),
       };
-      return { summary: t('action.create_contact', { who: email ? `${fullName} <${email}>` : fullName }), plan: { name, card } };
+      // A contact is where the user's future mail goes: one whose address the
+      // user didn't name (typed in the chat, or a participant of the open
+      // message) asks first, and so does one without an address to check.
+      const alwaysAsk = !email || !knownRecipient(email, ctx);
+      return { summary: t('action.create_contact', { who: email ? `${fullName} <${email}>` : fullName }), plan: { name, card }, alwaysAsk };
     }
     case 'draft_reply': {
       if (!ctx.openEmailId) throw new Error('a reply can be opened only for the open message');
