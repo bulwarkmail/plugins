@@ -87,7 +87,7 @@
   "do.settings.invitations": "מענה להזמנות",
   "do.settings.invitations_hint": "תמיד שואל קודם. התשובה שלכם נשלחת למארגן.",
   "do.settings.events": "שינוי ומחיקה של אירועים",
-  "do.settings.events_hint": "תמיד שואל לפני מחיקה. אף פעם לא משנה את רשימת המוזמנים.",
+  "do.settings.events_hint": "תמיד שואל לפני מחיקה ולפני שינוי של אירוע שמשתתפים בו אנשים נוספים. אף פעם לא משנה את רשימת המוזמנים.",
   "do.settings.tags": "תיוג הודעות",
   "do.settings.tags_hint": "מוסיף ומסיר את התגיות שלכם.",
   "do.settings.vacation": "הודעת היעדרות",

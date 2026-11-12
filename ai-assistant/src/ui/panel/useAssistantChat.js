@@ -214,9 +214,10 @@ export function useAssistantChat(props) {
   /**
    * One exchange: a quick action (a task of prompts.js) or a typed request
    * (the chat). `label` is what the user turn shows; `sent` what the chat
-   * sends when it differs.
+   * sends when it differs. `typed`: the label is what the user typed in the
+   * input (not a quick action, a saved prompt or a card's text).
    */
-  const send = useCallback(async ({ label, sent, task, input: taskInput, show, scope, src, finish, data }) => {
+  const send = useCallback(async ({ label, sent, typed, task, input: taskInput, show, scope, src, finish, data }) => {
     const endpoint = setup?.endpoint;
     if (!endpoint) return;
     // Any other request ends an edit (submit() used it already).
@@ -242,6 +243,7 @@ export function useAssistantChat(props) {
     const at = Date.now();
     const userTurn = {
       id: uid(), role: 'user', at, content: note + (sent ?? label), label,
+      ...(typed === true ? { typed: true } : {}),
       ...(emailId !== undefined ? { emailId } : {}),
       ...(mode === 'reader' && contextEmail ? { subject: contextEmail.subject ?? '' } : {}),
     };
@@ -263,13 +265,19 @@ export function useAssistantChat(props) {
         const prompt = buildPrompt(task, { language: locale, extra, ...taskInput, ...(task === 'actions' ? { now } : {}) });
         text = await streamCompletion(api, endpoint, prompt, { onText, signal: abort.signal });
       } else {
-        // What the user typed in this chat: an action can tell an address the
-        // user gave from one the model took from a message.
-        const userText = [...previous.filter((x) => x.role === 'user').map((x) => x.label ?? ''), label ?? ''].join(' ');
+        // What the user typed in this chat, and nothing else: an action can
+        // tell an address the user gave from one the model took from a
+        // message. The lines the panel adds (the subject and sender of the
+        // message a question is about, a highlighted passage), quick actions,
+        // saved prompts and cards' texts never count.
+        const userText = [...previous, userTurn].filter((x) => x.role === 'user' && x.typed === true).map((x) => x.label ?? '').join(' ');
         const ctx = { ...areasRef.current.toolsCtx, userText, inReplyToId: mode === 'composer' ? context?.inReplyToId : undefined, lookups, actions: actionMode, mode, openEmailId: mode === 'reader' ? contextEmail?.id : undefined, settingsName: t('app.nav.settings'), zone: now.zone, config: setup?.config ?? {}, prefs,
-          // What the user typed and who takes part in the open message: the recipients they chose (draft_email).
-          userTyped: [...previous, userTurn].filter((x) => x.role === 'user').map((x) => x.content ?? '').join(' '),
-          participants: mode === 'reader' && contextEmail ? ['from', 'to', 'cc', 'replyTo'].flatMap((k) => (contextEmail[k] ?? []).map((p) => p?.email).filter(Boolean)) : [] };
+          // What the user typed and who takes part in the open message: the
+          // recipients they chose (draft_email, create_contact). A Reply-To
+          // counts only as the sender or a recipient: a reply would go there
+          // without the user having seen it.
+          userTyped: userText,
+          participants: mode === 'reader' && contextEmail ? ['from', 'to', 'cc'].flatMap((k) => (contextEmail[k] ?? []).map((p) => p?.email).filter(Boolean)) : [] };
         const tools = [...toolsFor(ctx), ...actionToolsFor(ctx)];
         let autoActions = 0;
         // Lookups run straight away; an action is shown first, then waits for
@@ -385,7 +393,7 @@ export function useAssistantChat(props) {
         setTurns(turnsRef.current);
       }
     }
-    void send({ label: text, scope: source.scope, src: source.text });
+    void send({ label: text, typed: true, scope: source.scope, src: source.text });
   }, [input, running, setup, send, source, editing]);
 
   // Edit and Answer again (chat tools): the last typed request and the last
@@ -557,7 +565,7 @@ export function useAssistantChat(props) {
       // The quick action again, with what it was asked the first time.
       void send({ label: userTurn.label ?? userTurn.content, task: turn.task, input: turn.input, show: turn.show, scope: turn.scope, src: turn.source });
     } else {
-      void send({ label: userTurn.label ?? userTurn.content, sent: userTurn.content, scope: turn.scope, src: turn.source });
+      void send({ label: userTurn.label ?? userTurn.content, sent: userTurn.content, typed: userTurn.typed === true, scope: turn.scope, src: turn.source });
     }
   }, [send]);
 

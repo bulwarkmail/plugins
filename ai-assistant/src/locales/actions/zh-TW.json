@@ -87,7 +87,7 @@
   "do.settings.invitations": "回覆邀請",
   "do.settings.invitations_hint": "一律先問你。你的回覆會傳送給主辦人。",
   "do.settings.events": "變更和刪除活動",
-  "do.settings.events_hint": "刪除前一律先問你。不會變更受邀者。",
+  "do.settings.events_hint": "刪除前，以及變更有其他人參與的活動前，一律先問你。不會變更受邀者。",
   "do.settings.tags": "為郵件加上標籤",
   "do.settings.tags_hint": "新增和移除你的標籤。",
   "do.settings.vacation": "外出自動回覆",

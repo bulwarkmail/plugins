@@ -87,7 +87,7 @@
   "do.settings.invitations": "Répondre aux invitations",
   "do.settings.invitations_hint": "Demande toujours d'abord. Votre réponse va à l'organisateur.",
   "do.settings.events": "Modifier et supprimer des événements",
-  "do.settings.events_hint": "Demande toujours avant de supprimer. Ne change jamais qui est invité.",
+  "do.settings.events_hint": "Demande toujours avant de supprimer et avant de modifier un événement auquel d'autres personnes participent. Ne change jamais qui est invité.",
   "do.settings.tags": "Étiqueter les messages",
   "do.settings.tags_hint": "Ajoute et retire vos étiquettes.",
   "do.settings.vacation": "Réponse d'absence",

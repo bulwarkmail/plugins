@@ -140,7 +140,7 @@ describe('which of the new actions are offered', () => {
 });
 
 describe('asking first', () => {
-  it('always for invitations, deletes, out-of-office, filters, batches, settings and contacts; as the user chose for event changes and tags', () => {
+  it('always for invitations, deletes, out-of-office, filters, batches, settings and contacts; for event changes when other people take part; as the user chose for tags', () => {
     const always = ['answer_invitation', 'delete_event', 'set_vacation', 'turn_off_vacation', 'create_filter', 'batch_messages', 'change_setting', 'update_contact'];
     for (const action of AREAS.actions.actions) {
       expect(action.alwaysAsk === true, action.name).toBe(always.includes(action.name));

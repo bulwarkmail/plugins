@@ -87,7 +87,7 @@
   "do.settings.invitations": "الرد على الدعوات",
   "do.settings.invitations_hint": "يسأل أولًا دائمًا. يصل ردك إلى المنظّم.",
   "do.settings.events": "تغيير الأحداث وحذفها",
-  "do.settings.events_hint": "يسأل دائمًا قبل الحذف. لا يغيّر المدعوين أبدًا.",
+  "do.settings.events_hint": "يسأل دائمًا قبل الحذف وقبل تغيير حدث يشارك فيه آخرون. لا يغيّر المدعوين أبدًا.",
   "do.settings.tags": "وسم الرسائل",
   "do.settings.tags_hint": "يضيف وسومك ويزيلها.",
   "do.settings.vacation": "رد الغياب",

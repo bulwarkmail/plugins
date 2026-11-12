@@ -160,6 +160,16 @@ Actions has two modes:
   deleted again). After five actions in one answer the assistant asks
   first anyway.
 
+Some actions ask first in both modes, because text in a message could
+ask the model for them: moving a message to the trash or junk folder,
+moving or archiving any message other than the one you have open (in the
+composer, every message), adding a contact whose address you didn't type
+in the chat and that isn't the sender or a recipient of the open
+message, and opening a new message to such an address. Only what you type
+into the chat counts as typed: not a subject or a sender's name, a passage
+you highlighted, a quick action or a saved prompt. A Reply-To address
+counts only when it is also the sender or a recipient.
+
 Actions are off until a user turns them on. The administrator decides
 how far users may go (off, ask first, or automatic) in the plugin's
 admin settings. The model is told to act only when you ask or agree,
@@ -195,7 +205,8 @@ needs them.
 
 Answering an invitation, deleting an event, the out-of-office reply,
 filters, many messages at once, settings and contacts **always ask you
-first**, even in automatic mode. The card says what will happen
+first**, even in automatic mode, and so does any change to an event that
+other people take part in. The card says what will happen
 ("Archive 12 messages?" with the first five subjects, "Change Time
 format: 12-hour → 24-hour?", the filter in plain words). Undo puts things
 back: the event, the filter, the messages, the setting and the contact
@@ -238,7 +249,8 @@ switches the whole group off with **Files**.
 ## Answers, cards and what the assistant knows
 
 Answers come as formatted text (bullet lists, bold, small tables, links
-that open in a new tab). The assistant can add cards to an answer: quick
+that open in a new tab). A link whose text isn't its own address shows the
+site it leads to next to it. The assistant can add cards to an answer: quick
 replies to click, time slots to put into the message or answer with, a
 checklist, people, a table. In the composer a card's text goes into the
 message where the cursor is.
@@ -310,7 +322,7 @@ settings. Set up one or both services:
 | Let users connect their own API key | Off by default |
 | More context | Attachments and images of the open message, the whole conversation, the messages selected in the list, and @-mentioned messages, contacts and files. On by default |
 | Anthropic: images, OpenAI-compatible: images | Whether that service's model gets images. Automatic: yes for Anthropic and api.openai.com (apart from text-only models), no for other servers such as Ollama. Without images the model gets the file name only |
-| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once, contacts. On by default. All but changing an event and tags always ask the user first |
+| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once, contacts. On by default. All but changing an event and tags always ask the user first; changing an event asks first when other people take part in it |
 | Most messages per batch | 1 to 200, default 50 |
 | Change settings | Let users allow the assistant to change their app settings (appearance, reading, composing, list, notifications, calendar view). Off by default |
 | Files | Find, read and attach the user's files, save attachments to Files, create files and folders. Never deletes or shares. On by default |

@@ -45,12 +45,13 @@ describe('the card shows what is saved', () => {
     await expect(describeAction(api, 'update_event', { id: 'E1', description: 'y'.repeat(MAX_SHOWN_TEXT + 1) }, ctxFor(api))).rejects.toThrow(/longer than 1000/);
   });
 
-  it('asks first, whatever the mode, before changing a description other people read', async () => {
+  it('asks first, whatever the mode, before changing an event other people take part in', async () => {
     const api = apiWith();
     expect((await describeAction(api, 'update_event', { id: 'E2', description: 'new words' }, ctxFor(api))).alwaysAsk).toBe(true);
-    // Only the user in it, or no description change: the user's mode decides.
+    // Its title and time reach the other people just as well.
+    expect((await describeAction(api, 'update_event', { id: 'E2', title: 'Planning 2' }, ctxFor(api))).alwaysAsk).toBe(true);
+    // Only the user in it: the user's mode decides.
     expect((await describeAction(api, 'update_event', { id: 'E1', description: 'new words' }, ctxFor(api))).alwaysAsk).toBe(false);
-    expect((await describeAction(api, 'update_event', { id: 'E2', title: 'Planning 2' }, ctxFor(api))).alwaysAsk).toBe(false);
   });
 
   it('says "changes to" rather than asking, so a card that ran by itself reads right', async () => {

@@ -87,7 +87,7 @@
   "do.settings.invitations": "Davetlere yanıt ver",
   "do.settings.invitations_hint": "Her zaman önce sorar. Yanıtınız organizatöre gider.",
   "do.settings.events": "Etkinlikleri değiştir ve sil",
-  "do.settings.events_hint": "Silmeden önce her zaman sorar. Davetlileri asla değiştirmez.",
+  "do.settings.events_hint": "Silmeden önce ve başkalarının katıldığı bir etkinliği değiştirmeden önce her zaman sorar. Davetlileri asla değiştirmez.",
   "do.settings.tags": "İletileri etiketle",
   "do.settings.tags_hint": "Etiketlerinizi ekler ve kaldırır.",
   "do.settings.vacation": "Ofis dışında yanıtı",
