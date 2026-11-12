@@ -19,14 +19,19 @@ import { areaAction, areaActions, offered } from './areas/index.js';
 
 const ADDRESS_IN_TEXT = /[^\s@<>"',;()]+@[^\s@<>"',;()]+\.[^\s@<>"',;().]+/g;
 
+/** The addresses the user typed in the chat (ctx.userTyped), lower case. */
+const typedAddresses = (ctx = {}) => (String(ctx.userTyped ?? '').match(ADDRESS_IN_TEXT) ?? []).map((a) => a.toLowerCase());
+
 /** Whether the user named `address`: typed in the chat (ctx.userTyped) or a participant of the open message (ctx.participants). */
 export function knownRecipient(address, ctx = {}) {
   const wanted = String(address ?? '').trim().toLowerCase();
   if (!wanted) return false;
-  const typed = (String(ctx.userTyped ?? '').match(ADDRESS_IN_TEXT) ?? []).map((a) => a.toLowerCase());
   const people = (ctx.participants ?? []).map((a) => String(a).toLowerCase());
-  return typed.includes(wanted) || people.includes(wanted);
+  return typedAddresses(ctx).includes(wanted) || people.includes(wanted);
 }
+
+/** A display name as compared: no surrounding quotes, one space, any case. */
+const plainName = (name) => String(name ?? '').normalize('NFKC').replace(/^["'\s]+|["'\s]+$/g, '').replace(/\s+/g, ' ').toLowerCase();
 
 /**
  * The Reply-To addresses of a message view: [] without a Reply-To, null when
@@ -372,7 +377,13 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
       // A contact is where the user's future mail goes: one whose address the
       // user didn't name (typed in the chat, or a participant of the open
       // message) asks first, and so does one without an address to check.
-      const alwaysAsk = !email || !knownRecipient(email, ctx);
+      // A participant's address saved under another name than the message
+      // shows for it (ctx.people) asks too; one the user typed doesn't.
+      let alwaysAsk = !email || !knownRecipient(email, ctx);
+      if (!alwaysAsk && !typedAddresses(ctx).includes(email.toLowerCase())) {
+        const shown = (ctx.people ?? []).filter((p) => String(p?.email ?? '').toLowerCase() === email.toLowerCase()).map((p) => plainName(p.name)).filter(Boolean);
+        if (shown.length && !shown.includes(plainName(fullName))) alwaysAsk = true;
+      }
       return { summary: t('action.create_contact', { who: email ? `${fullName} <${email}>` : fullName }), plan: { name, card }, alwaysAsk };
     }
     case 'draft_reply': {
