@@ -227,6 +227,8 @@
   "action.create_contact": "Afegeix {who} als contactes",
   "action.draft_reply": "Obre una resposta a «{subject}» amb l'esborrany",
   "action.draft_reply_all": "Obre una resposta a tothom a «{subject}» amb l'esborrany",
+  "action.reply_to": "La resposta va a {to}",
+  "action.reply_to_unknown": "Aquest missatge no mostra on aniria una resposta",
   "action.draft_email": "Obre un missatge nou per a {to}: «{subject}»",
   "action.approve": "Fes-ho",
   "action.skip": "Omet",

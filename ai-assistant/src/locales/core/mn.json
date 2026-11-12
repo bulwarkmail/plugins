@@ -227,6 +227,8 @@
   "action.create_contact": "{who}-г харилцагчдад нэмэх",
   "action.draft_reply": "«{subject}»-д ноорогтой хариу нээх",
   "action.draft_reply_all": "«{subject}»-д ноорогтой бүгдэд хариу нээх",
+  "action.reply_to": "Хариу {to} руу очно",
+  "action.reply_to_unknown": "Энэ мессежээс хариу хаашаа очихыг харах боломжгүй",
   "action.draft_email": "{to} руу шинэ мессеж нээх: «{subject}»",
   "action.approve": "Хийх",
   "action.skip": "Алгасах",

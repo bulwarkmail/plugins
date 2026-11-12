@@ -227,6 +227,8 @@
   "action.create_contact": "Ajouter {who} à vos contacts",
   "action.draft_reply": "Ouvrir une réponse à « {subject} » avec le brouillon",
   "action.draft_reply_all": "Ouvrir une réponse à tous à « {subject} » avec le brouillon",
+  "action.reply_to": "La réponse part à {to}",
+  "action.reply_to_unknown": "Ce message n'indique pas où irait une réponse",
   "action.draft_email": "Ouvrir un nouveau message à {to} : « {subject} »",
   "action.approve": "Exécuter",
   "action.skip": "Ignorer",

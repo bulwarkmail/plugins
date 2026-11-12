@@ -227,6 +227,8 @@
   "action.create_contact": "הוספת {who} לאנשי הקשר",
   "action.draft_reply": "פתיחת תשובה ל\"{subject}\" עם הטיוטה",
   "action.draft_reply_all": "פתיחת תשובה לכולם ל\"{subject}\" עם הטיוטה",
+  "action.reply_to": "התשובה תישלח אל {to}",
+  "action.reply_to_unknown": "ההודעה הזו לא מראה לאן תישלח תשובה",
   "action.draft_email": "פתיחת הודעה חדשה אל {to}: \"{subject}\"",
   "action.approve": "בצע",
   "action.skip": "דלג",

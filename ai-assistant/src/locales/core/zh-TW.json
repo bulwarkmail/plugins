@@ -227,6 +227,8 @@
   "action.create_contact": "將 {who} 加入聯絡人",
   "action.draft_reply": "以草稿開啟對「{subject}」的回覆",
   "action.draft_reply_all": "以草稿開啟對「{subject}」的全部回覆",
+  "action.reply_to": "回覆會寄給 {to}",
+  "action.reply_to_unknown": "從這封郵件看不出回覆會寄到哪裡",
   "action.draft_email": "開啟寄給 {to} 的新郵件：「{subject}」",
   "action.approve": "執行",
   "action.skip": "略過",

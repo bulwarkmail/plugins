@@ -227,6 +227,8 @@
   "action.create_contact": "Legg {who} til i kontaktene",
   "action.draft_reply": "Åpne et svar på «{subject}» med utkastet",
   "action.draft_reply_all": "Åpne et svar til alle på «{subject}» med utkastet",
+  "action.reply_to": "Svaret går til {to}",
+  "action.reply_to_unknown": "Denne meldingen viser ikke hvor et svar ville gått",
   "action.draft_email": "Åpne en ny melding til {to}: «{subject}»",
   "action.approve": "Utfør",
   "action.skip": "Hopp over",

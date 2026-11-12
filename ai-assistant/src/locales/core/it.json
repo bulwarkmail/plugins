@@ -227,6 +227,8 @@
   "action.create_contact": "Aggiungi {who} ai contatti",
   "action.draft_reply": "Apri una risposta a «{subject}» con la bozza",
   "action.draft_reply_all": "Apri una risposta a tutti a «{subject}» con la bozza",
+  "action.reply_to": "La risposta va a {to}",
+  "action.reply_to_unknown": "Questo messaggio non mostra dove andrebbe una risposta",
   "action.draft_email": "Apri un nuovo messaggio a {to}: «{subject}»",
   "action.approve": "Esegui",
   "action.skip": "Salta",

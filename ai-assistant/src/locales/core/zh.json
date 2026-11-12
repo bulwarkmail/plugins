@@ -227,6 +227,8 @@
   "action.create_contact": "将 {who} 加入联系人",
   "action.draft_reply": "用草稿打开对“{subject}”的回复",
   "action.draft_reply_all": "用草稿打开对“{subject}”的全部回复",
+  "action.reply_to": "回复会发给 {to}",
+  "action.reply_to_unknown": "从这封邮件看不出回复会发到哪里",
   "action.draft_email": "打开发给 {to} 的新邮件：“{subject}”",
   "action.approve": "执行",
   "action.skip": "跳过",

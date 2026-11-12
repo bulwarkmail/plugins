@@ -227,6 +227,8 @@
   "action.create_contact": "Добавить {who} в контакты",
   "action.draft_reply": "Открыть ответ на «{subject}» с черновиком",
   "action.draft_reply_all": "Открыть ответ всем на «{subject}» с черновиком",
+  "action.reply_to": "Ответ уйдёт на {to}",
+  "action.reply_to_unknown": "По этому письму не видно, куда уйдёт ответ",
   "action.draft_email": "Открыть новое письмо для {to}: «{subject}»",
   "action.approve": "Выполнить",
   "action.skip": "Пропустить",

@@ -12,8 +12,8 @@
 // Most of them follow the user's mode. These always ask first, since the
 // user would hardly notice them otherwise and the model may act on what a
 // message it reads says: a move to Trash or Junk, moving or archiving any
-// message other than the open one, and a new contact or a new message whose
-// address the user didn't name.
+// message other than the open one, and a new contact, a new message or a
+// reply whose address the user didn't name.
 
 import { areaAction, areaActions, offered } from './areas/index.js';
 
@@ -26,6 +26,55 @@ export function knownRecipient(address, ctx = {}) {
   const typed = (String(ctx.userTyped ?? '').match(ADDRESS_IN_TEXT) ?? []).map((a) => a.toLowerCase());
   const people = (ctx.participants ?? []).map((a) => String(a).toLowerCase());
   return typed.includes(wanted) || people.includes(wanted);
+}
+
+/**
+ * The Reply-To addresses of a message view: [] without a Reply-To, null when
+ * the view can't tell. The webmail's view carries the raw headers by name
+ * (a Reply-To value may be in several headers and hold several addresses);
+ * a `replyTo` list is read where a view has one.
+ */
+export function replyToOf(email) {
+  if (Array.isArray(email?.replyTo)) return email.replyTo.map((r) => String(typeof r === 'string' ? r : r?.email ?? '').trim()).filter(Boolean);
+  let headers = email?.headers;
+  if (Array.isArray(headers)) headers = Object.fromEntries(headers.filter((h) => h?.name).map((h) => [h.name, h.value]));
+  if (!headers || typeof headers !== 'object') return null;
+  const names = Object.keys(headers).filter((name) => name.toLowerCase() === 'reply-to');
+  if (!names.length) return [];
+  const raw = names.flatMap((name) => [headers[name]].flat()).join(', ');
+  const found = [...new Set(raw.match(ADDRESS_IN_TEXT) ?? [])];
+  return found.length ? found : null;
+}
+
+/** The user's own addresses (identities and accounts), lower case; empty when they can't be read. */
+async function ownAddresses(api) {
+  const safe = async (call) => { try { return (await call()) ?? []; } catch { return []; } };
+  const [identities, accounts] = await Promise.all([safe(() => api.user.getIdentities()), safe(() => api.user.getAccounts())]);
+  return new Set([...identities, ...accounts].map((x) => String(x?.email ?? '').trim().toLowerCase()).filter(Boolean));
+}
+
+/**
+ * Where a reply to `email` goes, as the webmail addresses it: the Reply-To,
+ * else the sender; reply to all adds To and Cc without the user's own
+ * addresses; a reply to the user's own message goes to its recipients.
+ * null when the message view can't tell.
+ */
+async function replyRecipients(api, email, all) {
+  const replyTo = replyToOf(email);
+  if (replyTo === null) return null;
+  const own = await ownAddresses(api);
+  const isOwn = (a) => own.has(a.toLowerCase());
+  const list = (key) => (Array.isArray(email[key]) ? email[key] : []).map((p) => String(p?.email ?? '').trim()).filter(Boolean);
+  const [from, to, cc] = [list('from'), list('to'), list('cc')];
+  let out;
+  if (!replyTo.some((a) => !isOwn(a)) && from[0] && isOwn(from[0]) && to.length) {
+    out = all ? [...to, ...cc] : to;
+  } else {
+    const target = replyTo.length ? replyTo : from.slice(0, 1);
+    out = all ? [...target, ...to.filter((a) => !isOwn(a)), ...cc.filter((a) => !isOwn(a))] : target;
+  }
+  const seen = new Set();
+  return out.filter((a) => !seen.has(a.toLowerCase()) && seen.add(a.toLowerCase()));
 }
 
 /** Folders a move to always asks first: what lands there is out of the user's sight. */
@@ -219,8 +268,8 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
     return { summary, plan: { ...plan, name, area: area.area }, alwaysAsk };
   }
   const t = api.i18n.t;
-  // (archive, move, contacts and draft_email set alwaysAsk where they need
-  // it; the other core actions follow the mode.)
+  // (archive, move, contacts, draft_reply and draft_email set alwaysAsk
+  // where they need it; the other core actions follow the mode.)
   const locale = api.i18n?.getLocale?.() ?? 'en';
   switch (name) {
     case 'archive_message': {
@@ -314,7 +363,17 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
       const body = text(args.text, 20000);
       if (!body) throw new Error('text is empty');
       const all = args.all === true;
-      return { summary: t(all ? 'action.draft_reply_all' : 'action.draft_reply', { subject: email.subject || '…' }), plan: { name, email, text: body, all } };
+      // The card says where the reply goes. It asks first when that is an
+      // address the message chose (a Reply-To that is neither the sender nor
+      // a recipient) and the user didn't type, or when it can't be told.
+      const recipients = await replyRecipients(api, email, all);
+      const inMessage = ['from', 'to', 'cc'].flatMap((key) => (Array.isArray(email[key]) ? email[key] : []).map((p) => p?.email).filter(Boolean));
+      const known = { ...ctx, participants: [...(ctx.participants ?? []), ...inMessage] };
+      const alwaysAsk = recipients === null || recipients.some((a) => !knownRecipient(a, known));
+      const lines = [t(all ? 'action.draft_reply_all' : 'action.draft_reply', { subject: email.subject || '…' })];
+      if (recipients === null) lines.push(t('action.reply_to_unknown'));
+      else if (recipients.length) lines.push(t('action.reply_to', { to: recipients.join(', ') }));
+      return { summary: lines.join('\n'), plan: { name, email, text: body, all }, alwaysAsk };
     }
     case 'draft_email': {
       const to = (Array.isArray(args.to) ? args.to : String(args.to ?? '').split(/[,;]/)).map((a) => text(a, 200)).filter(Boolean).slice(0, 20);

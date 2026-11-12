@@ -168,7 +168,9 @@ in the chat and that isn't the sender or a recipient of the open
 message, and opening a new message to such an address. Only what you type
 into the chat counts as typed: not a subject or a sender's name, a passage
 you highlighted, a quick action or a saved prompt. A Reply-To address
-counts only when it is also the sender or a recipient.
+counts only when it is also the sender or a recipient. A reply card says
+where the reply goes; it asks first when that is such a Reply-To, or when
+the message doesn't show where a reply would go.
 
 Actions are off until a user turns them on. The administrator decides
 how far users may go (off, ask first, or automatic) in the plugin's

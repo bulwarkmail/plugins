@@ -227,6 +227,8 @@
   "action.create_contact": "Pievienot {who} kontaktiem",
   "action.draft_reply": "Atvērt atbildi uz “{subject}” ar melnrakstu",
   "action.draft_reply_all": "Atvērt atbildi visiem uz “{subject}” ar melnrakstu",
+  "action.reply_to": "Atbilde tiks nosūtīta: {to}",
+  "action.reply_to_unknown": "No šīs ziņas nav redzams, kur nonāktu atbilde",
   "action.draft_email": "Atvērt jaunu ziņu adresātam {to}: “{subject}”",
   "action.approve": "Izpildīt",
   "action.skip": "Izlaist",

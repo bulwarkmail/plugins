@@ -227,6 +227,8 @@
   "action.create_contact": "{who} felvétele a névjegyek közé",
   "action.draft_reply": "Válasz megnyitása erre: „{subject}”, a piszkozattal",
   "action.draft_reply_all": "Válasz mindenkinek megnyitása erre: „{subject}”, a piszkozattal",
+  "action.reply_to": "A válasz címzettje: {to}",
+  "action.reply_to_unknown": "Ebből az üzenetből nem látszik, kinek menne a válasz",
   "action.draft_email": "Új üzenet megnyitása neki: {to}: „{subject}”",
   "action.approve": "Végrehajtás",
   "action.skip": "Kihagyás",

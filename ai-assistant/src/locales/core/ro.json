@@ -227,6 +227,8 @@
   "action.create_contact": "Adaugă {who} la contacte",
   "action.draft_reply": "Deschide un răspuns la „{subject}” cu ciorna",
   "action.draft_reply_all": "Deschide un răspuns către toți la „{subject}” cu ciorna",
+  "action.reply_to": "Răspunsul merge la {to}",
+  "action.reply_to_unknown": "Acest mesaj nu arată unde ar ajunge un răspuns",
   "action.draft_email": "Deschide un mesaj nou către {to}: „{subject}”",
   "action.approve": "Execută",
   "action.skip": "Sari peste",

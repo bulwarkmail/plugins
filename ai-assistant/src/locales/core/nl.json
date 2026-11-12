@@ -227,6 +227,8 @@
   "action.create_contact": "{who} aan uw contacten toevoegen",
   "action.draft_reply": "Antwoord op '{subject}' met het concept openen",
   "action.draft_reply_all": "Antwoord aan allen op '{subject}' met het concept openen",
+  "action.reply_to": "Het antwoord gaat naar {to}",
+  "action.reply_to_unknown": "Dit bericht laat niet zien waar een antwoord heen zou gaan",
   "action.draft_email": "Nieuw bericht aan {to} openen: '{subject}'",
   "action.approve": "Uitvoeren",
   "action.skip": "Overslaan",
