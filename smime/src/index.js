@@ -38,7 +38,7 @@ import {
   parseCertificatePemOrDer, parseCertificateDer, extractCertificateInfo, computeFingerprint, issuerCapabilities,
   pemCertificates, classifyCapabilities, rdnToString, certificateAddresses,
 } from './certificate-utils.js';
-import { makeTrust, vouchedFor } from './trust.js';
+import { makeTrust, vouchedFor, weakKey } from './trust.js';
 import { generateUUID } from './util.js';
 import { rawSendOptions } from './send-options.js';
 import { makeUi, fmtDate } from './ui.js';
@@ -50,7 +50,7 @@ import {
   saveKeyRecord, listKeyRecords, deleteKeyRecord,
   savePublicCert, listPublicCerts, deletePublicCert,
   saveSessionKeys, getSessionKeys, deleteSessionKeys, clearSessionKeys, markSessionKeysUsed, lockIdleSessionKeys,
-  saveTrusted, listTrusted, deleteTrusted, getChoice, saveChoice, setAccountResolver, getAddressAnswer, saveAddressAnswer,
+  saveTrusted, listTrusted, deleteTrusted, getChoice, saveChoice, setAccountResolver, getCertificateAnswer, saveCertificateAnswer,
 } from './key-storage.js';
 import { unlockedDecryptMaps, forgetRebuiltKeys } from './session-keys.js';
 import { certValidNow, createOsKeys, keystoreCode, keystoreStops, senderKeys } from './os-keys.js';
@@ -353,10 +353,11 @@ async function withSigningKey(records, sign) {
 /**
  * A stored recipient certificate as the send path needs it: parsed, with its
  * fingerprint, and whether it may be used today: in its dates, may encrypt, names the
- * record's address among all its addresses, and, when it came from a signed message, a
- * trusted issuer or a certificate the user trusts vouches for it now. A certificate the
- * user imported that names other addresses only is usable after the user agreed for this
- * address (`mismatch`). Null when it doesn't parse.
+ * record's address among all its addresses, has a key at or above the floor (trust.js
+ * weakKey), and, when it came from a signed message, a trusted issuer or a certificate the
+ * user trusts vouches for it now. A certificate the user imported that names other
+ * addresses only, or has a short key, is usable after the user agreed for this address
+ * (`concerns`: 'address', 'key'). Null when it doesn't parse.
  */
 async function describeRecipientCert(record, trust) {
   try {
@@ -371,15 +372,18 @@ async function describeRecipientCert(record, trust) {
     }
     const addresses = certificateAddresses(cert);
     const named = addresses.includes(String(record.email || '').toLowerCase());
+    const shortKey = weakKey(cert);
+    const handImported = !fromSignedMail(record);
     return {
       record,
       fingerprint,
       addresses,
-      mismatch: !named,
+      concerns: handImported ? [...(named ? [] : ['address']), ...(shortKey ? ['key'] : [])] : [],
       issuer: rdnToString(cert.issuer),
       notAfter: cert.notAfter.value.toISOString(),
       usable: inDates && classifyCapabilities(cert).canEncrypt && vouched
-        && (named || (!fromSignedMail(record) && addresses.length > 0)),
+        && (named || (handImported && addresses.length > 0))
+        && (!shortKey || handImported),
       vouched,
     };
   } catch {
@@ -451,52 +455,64 @@ async function recipientCertsFor(emails, ownAddresses) {
   const trust = await loadTrust();
   const missing = [];
   const unusable = [];
+  // Addresses whose only usable certificates the user declined (it names other addresses or
+  // its key is short): the message says so rather than call them unusable.
+  const declined = [];
   const pending = [];
   for (const email of [...new Set(emails.map((e) => e.toLowerCase()))]) {
     if (ownAddresses.has(email)) continue;
     const stored = certs.filter((c) => String(c.email || '').toLowerCase() === email);
     if (stored.length === 0) { missing.push(email); continue; }
     const usable = [];
+    let refused = 0;
     for (const d of await Promise.all(stored.map((c) => describeRecipientCert(c, trust)))) {
       if (!d || !d.usable) continue;
-      if (d.mismatch) {
-        // The user answered for this address and certificate before.
-        const answer = await getAddressAnswer(email, d.fingerprint).catch(() => null);
-        if (answer && answer.accepted === false) continue;
-        if (answer && answer.accepted === true) d.mismatch = false;
+      if (d.concerns.length) {
+        // The user answered for this address and certificate before, about the same concerns.
+        const answer = await getCertificateAnswer(email, d.fingerprint).catch(() => null);
+        const covered = answer && d.concerns.every((c) => (answer.covers || ['address']).includes(c));
+        if (covered && answer.accepted === false) { refused++; continue; }
+        if (covered && answer.accepted === true) d.concerns = [];
       }
       usable.push(d);
     }
-    if (usable.length === 0) { unusable.push(email); continue; }
+    if (usable.length === 0) { (refused ? declined : unusable).push(email); continue; }
     pending.push([email, usable]);
   }
   if (missing.length > 0) {
     host.toast.error(t('send.missingCertificates', { emails: missing.join(', ') }));
     return null;
   }
-  if (unusable.length > 0) {
-    host.toast.error(t('send.noUsableCertificate', { emails: unusable.join(', ') }));
+  if (unusable.length > 0 || declined.length > 0) {
+    if (unusable.length > 0) host.toast.error(t('send.noUsableCertificate', { emails: unusable.join(', ') }));
+    if (declined.length > 0) host.toast.error(t('send.declinedCertificate', { emails: declined.join(', ') }));
     return null;
   }
   const found = [];
   for (const [email, usable] of pending) {
-    // A certificate imported for this address that names other addresses only: the user
-    // says once, seeing the addresses it names, whether it may be used for this one.
+    // A certificate imported for this address that names other addresses only, or whose key
+    // is short: the user says once, told which of the two (or both), whether it may be used
+    // for this address.
     const agreed = [];
     for (const d of usable) {
-      if (d.mismatch) {
+      if (d.concerns.length) {
+        const both = d.concerns.length === 2;
+        const lead = both ? t('send.addressMismatchShortKey', { email, addresses: d.addresses.join(', ') })
+          : d.concerns[0] === 'address' ? t('send.addressMismatch', { email, addresses: d.addresses.join(', ') })
+            : t('send.shortKey', { email });
         const yes = await host.ui.confirm({
           title: t('send.chooseTitle', { email }),
-          message: `${t('send.addressMismatch', { email, addresses: d.addresses.join(', ') })}\n\n${certDetails(d)}`,
+          message: `${lead}\n\n${certDetails(d)}`,
           confirmLabel: t('send.chooseConfirm'),
         });
-        await saveAddressAnswer(email, d.fingerprint, !!yes).catch((err) => host.log.warn('saving the certificate answer failed', err));
+        await saveCertificateAnswer(email, d.fingerprint, !!yes, d.concerns)
+          .catch((err) => host.log.warn('saving the certificate answer failed', err));
         if (!yes) continue;
       }
       agreed.push(d);
     }
     if (agreed.length === 0) {
-      host.toast.error(t('send.noUsableCertificate', { emails: email }));
+      host.toast.error(t('send.declinedCertificate', { emails: email }));
       return null;
     }
     // A certificate the user imported always comes before one from a signed message.

@@ -244,18 +244,20 @@ export async function saveChoice(email, fingerprint, among) {
   await putOwned(db, CHOICES_STORE, { id, email: String(email).toLowerCase(), fingerprint, among, at: Date.now() });
 }
 
-// { id, accountId, email, fingerprint, accepted, at }: the user's answer, for one address
-// and one certificate, on using a certificate that doesn't name that address.
+// { id, accountId, email, fingerprint, accepted, covers, at }: the user's answer, for one
+// address and one certificate imported by hand, on using it although it doesn't name the
+// address ('address' in `covers`) or its key is short ('key'). An answer without `covers`
+// was about the address only.
 
-export async function getAddressAnswer(email, fingerprint) {
+export async function getCertificateAnswer(email, fingerprint) {
   const db = await openTrustDB();
   return getOwned(db, CHOICES_STORE, `${await choiceId(email)}\n${String(fingerprint).toLowerCase()}`);
 }
 
-export async function saveAddressAnswer(email, fingerprint, accepted) {
+export async function saveCertificateAnswer(email, fingerprint, accepted, covers) {
   const db = await openTrustDB();
   const id = `${await choiceId(email)}\n${String(fingerprint).toLowerCase()}`;
-  await putOwned(db, CHOICES_STORE, { id, email: String(email).toLowerCase(), fingerprint, accepted, at: Date.now() });
+  await putOwned(db, CHOICES_STORE, { id, email: String(email).toLowerCase(), fingerprint, accepted, covers, at: Date.now() });
 }
 
 // ── Session (unlocked) key CRUD ─────────────────────────────────────
