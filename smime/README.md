@@ -11,14 +11,27 @@ material ever leaves the device.
 |---|---|
 | **Sign** outgoing mail | `onComposeSend` builds the MIME and signs it with CMS `SignedData`, then submits via `api.jmap.sendRaw`. The *Signature format* setting picks detached (`multipart/signed`, readable without S/MIME; the default) or opaque (`application/pkcs7-mime`). |
 | **Encrypt** outgoing mail | `onComposeSend` builds CMS `EnvelopedData` to every recipient (AES-256-GCM by default; AES-128 optional) plus the sender, then submits raw. Sign + Encrypt does proper sign-then-encrypt. |
-| **Verify** incoming signatures | `onRenderEmailBody` fetches the raw message (`api.jmap.fetchBlob`), so the signed part is checked byte-for-byte, validates the signature cryptographically, checks validity dates, flags self-signed signers and signer≠From mismatches, and renders the inner body. Only a message signed as a whole counts: its own top-level type is `multipart/signed` (with exactly the signed part and the signature) or `application/pkcs7-mime`, in a header every parser reads the same way (one Content-Type field, each parameter once), with the boundary only on its delimiter lines, and the mail server has to read the parts the plugin verifies: the same tree of parts with the same names and sizes, and no attachment outside the signed part. Anything else reads as a damaged signed message. A signed part inside another message is not verified; the banner says that part of the message is signed. |
+| **Verify** incoming signatures | `onRenderEmailBody` fetches the raw message (`api.jmap.fetchBlob`), so the signed part is checked byte-for-byte, checks the signature and the certificate's validity dates, and renders the inner body. The banner names the signer as verified (green, "Valid signature by …") only when the certificate chains to a trusted issuer or is a certificate the user trusts, may sign mail, the digest is not SHA-1 or MD5, and the From address is one of the certificate's addresses (see *Trust* below). Any other intact signature reads "Signature matches, signer not verified", with the reason in the details. Only a message signed as a whole counts: its own top-level type is `multipart/signed` (with exactly the signed part and the signature) or `application/pkcs7-mime`, in a header every parser reads the same way (one Content-Type field, each parameter once), with the boundary only on its delimiter lines, and the mail server has to read the parts the plugin verifies: the same tree of parts with the same names and sizes, and no attachment outside the signed part. Anything else reads as a damaged signed message. A signed part inside another message is not verified; the banner says that part of the message is signed. |
 | **Decrypt** incoming mail | `onRenderEmailBody` decrypts with your unlocked key: `EnvelopedData` with AES-CBC (128/192/256), 3DES or DES, and `AuthEnvelopedData` with AES-GCM (128/256) or ChaCha20-Poly1305. That covers Thunderbird, Outlook and all four modes of Stalwart's encryption at rest. The content key can be wrapped with RSAES-PKCS1-v1_5, RSA-OAEP (SHA-256 in `EnvelopedData`, or any of these with an OS key; SHA-1, SHA-256, SHA-384 or SHA-512 in `AuthEnvelopedData`), or ECDH-ES on P-256, P-384 or P-521 with AES key wrap. Mail in anything else, such as RC2, gets a banner that names the algorithm. |
-| **Key management** | `settings-section` slot: import PKCS#12 (`.p12`/`.pfx`), unlock/lock, delete, import recipient certificates, set sign/encrypt defaults. |
+| **Key management** | `settings-section` slot: import PKCS#12 (`.p12`/`.pfx`), unlock/lock, delete, import recipient certificates and trusted issuers, set sign/encrypt defaults. |
 | **Keys in the OS** | In the desktop app, certificates from the Windows store, the macOS keychain and smart cards show up next to imported keys, marked as from the system store. They sign and decrypt without an import, through the optional `keystore` permission. Without it, everything runs on the PKCS#12 import as before. |
 | **Status** | `email-banner` slot shows signature / encryption state as reader info bars; Sign and Encrypt are check items in the composer's Options menu, per message, starting from the defaults in Settings. |
 
 ## Security model
 
+- **Trust.** A browser gives a page no access to the system's trusted roots, so
+  the plugin keeps its own list. Trusted issuers are certificate authorities the
+  user imports under *Trusted issuers*, plus the PEM certificates an admin puts
+  into the plugin's admin setting `trustedIssuers` (read with `api.config.get`).
+  Trusted signer certificates are single certificates the user trusted from the
+  signature details ("Trust this certificate"), kept by fingerprint, and
+  recipient certificates the user imported by hand. A path from the signer to a
+  trusted issuer is built from the certificates in the message; each link needs
+  a valid signature, its validity dates, the CA flag and certificate signing in
+  its key usage (and a fitting path length). No root list is bundled, so mail
+  signed under a public CA reads "signer not verified" until the user or the
+  admin adds that CA. Revocation is not checked (nothing is fetched), and the
+  details say so.
 - **Privileged tier.** Declares `tier: "privileged"` + `crypto:full`. Per
   `resolvePluginTier`, the same-origin tier is only granted to a **signed,
   admin-approved (managed)** bundle after high-risk consent. A self-uploaded
@@ -99,8 +112,9 @@ src/
   key-agree.js        ECDH recipients: X9.63 KDF + AES key wrap
   os-keys.js          keys in the OS store: virtual key records, handles for api.keystore
   smime-verify.js     CMS signature verification + signer status
+  trust.js            whose signature counts as verified: trusted issuers, paths, usage, From
   pkcs12.js           PKCS#12 import + key wrap/unlock
-  key-storage.js      IndexedDB: key records, recipient certs, session keys
+  key-storage.js      IndexedDB: key records, recipient certs, session keys, trusted certificates
   util.js             uuid / hex / equality helpers
   node-crypto-shim.js browser shim for the Node "crypto" builtin
 ```

@@ -23,6 +23,7 @@ import { fakeApi } from '../../test-utils/fake-api.mjs';
 import * as kit from '../../test-utils/ui-kit.mjs';
 import { fakeKeystore } from './helpers/fake-keystore.mjs';
 import { fakeIndexedDB } from './helpers/fake-indexeddb.mjs';
+import { trustSigner } from './helpers/trusted-signer.mjs';
 import { smimeSign, smimeSignDetached } from '../src/smime-sign.js';
 import { bannerRows } from '../src/ui.js';
 
@@ -65,7 +66,8 @@ beforeAll(async () => {
   signer = { key: leaf.privateKey, cert: new Uint8Array(cert.toSchema(true).toBER(false)) };
 }, 120_000);
 
-beforeEach(() => { globalThis.indexedDB = fakeIndexedDB(); });
+// The user trusts the signer's certificate, so these honest mails show the trusted verdict.
+beforeEach(async () => { globalThis.indexedDB = fakeIndexedDB(); await trustSigner(signer.cert); });
 
 function plugin(raw) {
   const ks = fakeKeystore([{ certificate: fixture('cert.pem').toString(), key: fixture('key.pem').toString() }]);

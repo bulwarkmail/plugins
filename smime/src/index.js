@@ -34,7 +34,10 @@ import {
 } from './smime-detect.js';
 import { parseMime, extractDetachedSigned, opaqueBody } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
-import { parseCertificatePemOrDer, extractCertificateInfo } from './certificate-utils.js';
+import {
+  parseCertificatePemOrDer, extractCertificateInfo, computeFingerprint, issuerCapabilities, pemCertificates,
+} from './certificate-utils.js';
+import { makeTrust } from './trust.js';
 import { generateUUID } from './util.js';
 import { rawSendOptions } from './send-options.js';
 import { makeUi } from './ui.js';
@@ -46,6 +49,7 @@ import {
   saveKeyRecord, listKeyRecords, deleteKeyRecord,
   savePublicCert, listPublicCerts, deletePublicCert,
   saveSessionKeys, getSessionKeys, deleteSessionKeys, clearSessionKeys,
+  saveTrusted, listTrusted, deleteTrusted,
 } from './key-storage.js';
 import { unlockedDecryptMaps, forgetRebuiltKeys } from './session-keys.js';
 import { certValidNow, createOsKeys, keystoreCode, keystoreStops, senderKeys } from './os-keys.js';
@@ -83,6 +87,48 @@ function useAes128() {
 function useDetachedSignature() {
   // Also detached for installs that predate the setting.
   return settings().signatureFormat !== 'opaque';
+}
+
+// ─── Trust (trust.js) ─────────────────────────────────────────────────
+
+// The admin's trusted issuers: PEM text in the plugin's admin setting `trustedIssuers`,
+// read with api.config.get (the admin's settings that aren't secrets, webmail 1.15.0 and
+// later). Read again after a few minutes, not for every message.
+const ADMIN_ISSUERS_MS = 5 * 60_000;
+let adminIssuerCache = null;
+
+async function adminIssuers() {
+  if (adminIssuerCache && Date.now() - adminIssuerCache.at < ADMIN_ISSUERS_MS) return adminIssuerCache.ders;
+  let text = '';
+  try {
+    const config = typeof host.config?.get === 'function' ? await host.config.get() : null;
+    if (config && typeof config.trustedIssuers === 'string') text = config.trustedIssuers;
+  } catch { /* no admin setting: no issuers from it */ }
+  const ders = pemCertificates(text);
+  adminIssuerCache = { at: Date.now(), ders };
+  return ders;
+}
+
+// A recipient certificate counts as hand-imported unless it came from a signed message.
+const fromSignedMail = (cert) => cert.source === 'signed-email';
+
+/**
+ * What a verification trusts: the user's and the admin's trusted issuers, and as single
+ * certificates the ones the user trusted from a signed mail and the recipient
+ * certificates the user imported by hand.
+ */
+async function loadTrust() {
+  const [trusted, certs, admin] = await Promise.all([
+    listTrusted().catch(() => []),
+    listPublicCerts().catch(() => []),
+    adminIssuers(),
+  ]);
+  const handImported = await Promise.all(certs.filter((c) => !fromSignedMail(c) && c.certificate)
+    .map((c) => computeFingerprint(c.certificate).catch(() => null)));
+  return makeTrust({
+    issuers: [...trusted.filter((r) => r.kind === 'issuer' && r.certificate).map((r) => r.certificate), ...admin],
+    pinned: [...trusted.filter((r) => r.kind === 'signer').map((r) => r.fingerprint), ...handImported].filter(Boolean),
+  });
 }
 
 // ─── Privileged-tier capability probe ─────────────────────────────────
@@ -621,7 +667,7 @@ async function renderEncrypted(body, ctx, loadCms, fromEmail, started, asked) {
     if (looksSigned) {
       try {
         const signedDer = normalizeCmsBytes(bytesArrayBuffer(innerBytes));
-        const v = await smimeVerify(signedDer, fromEmail);
+        const v = await smimeVerify(signedDer, fromEmail, await loadTrust());
         v.status.format = 'opaque';
         innerBytes = v.mimeBytes;
         Object.assign(verification, v.status, { isEncrypted: true, decryptionSuccess: true });
@@ -629,10 +675,12 @@ async function renderEncrypted(body, ctx, loadCms, fromEmail, started, asked) {
       } catch { /* not actually signed; keep decrypted content as-is */ }
     }
 
-    // EFAIL: CBC lets an attacker reshape the plaintext without the key, for instance into
-    // an image URL that carries the rest of the mail away. Only a verified signature shows
-    // nobody did. External content stays off whatever the user trusts, and the note is
-    // only there if this webmail can do as the plugin asks.
+    // EFAIL: CBC lets whoever holds the ciphertext reshape the plaintext without the key, for
+    // instance into an image URL that carries the rest of the mail away. Only an intact
+    // signature shows nobody did. External content stays off whatever the user trusts, and
+    // the note is only there if this webmail can do as the plugin asks. This depends on the
+    // intact signature alone, not on whether the signer is verified: whoever reshapes the
+    // ciphertext doesn't know the plaintext, so can't sign the result, trusted or not.
     const unprotected = !result.integrity && verification.cryptoValid !== true;
     if (unprotected && host.host?.features?.blockExternalContent === true) verification.noIntegrity = true;
 
@@ -721,7 +769,7 @@ async function onRenderEmailBody(body, ctx) {
         await invalid(MALFORMED_SIGNED);
         return undefined;
       }
-      const v = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, fromEmail);
+      const v = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, fromEmail, await loadTrust());
       v.status.format = 'detached';
       await maybeAutoImportSigner(v.status);
       const parsed = parseMime(v.mimeBytes);
@@ -773,7 +821,7 @@ async function onRenderEmailBody(body, ctx) {
     const der = await loadCms();
 
     if (type === 'signed-data') {
-      const v = await smimeVerify(der, fromEmail);
+      const v = await smimeVerify(der, fromEmail, await loadTrust());
       v.status.format = 'opaque';
       await maybeAutoImportSigner(v.status);
       const parsed = parseMime(v.mimeBytes);
@@ -824,8 +872,10 @@ const { EmailBanner, SettingsSection } = makeUi(host, {
   settings, isCapable, getPrefs, setPrefs, detectSmime, ensureKeyUnlocked,
   listKeyRecords, saveKeyRecord, deleteKeyRecord, getSessionKeys, saveSessionKeys, deleteSessionKeys,
   listPublicCerts, savePublicCert, deletePublicCert,
+  listTrusted, saveTrusted, deleteTrusted, adminIssuers,
   osKeys, FRESH_PREFIX,
   importPkcs12, unlockPrivateKey, parseCertificatePemOrDer, extractCertificateInfo, generateUUID,
+  issuerCapabilities, pemCertificates,
   // The settings page runs in its own iframe; it republishes the composer's
   // Options entries so a newly imported key makes Sign / Encrypt usable.
   onKeysChanged: () => publishComposeActions(host, composeDeps),

@@ -27,6 +27,7 @@ import { fakeApi } from '../../test-utils/fake-api.mjs';
 import * as kit from '../../test-utils/ui-kit.mjs';
 import { fakeKeystore } from './helpers/fake-keystore.mjs';
 import { fakeIndexedDB } from './helpers/fake-indexeddb.mjs';
+import { trustSigner } from './helpers/trusted-signer.mjs';
 import { smimeSign, smimeSignDetached } from '../src/smime-sign.js';
 import { bannerRows } from '../src/ui.js';
 
@@ -73,7 +74,8 @@ beforeAll(async () => {
   sigB64 = b64(await smimeSignDetached(enc.encode(ENTITY), signer.key, signer.cert));
 }, 120_000);
 
-beforeEach(() => { globalThis.indexedDB = fakeIndexedDB(); });
+// The user trusts the signer's certificate, so a mail both sides read the same way shows the trusted verdict.
+beforeEach(async () => { globalThis.indexedDB = fakeIndexedDB(); await trustSigner(signer.cert); });
 
 // `raw` is the message as text (sent as UTF-8) or as bytes.
 function plugin(raw) {

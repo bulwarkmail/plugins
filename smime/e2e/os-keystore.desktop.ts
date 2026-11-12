@@ -169,12 +169,13 @@ test.describe('S/MIME with a key from CurrentUser\\My', () => {
     expect(asked.filter((prompt) => /certificate/i.test(`${prompt.message} ${prompt.detail}`))).toEqual([]);
   });
 
-  test('signs with the OS key: the shell asks, and the signature verifies', async () => {
+  test('signs with the OS key: the shell asks, and the signature matches', async () => {
     const { page, app } = launched;
     const subject = `OS key signed ${run}`;
     await compose(page, subject, [/sign \(s\/mime\)/i]);
     await openMail(page, subject);
-    await expectBanner(page, /valid signature/i);
+    // The test certificate is self-signed and nobody trusts it, so the signer reads as not verified.
+    await expectBanner(page, /signature matches, signer not verified/i);
     // The shell's dialog names the certificate. The run id is the last word of its subject.
     const runId = cert.subject.split(' ').pop()!;
     const asked = await prompts(app);

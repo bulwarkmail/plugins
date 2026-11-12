@@ -5,15 +5,18 @@
 
 import * as pkijs from 'pkijs';
 import * as asn1js from 'asn1js';
-import { extractCertificateInfo } from './certificate-utils.js';
+import { extractCertificateInfo, rdnToString } from './certificate-utils.js';
 import { nativeEngine } from './crypto-engine.js';
+import { evaluateSigner } from './trust.js';
 import { arraysEqual, toArrayBuffer, toHex } from './util.js';
 
 /**
  * Verify a CMS SignedData structure and extract the encapsulated content.
+ * `trust` (trust.js makeTrust) decides whether the signer is verified; without it
+ * nobody is.
  * @returns { mimeBytes: Uint8Array, status: SmimeStatus }
  */
-export async function smimeVerify(cmsBytes, fromHeader) {
+export async function smimeVerify(cmsBytes, fromHeader, trust) {
   const contentInfo = parseContentInfo(cmsBytes);
   const signedData = extractSignedData(contentInfo);
 
@@ -21,7 +24,7 @@ export async function smimeVerify(cmsBytes, fromHeader) {
 
   return {
     mimeBytes: innerContent,
-    status: await verifyStatus(signedData, { signer: 0, checkChain: false }, fromHeader),
+    status: await verifyStatus(signedData, { signer: 0, checkChain: false }, fromHeader, trust),
   };
 }
 
@@ -29,26 +32,26 @@ export async function smimeVerify(cmsBytes, fromHeader) {
  * Verify a detached signature over the signed entity's raw bytes.
  * @returns { mimeBytes: Uint8Array, status: SmimeStatus }
  */
-export async function smimeVerifyDetached(signatureDer, entityBytes, fromHeader) {
+export async function smimeVerifyDetached(signatureDer, entityBytes, fromHeader, trust) {
   const signedData = extractSignedData(parseContentInfo(signatureDer));
   // pkijs checks embedded eContent in preference to the data we pass, so a
   // CMS carrying its own content would vouch for that, not the shown part.
   if (signedData.encapContentInfo?.eContent) throw new Error('Detached signature carries its own content');
 
   // Retry with CRLF line endings in case a relay stripped the CRs.
-  let status = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(entityBytes) }, fromHeader);
+  let status = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(entityBytes) }, fromHeader, trust);
   const canonical = toCrlf(entityBytes);
   // Compare the digest result alone: with an expired certificate signatureValid
   // is false either way, and the LF attempt would report changed content.
   if (!status.cryptoValid && canonical) {
-    const retry = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(canonical) }, fromHeader);
+    const retry = await verifyStatus(signedData, { signer: 0, checkChain: false, data: toArrayBuffer(canonical) }, fromHeader, trust);
     if (retry.cryptoValid) status = retry;
   }
 
   return { mimeBytes: entityBytes, status };
 }
 
-async function verifyStatus(signedData, verifyParams, fromHeader) {
+async function verifyStatus(signedData, verifyParams, fromHeader, trust) {
   const signerCert = extractSignerCertificate(signedData);
   if (!signerCert) {
     return {
@@ -64,11 +67,9 @@ async function verifyStatus(signedData, verifyParams, fromHeader) {
   let verifyError;
 
   try {
-    // checkChain:false — validate the signature cryptographically. Trust of the
-    // issuer chain is surfaced separately (selfSigned flag + the banner), rather
-    // than collapsing "untrusted issuer" into "invalid signature". This matches
-    // how most S/MIME clients present results and keeps validly-signed mail from
-    // self-signed or non-bundled CAs from showing a scary "invalid" badge.
+    // checkChain:false: this checks the signature and digest against the certificate in
+    // the message. Who vouches for that certificate is trust.js's question, answered
+    // below, so an unknown issuer reads as "signer not verified", not as a broken signature.
     signatureValid = await signedData.verify(verifyParams, nativeEngine());
   } catch (err) {
     signatureError = err instanceof Error ? err.message : 'Signature verification failed';
@@ -89,10 +90,13 @@ async function verifyStatus(signedData, verifyParams, fromHeader) {
   if (certExpired && !signatureError) signatureError = 'Signer certificate has expired';
   if (certNotYetValid && !signatureError) signatureError = 'Signer certificate is not yet valid';
 
-  const signerEmail = certInfo.emailAddresses[0] ?? '';
+  // Every address the certificate names (subject and alternative names), in lower case.
+  const addresses = [...new Set(certInfo.emailAddresses.map((e) => String(e).toLowerCase()))];
+  const signerEmail = addresses[0] ?? '';
   const signerPublicCert = {
     id: `signer-${certInfo.fingerprint}`,
-    email: signerEmail.toLowerCase(),
+    email: signerEmail,
+    emails: addresses,
     certificate: certDer,
     issuer: certInfo.issuer,
     subject: certInfo.subject,
@@ -104,23 +108,32 @@ async function verifyStatus(signedData, verifyParams, fromHeader) {
     source: 'signed-email',
   };
 
+  // A certificate without an address matches no From.
   let signerEmailMatch;
-  if (fromHeader && signerEmail) {
-    signerEmailMatch = fromHeader.toLowerCase() === signerEmail.toLowerCase();
-  }
+  if (fromHeader) signerEmailMatch = addresses.includes(fromHeader.toLowerCase());
 
   const issuerDer = new Uint8Array(signerCert.issuer.toSchema().toBER(false));
   const subjectDer = new Uint8Array(signerCert.subject.toSchema().toBER(false));
   const selfSigned = arraysEqual(issuerDer, subjectDer);
 
+  const intact = signatureValid && !certExpired && !certNotYetValid;
+  const trusted = intact
+    ? await evaluateSigner({ signedData, signerCert, fingerprint: certInfo.fingerprint, addresses, fromEmail: fromHeader, trust })
+    : { verified: false, reasons: [] };
+
   return {
     isSigned: true,
     isEncrypted: false,
-    signatureValid: signatureValid && !certExpired && !certNotYetValid,
+    signatureValid: intact,
     signatureError,
     signerCert: signerPublicCert,
     signerEmailMatch,
     selfSigned,
+    // Only a signer trust.js verified gets the trusted verdict; the rest reads "signer not verified".
+    signerVerified: trusted.verified,
+    trustedVia: trusted.via,
+    trustAnchor: trusted.anchor ? rdnToString(trusted.anchor.subject) : undefined,
+    trustReasons: trusted.reasons,
     // The individual checks behind signatureValid, for the details view.
     cryptoValid: signatureValid,
     verifyError,

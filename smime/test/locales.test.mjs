@@ -168,8 +168,9 @@ describe('S/MIME in another language', () => {
     [{ isEncrypted: true, decryptionError: 'damaged' }, '‹banner.encryption›', '‹banner.encryptedDamaged›'],
     [{ isEncrypted: true }, '‹banner.encryption›', '‹banner.encrypted›'],
     [{ isSigned: true }, '‹banner.signature›', '‹banner.signed›'],
-    [{ isSigned: true, signatureValid: true }, '‹banner.signature›', '‹banner.valid›'],
-    [{ isSigned: true, signatureValid: true, selfSigned: true, signerEmailMatch: false, signerCert: { email: 'a@x.org' } }, '‹banner.signature›', '‹banner.validBy› a@x.org · ‹banner.selfSigned› · ‹banner.signerMismatch›'],
+    [{ isSigned: true, signatureValid: true }, '‹banner.signature›', '‹banner.unverified›'],
+    [{ isSigned: true, signatureValid: true, selfSigned: true, signerEmailMatch: false, signerCert: { email: 'a@x.org' } }, '‹banner.signature›', '‹banner.unverified›'],
+    [{ isSigned: true, signatureValid: true, signerVerified: true, fromEmail: 'a@x.org', signerCert: { email: 'a@x.org' } }, '‹banner.signature›', '‹banner.validBy› a@x.org'],
     [{ isSigned: true, signatureError: 'Signer certificate has expired' }, '‹banner.signature›', '‹banner.invalid› ‹error.signerExpired›'],
     [{ isSigned: true, signatureError: 'ASN.1 garbage' }, '‹banner.signature›', '‹banner.invalid› ASN.1 garbage'],
     [{ partlySigned: true }, '‹banner.signature›', '‹banner.partlySigned›'],
@@ -188,10 +189,60 @@ describe('S/MIME in another language', () => {
     await act(async () => { render(React.createElement(EmailBanner, { email: { id: 'm1' } })); });
     fireEvent.click(screen.getByRole('button', { name: '‹banner.showDetails›' }));
     const text = document.body.textContent;
-    for (const key of ['check.unchanged', 'check.validUntil', 'check.senderMatch', 'check.issuerUnchecked', 'field.subject', 'field.email', 'field.issuer', 'field.valid', 'field.serial', 'field.format', 'format.detached']) {
+    for (const key of ['check.unchanged', 'check.validUntil', 'check.senderMatch', 'check.issuerUntrusted', 'check.revocation', 'field.subject', 'field.email', 'field.issuer', 'field.valid', 'field.serial', 'field.format', 'format.detached']) {
       expect(text, key).toContain(`‹${key}›`);
     }
     expect(screen.getByRole('button', { name: '‹banner.hideDetails›' })).toBeTruthy();
+    expectNoEnglish(text);
+  });
+
+  it('draws the reasons a signer is not verified, and the trust action, from the locale', async () => {
+    const prompts = [];
+    const api = pseudoApi({ 'ui.confirm': async (p) => { prompts.push(p); return false; } });
+    await api.storage.set('verify:m1', {
+      isSigned: true, signatureValid: true, cryptoValid: true, signerEmailMatch: true, fromEmail: 'a@x.org', selfSigned: true,
+      signerVerified: false, trustReasons: ['self'],
+      signerCert: { email: 'a@x.org', emails: ['a@x.org'], subject: 'CN=A', issuer: 'CN=A', fingerprint: 'ab', notAfter: '2999-01-01', notBefore: '2000-01-01' },
+    });
+    const { EmailBanner } = makeUi(api, deps({ saveTrusted: async () => {}, generateUUID: () => 'u' }));
+    await act(async () => { render(React.createElement(EmailBanner, { email: { id: 'm1' } })); });
+    fireEvent.click(screen.getByRole('button', { name: '‹banner.showDetails›' }));
+    expect(document.body.textContent).toContain('‹check.selfSigned›');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '‹banner.trust›' })); });
+    expect(prompts[0]).toMatchObject({ title: '‹trust.title›', message: '‹trust.message› a@x.org ab', confirmLabel: '‹trust.confirm›' });
+    cleanup();
+
+    for (const [reasons, key] of [[['issuer', 'usage'], 'check.usage'], [['issuer', 'digest'], 'check.weakDigest']]) {
+      const other = pseudoApi();
+      await other.storage.set('verify:m2', {
+        isSigned: true, signatureValid: true, cryptoValid: true, signerEmailMatch: true, fromEmail: 'a@x.org', signerVerified: false, trustReasons: reasons,
+        signerCert: { email: 'a@x.org', fingerprint: 'ab', notAfter: '2999-01-01', notBefore: '2000-01-01' },
+      });
+      const { EmailBanner: Banner } = makeUi(other, deps({ saveTrusted: async () => {} }));
+      await act(async () => { render(React.createElement(Banner, { email: { id: 'm2' } })); });
+      fireEvent.click(screen.getByRole('button', { name: '‹banner.showDetails›' }));
+      expect(document.body.textContent).toContain(`‹${key}›`);
+      expect(document.body.textContent).toContain('‹check.issuerUntrusted›');
+      // Trusting the certificate would not cure this, so it isn't offered.
+      expect(screen.queryByRole('button', { name: '‹banner.trust›' })).toBeNull();
+      expectNoEnglish(document.body.textContent);
+      cleanup();
+    }
+  });
+
+  it('draws the trusted issuers from the locale', async () => {
+    const api = pseudoApi();
+    const { SettingsSection } = makeUi(api, deps({
+      listTrusted: async () => [
+        { id: 't1', kind: 'issuer', subject: 'CN=Corp CA', fingerprint: 'aa', notBefore: '2020-01-01', notAfter: '2999-01-01' },
+        { id: 't2', kind: 'signer', emails: ['bob@x.org'], subject: 'CN=Bob', fingerprint: 'bb', notBefore: '2020-01-01', notAfter: '2000-01-01' },
+      ],
+    }));
+    await act(async () => { render(React.createElement(SettingsSection)); });
+    const text = document.body.textContent;
+    for (const key of ['issuers.title', 'issuers.description', 'issuers.import', 'issuers.single']) expect(text, key).toContain(`‹${key}›`);
+    expect(text).toContain('Corp CA');
+    expect(screen.getByLabelText('‹issuers.file›').getAttribute('type')).toBe('file');
     expectNoEnglish(text);
   });
 
@@ -223,6 +274,7 @@ describe('S/MIME in another language', () => {
     await act(async () => { render(React.createElement(SettingsSection)); });
     expect(document.body.textContent).toContain('‹keys.empty›');
     expect(document.body.textContent).toContain('‹certificates.empty›');
+    expect(document.body.textContent).toContain('‹issuers.empty›');
     cleanup();
     const { SettingsSection: Off } = makeUi(pseudoApi(), deps({ isCapable: async () => false }));
     await act(async () => { render(React.createElement(Off)); });

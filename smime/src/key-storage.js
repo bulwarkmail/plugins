@@ -17,6 +17,15 @@
  * non-extractable key stays non-extractable when read back. Only CryptoKeys
  * and bytes go in there: a webcrypto-liner key is a JS object and comes back
  * as a plain Object (see session-keys.js).
+ *
+ * What the user trusts (trust.js) lives in a database of its own,
+ * smime-plugin-trust, so the stores above keep the version older releases
+ * opened them with: a version change would wait for every tab that still
+ * runs an older release to close.
+ *  - trusted: { id, kind, fingerprint, certificate?, subject, issuer,
+ *             notBefore, notAfter, emails?, addedAt }. kind 'issuer' is a
+ *             trusted issuer (with its certificate), kind 'signer' a single
+ *             trusted signer certificate, kept by fingerprint.
  */
 
 import { classifyCapabilities, parseCertificateDer } from './certificate-utils.js';
@@ -113,6 +122,39 @@ export async function listPublicCerts(accountId) {
 export async function deletePublicCert(id) {
   const db = await openDB();
   await txPromise(db, PUBLIC_CERTS_STORE, 'readwrite', (s) => s.delete(id));
+}
+
+// ── Trusted issuers and trusted signer certificates ────────────────
+
+const TRUST_DB_NAME = 'smime-plugin-trust';
+const TRUST_DB_VERSION = 1;
+const TRUSTED_STORE = 'trusted';
+
+function openTrustDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(TRUST_DB_NAME, TRUST_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(TRUSTED_STORE)) db.createObjectStore(TRUSTED_STORE, { keyPath: 'id' });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function saveTrusted(record) {
+  const db = await openTrustDB();
+  await txPromise(db, TRUSTED_STORE, 'readwrite', (s) => s.put(record));
+}
+
+export async function listTrusted() {
+  const db = await openTrustDB();
+  return txPromise(db, TRUSTED_STORE, 'readonly', (s) => s.getAll());
+}
+
+export async function deleteTrusted(id) {
+  const db = await openTrustDB();
+  await txPromise(db, TRUSTED_STORE, 'readwrite', (s) => s.delete(id));
 }
 
 // ── Session (unlocked) key CRUD ─────────────────────────────────────
