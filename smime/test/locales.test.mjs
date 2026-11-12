@@ -215,6 +215,7 @@ describe('S/MIME in another language', () => {
     for (const [reasons, key] of [
       [['issuer', 'usage'], 'check.usage'], [['issuer', 'digest'], 'check.weakDigest'],
       [['issuer', 'constraints'], 'check.nameConstraints'], [['issuer', 'limit'], 'check.pathLimit'],
+      [['issuer', 'weakKey'], 'check.weakKey'],
     ]) {
       const other = pseudoApi();
       await other.storage.set('verify:m2', {

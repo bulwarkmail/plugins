@@ -34,7 +34,10 @@ material ever leaves the device.
   dropped, a certificate that led nowhere isn't tried again, a path has at most
   8 certificates, one verification makes at most 64 signature checks, and only
   the first 32 certificates of a message are looked at; reaching a bound reads
-  "signer not verified" with the reason. No root list is bundled, so mail
+  "signer not verified" with the reason. A key under RSA 2048 bits or an
+  elliptic curve under 256 bits anywhere on the path, and a SHA-1 or MD5 hash
+  in any signature (RSA-PSS parameters included), also read "not verified".
+  No root list is bundled, so mail
   signed under a public CA reads "signer not verified" until the user or the
   admin adds that CA. Revocation is not checked (nothing is fetched), and the
   details say so.

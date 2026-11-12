@@ -83,6 +83,7 @@ export function signatureChecks(status, t, locale) {
   if (reasons.includes('limit')) checks.push({ tone: 'warn', text: t('check.pathLimit') });
   if (reasons.includes('usage')) checks.push({ tone: 'warn', text: t('check.usage') });
   if (reasons.includes('digest')) checks.push({ tone: 'warn', text: t('check.weakDigest') });
+  if (reasons.includes('weakKey')) checks.push({ tone: 'warn', text: t('check.weakKey') });
   checks.push({ tone: 'info', text: t('check.revocation') });
   return checks;
 }

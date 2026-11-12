@@ -15,9 +15,13 @@
 //  - key usage allows signing and extended key usage allows mail, where present;
 //  - the mail signature is not made with SHA-1 or MD5 (nor is any certificate below the
 //    trusted issuer);
-//  - the mail's From address is one of the addresses the certificate names.
+//  - the mail's From address is one of the addresses the certificate names;
+//  - no key on the path (the signer's included) is shorter than RSA 2048 bits or an
+//    elliptic curve of 256 bits.
 // Revocation is not checked: nothing here goes to the network.
 
+import * as asn1js from 'asn1js';
+import * as pkijs from 'pkijs';
 import { classifyCapabilities, issuerCapabilities, parseCertificateDer } from './certificate-utils.js';
 import { nativeEngine } from './crypto-engine.js';
 
@@ -29,6 +33,64 @@ const WEAK_SIGNATURES = new Set([
   '1.2.840.113549.1.1.2', '1.2.840.113549.1.1.3', '1.2.840.113549.1.1.4', '1.2.840.113549.1.1.5',
   '1.2.840.10045.4.1', '1.2.840.10040.4.3', '1.3.14.3.2.29',
 ]);
+const RSA_PSS = '1.2.840.113549.1.1.10';
+
+/**
+ * Whether a signature algorithm hashes with SHA-1 or MD5: one of the fixed ones, or RSA-PSS
+ * whose hash or mask generation hash is (RFC 4055 makes both SHA-1 when left out).
+ */
+export function weakSignatureAlgorithm(algorithm) {
+  if (!algorithm) return false;
+  if (WEAK_SIGNATURES.has(algorithm.algorithmId)) return true;
+  if (algorithm.algorithmId !== RSA_PSS) return false;
+  try {
+    const params = algorithm.algorithmParams instanceof asn1js.Sequence
+      ? new pkijs.RSASSAPSSParams({ schema: algorithm.algorithmParams })
+      : new pkijs.RSASSAPSSParams();
+    const mgfHash = new pkijs.AlgorithmIdentifier({ schema: params.maskGenAlgorithm.algorithmParams });
+    return WEAK_DIGESTS.has(params.hashAlgorithm.algorithmId) || WEAK_DIGESTS.has(mgfHash.algorithmId);
+  } catch {
+    return true;
+  }
+}
+
+// Elliptic curves by their size in bits: NIST P-192, P-224, P-256, P-384, P-521, secp256k1,
+// brainpoolP160r1 to P512r1.
+const CURVE_BITS = {
+  '1.2.840.10045.3.1.1': 192, '1.3.132.0.33': 224, '1.2.840.10045.3.1.7': 256, '1.3.132.0.34': 384, '1.3.132.0.35': 521,
+  '1.3.132.0.10': 256, '1.3.36.3.3.2.8.1.1.1': 160, '1.3.36.3.3.2.8.1.1.3': 192, '1.3.36.3.3.2.8.1.1.5': 224,
+  '1.3.36.3.3.2.8.1.1.7': 256, '1.3.36.3.3.2.8.1.1.9': 320, '1.3.36.3.3.2.8.1.1.11': 384, '1.3.36.3.3.2.8.1.1.13': 512,
+};
+const MIN_RSA_BITS = 2048;
+const MIN_CURVE_BITS = 256;
+
+/**
+ * Whether the certificate's key is too short: RSA under 2048 bits, an elliptic curve under
+ * 256 bits, or a curve or algorithm the plugin doesn't know (Ed25519 and Ed448 are fine).
+ */
+export function weakKey(cert) {
+  const spki = cert.subjectPublicKeyInfo;
+  const algorithm = spki.algorithm.algorithmId;
+  if (algorithm === '1.2.840.113549.1.1.1' || algorithm === RSA_PSS) {
+    try {
+      const rsa = asn1js.fromBER(spki.subjectPublicKey.valueBlock.valueHexView).result;
+      let modulus = new Uint8Array(rsa.valueBlock.value[0].valueBlock.valueHexView);
+      let start = 0;
+      while (start < modulus.length - 1 && modulus[start] === 0) start++;
+      modulus = modulus.subarray(start);
+      const bits = (modulus.length - 1) * 8 + (32 - Math.clz32(modulus[0]));
+      return bits < MIN_RSA_BITS;
+    } catch {
+      return true;
+    }
+  }
+  if (algorithm === '1.2.840.10045.2.1') {
+    const curve = spki.algorithm.algorithmParams instanceof asn1js.ObjectIdentifier
+      ? spki.algorithm.algorithmParams.valueBlock.toString() : '';
+    return !(CURVE_BITS[curve] >= MIN_CURVE_BITS);
+  }
+  return !(algorithm === '1.3.101.112' || algorithm === '1.3.101.113');
+}
 // Extensions a path may mark critical: the ones read here, the policy ones (no policy is
 // required, so they restrict nothing), and name constraints (a CA that carries them, critical
 // or not, can't issue: issuerCapabilities).
@@ -44,7 +106,7 @@ export const MAX_CHECKS = 64; // signature checks for one certificate's path
 export const MAX_POOL = 32; // certificates of a message the search looks at (the first ones)
 
 /** Why a signer is not verified, as the details panel words it. */
-export const REASONS = ['issuer', 'self', 'constraints', 'limit', 'usage', 'digest', 'from'];
+export const REASONS = ['issuer', 'self', 'constraints', 'limit', 'usage', 'digest', 'weakKey', 'from'];
 
 /**
  * The trust a verification works with. `issuers` are certificate DERs, `pinned` are
@@ -125,8 +187,12 @@ async function pathToAnchor(cert, path, below, search) {
       search.problems.add('constraints');
       continue;
     }
-    if (WEAK_SIGNATURES.has(cert.signatureAlgorithm.algorithmId)) {
+    if (weakSignatureAlgorithm(cert.signatureAlgorithm)) {
       search.problems.add('digest');
+      continue;
+    }
+    if (weakKey(issuer)) {
+      search.problems.add('weakKey');
       continue;
     }
     if (isAnchor) return issuer;
@@ -144,7 +210,8 @@ async function pathToAnchor(cert, path, below, search) {
  * (`pool`: other certificates that may be intermediates), else { reasons } with 'self'
  * or 'issuer', and 'constraints' when a CA on the way carries name constraints, 'limit'
  * when the search stopped at one of its bounds, 'digest' when a link was signed with
- * SHA-1 or MD5. Of `pool` only the first MAX_POOL distinct certificates are used.
+ * SHA-1 or MD5, 'weakKey' when an issuer's key is too short. Of `pool` only the first
+ * MAX_POOL distinct certificates are used.
  */
 export async function vouchedFor(cert, { fingerprint, pool = [], trust, now = new Date() }) {
   if (trust && trust.pinned.has(String(fingerprint).toLowerCase())) return { via: 'signer', reasons: [] };
@@ -175,10 +242,11 @@ export async function evaluateSigner({ signedData, signerCert, fingerprint, addr
   const { via, anchor } = vouched;
 
   if (!classifyCapabilities(signerCert).canSign) reasons.add('usage');
+  if (weakKey(signerCert)) reasons.add('weakKey');
 
   const signerInfo = signedData.signerInfos?.[0];
   if (WEAK_DIGESTS.has(signerInfo?.digestAlgorithm?.algorithmId)
-    || WEAK_SIGNATURES.has(signerInfo?.signatureAlgorithm?.algorithmId)) reasons.add('digest');
+    || weakSignatureAlgorithm(signerInfo?.signatureAlgorithm)) reasons.add('digest');
 
   const from = String(fromEmail || '').toLowerCase();
   if (!from || !addresses.includes(from)) reasons.add('from');

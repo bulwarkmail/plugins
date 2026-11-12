@@ -6,6 +6,14 @@ import * as pkijs from 'pkijs';
 import { smimeSign } from '../../src/smime-sign.js';
 
 const EC = { name: 'ECDSA', namedCurve: 'P-256' };
+
+/**
+ * A WebCrypto RSA key algorithm of `bits` (RSASSA-PKCS1-v1_5 unless `name` says RSA-PSS).
+ * An RSA-PSS key signs with its own `hash`, whatever hash a signing call names.
+ */
+export const rsaKey = (bits, name = 'RSASSA-PKCS1-v1_5', hash = 'SHA-256') => ({
+  name, modulusLength: bits, publicExponent: new Uint8Array([1, 0, 1]), hash,
+});
 const DAY = 86_400_000;
 const EMAIL_PROTECTION = '1.3.6.1.5.5.7.3.4';
 const KEY_USAGE = ['digitalSignature', 'contentCommitment', 'keyEncipherment', 'dataEncipherment', 'keyAgreement',
@@ -57,11 +65,12 @@ async function make({ cn, email, issuer, publicKey, signingKey, extensions, notB
  * A certificate authority, self-signed unless `issuer` (another makeCa result) signs it.
  * `ca: false` leaves the CA flag out; `keyUsage` replaces keyCertSign + cRLSign;
  * `nameConstraints` (a domain) adds a non-critical name constraints extension permitting it.
+ * `algorithm` is a WebCrypto key algorithm (ECDSA P-256 unless given; see rsaKey).
  */
 export async function makeCa(cn, {
-  issuer, ca = true, pathLen, keyUsage: bits = ['keyCertSign', 'cRLSign'], notBefore, notAfter, nameConstraints,
+  issuer, ca = true, pathLen, keyUsage: bits = ['keyCertSign', 'cRLSign'], notBefore, notAfter, nameConstraints, algorithm = EC,
 } = {}) {
-  const key = await crypto.subtle.generateKey(EC, false, ['sign', 'verify']);
+  const key = await crypto.subtle.generateKey(algorithm, false, ['sign', 'verify']);
   const extensions = [basicConstraints(ca, pathLen), ...(bits ? [keyUsage(bits)] : [])];
   if (nameConstraints) {
     extensions.push(new pkijs.Extension({
@@ -81,12 +90,13 @@ export async function makeCa(cn, {
  * A mail certificate issued by `issuer` (or self-signed without one), for `emails` in its
  * alternative names and `subjectEmail` in its subject. `eku` null leaves extended key
  * usage out, `keyUsage` null leaves key usage out. `hash` is the issuer's signature hash.
+ * `algorithm` is the leaf's WebCrypto key algorithm (ECDSA P-256 unless given).
  */
 export async function makeLeaf(issuer, {
   cn = 'Mail user', emails = [], subjectEmail, keyUsage: bits = ['digitalSignature', 'keyAgreement'], eku = [EMAIL_PROTECTION],
-  notBefore, notAfter, hash,
+  notBefore, notAfter, hash, algorithm = EC,
 } = {}) {
-  const key = await crypto.subtle.generateKey(EC, true, ['sign', 'verify']);
+  const key = await crypto.subtle.generateKey(algorithm, true, ['sign', 'verify']);
   const extensions = [basicConstraints(false)];
   if (bits) extensions.push(keyUsage(bits));
   if (eku) extensions.push(new pkijs.Extension({ extnID: '2.5.29.37', extnValue: new pkijs.ExtKeyUsage({ keyPurposes: eku }).toSchema().toBER(false) }));
