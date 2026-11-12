@@ -257,7 +257,10 @@ switches the whole group off with **Files**.
 
 Answers come as formatted text (bullet lists, bold, small tables, links
 that open in a new tab). A link whose text isn't its own address shows the
-site it leads to next to it. The assistant can add cards to an answer: quick
+site it leads to next to it, and so does an address that could mislead: one
+with a name before an @ in front of the site, a site name with letters
+outside the Latin alphabet or in punycode, or one followed by a site name
+in brackets. The assistant can add cards to an answer: quick
 replies to click, time slots to put into the message or answer with, a
 checklist, people, a table. In the composer a card's text goes into the
 message where the cursor is.

@@ -62,6 +62,50 @@ describe('a link in formatted text', () => {
     fireEvent.click(screen.getByRole('button', { name: 'https://example.org/docs' }));
     expect(open).toHaveBeenCalledWith('https://example.org/docs');
   });
+
+  it('adds nothing to a plain link followed by bracketed text that is no host (control)', () => {
+    render(React.createElement(Markdown, { text: 'See https://example.org/docs (page 2) for that.' }));
+    expect(document.querySelector('[data-link-host]')).toBeNull();
+  });
+});
+
+describe('the host next to a link, kept readable', () => {
+  const RLO = '‮';
+
+  it('is isolated left to right, so a direction change earlier in the answer can\'t turn it around', () => {
+    render(React.createElement(Markdown, { text: `Pay here ${RLO}[View invoice](https://pay.example.net/c) today.` }));
+    const host = document.querySelector('[data-link-host]');
+    expect(host.textContent).toBe('(pay.example.net)');
+    expect(host.tagName).toBe('BDI');
+    expect(host.getAttribute('dir')).toBe('ltr');
+  });
+
+  it('follows a link text without direction controls', () => {
+    render(React.createElement(Markdown, { text: `[${RLO}View invoice⁦](https://pay.example.net/c)` }));
+    const button = screen.getByRole('button', { name: 'View invoice' });
+    expect(button.textContent).toBe('View invoice');
+    expect(hostNextTo('View invoice')).toBe('(pay.example.net)');
+  });
+});
+
+describe('a link written as its own address that could mislead', () => {
+  const lookAlike = 'https://bаnk.example/login';
+
+  it.each([
+    ['with a user part, as a labelled link', '[https://bank.example@other.example/](https://bank.example@other.example/)', 'https://bank.example@other.example/', '(other.example)'],
+    ['with a user part, written bare', 'Sign in at https://bank.example@other.example/login now', 'https://bank.example@other.example/login', '(other.example)'],
+    ['with a look-alike letter in the host', `Sign in at ${lookAlike} now`, lookAlike, `(${new URL(lookAlike).host})`],
+    ['with a punycode host', 'Sign in at https://xn--bnk-sna.example/login now', 'https://xn--bnk-sna.example/login', '(xn--bnk-sna.example)'],
+    ['followed by bracketed text that looks like a host', 'Pay at https://other.example/pay (bank.example) today', 'https://other.example/pay', '(other.example)'],
+  ])('shows its host %s', (_what, text, label, host) => {
+    render(React.createElement(Markdown, { text }));
+    expect(hostNextTo(label)).toBe(host);
+  });
+
+  it('shows the real host after a link text that ends in a host of its own', () => {
+    render(React.createElement(Markdown, { text: '[Pay (bank.example)](https://other.example/pay)' }));
+    expect(hostNextTo('Pay (bank.example)')).toBe('(other.example)');
+  });
 });
 
 function makeApi({ answers = [LABELLED] } = {}) {
