@@ -162,13 +162,26 @@ class MalformedMessageError extends Error {
   }
 }
 
+// The message couldn't be fetched: says nothing about the message itself.
+class FetchFailedError extends Error {
+  constructor(cause) {
+    super(cause && cause.message ? cause.message : String(cause));
+    this.name = 'FetchFailedError';
+  }
+}
+
 /**
  * The CMS of a message that is application/pkcs7-mime as a whole, as DER. It is read
  * from the raw message, whose header has to read one way and say pkcs7-mime; throws
- * MalformedMessageError when it doesn't.
+ * MalformedMessageError when it doesn't, FetchFailedError when it can't be fetched.
  */
 async function fetchCms(blobId) {
-  const raw = await host.jmap.fetchBlob(blobId);
+  let raw;
+  try {
+    raw = await host.jmap.fetchBlob(blobId);
+  } catch (err) {
+    throw new FetchFailedError(err);
+  }
   const body = opaqueBody(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
   if (!body) throw new MalformedMessageError();
   return normalizeCmsBytes(bytesArrayBuffer(body));
@@ -656,6 +669,11 @@ async function onRenderEmailBody(body, ctx) {
     return undefined;
   }
 
+  if (detection.type === 'malformed-signed') {
+    await persistVerifyStatus(ctx.id, { isSigned: true, isEncrypted: false, signatureValid: false, signatureError: MALFORMED_SIGNED });
+    return undefined;
+  }
+
   if (!detection.supported) {
     const status = {
       isSigned: detection.type === 'detached-sig',
@@ -763,10 +781,15 @@ async function onRenderEmailBody(body, ctx) {
     }
   } catch (err) {
     host.log.error('onRenderEmailBody failed', err);
-    if (err instanceof MalformedMessageError) {
-      await persistVerifyStatus(ctx.id, { isSigned: true, isEncrypted: false, signatureValid: false, signatureError: MALFORMED_SIGNED });
+    // As for a detached signature: what fails to verify reads as invalid, not as the
+    // neutral "Signed message" the banner guesses from the header. A failed fetch says
+    // nothing about the message, so it leaves no verdict.
+    if (!(err instanceof FetchFailedError)) {
+      await persistVerifyStatus(ctx.id, {
+        isSigned: true, isEncrypted: false, signatureValid: false, signatureError: err && err.message ? err.message : String(err),
+      });
     }
-    return undefined; // fall back to host rendering on unexpected failure
+    return undefined; // the host renders the message itself
   }
 
   return undefined;

@@ -105,6 +105,34 @@ describe('reader banner', () => {
     const rows = bannerRows({ isEncrypted: true, decryptionError: 'locked' }, { t });
     expect(rows).toEqual([expect.objectContaining({ tone: 'warning', action: 'unlock' })]);
   });
+
+  it('waits for the verdict on a mail whose only hint is a pkcs7 attachment', async () => {
+    const api = fakeApi();
+    const { EmailBanner } = makeUi(api, deps());
+    const email = {
+      id: 'm3', headers: { 'Content-Type': 'multipart/mixed; boundary="b"' },
+      attachments: [{ blobId: 'b1', name: 'smime.p7s', type: 'application/pkcs7-signature', size: 2 }],
+    };
+    await act(async () => { render(React.createElement(EmailBanner, { email })); });
+    expect(document.querySelector('.bk-infobar')).toBeNull();
+    // The render hook stores its verdict after the banner looked the first time.
+    await api.storage.set('verify:m3', { partlySigned: true, at: Date.now() });
+    await waitFor(() => expect(document.querySelector('.bk-infobar')?.textContent).toMatch(/Part of this message is signed/));
+    expect(document.querySelector('.bk-infobar').getAttribute('data-tone')).toBe('warning');
+  });
+
+  it('looks once for a mail without a hint (control)', async () => {
+    const api = fakeApi();
+    const read = api.storage.get;
+    let reads = 0;
+    api.storage.get = async (key) => { reads++; return read(key); };
+    const { EmailBanner } = makeUi(api, deps());
+    const email = { id: 'm4', headers: { 'Content-Type': 'text/plain' }, attachments: [{ blobId: 'b1', name: 'a.pdf', type: 'application/pdf', size: 2 }] };
+    await act(async () => { render(React.createElement(EmailBanner, { email })); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)); });
+    expect(reads).toBe(1);
+    expect(document.querySelector('.bk-infobar')).toBeNull();
+  });
 });
 
 describe('settings section', () => {

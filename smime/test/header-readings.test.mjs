@@ -87,11 +87,13 @@ const invoice = { type: 'text/html', name: 'invoice.html', blobId: 'att', size: 
 const serverView = (rootType) => ({ type: rootType, subParts: [invoice, { type: 'text/plain', partId: '2' }] });
 const bodyY = () => `${invoicePart('Y')}--Y\r\nContent-Type: text/plain\r\n\r\n${signedBody()}--Y--\r\n`;
 
-function plugin(raw, blobs = {}) {
+function plugin(raw, blobs = {}, handlers = {}) {
   const ks = fakeKeystore([{ certificate: fixture('cert.pem').toString(), key: fixture('key.pem').toString() }]);
   const api = fakeApi({
     id: 'smime', translations: manifest.locales, hostFeatures: { keystore: true },
-    handlers: { ...ks.handlers, 'jmap.fetchBlob': async (id) => blobs[id] ?? enc.encode(raw), 'ui.rerenderEmail': async () => {}, 'ui.setActions': async () => {} },
+    handlers: {
+      ...ks.handlers, 'jmap.fetchBlob': async (id) => blobs[id] ?? enc.encode(raw), 'ui.rerenderEmail': async () => {}, 'ui.setActions': async () => {}, ...handlers,
+    },
   });
   const mod = { exports: {} };
   new Function('module', 'exports', 'require', code)(mod, mod.exports, (id) => {
@@ -154,12 +156,51 @@ describe('a top-level Content-Type the server may read differently', () => {
 
 describe('a header that says signed data over content that is none', () => {
   const ct = 'application/pkcs7-mime; smime-type=signed-data; name="smime.p7m"';
+  const pemDer = (pem) => new Uint8Array(Buffer.from(pem.replace(/-----[^-]+-----|\s/g, ''), 'base64'));
+
+  it('4. encrypted data under a signed-data header: a verdict is stored, the bar does not say "Signed message"', async () => {
+    const der = pemDer(fixture('cbc.p7m').toString('latin1').split(/\r?\n\r?\n/).slice(1).join(''));
+    const o = await open(`${head}Content-Type: ${ct}\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64(der)}\r\n`,
+      { contentType: ct, bodyStructure: { type: 'application/pkcs7-mime', blobId: 'p7m', partId: '1' }, attachments: [] }, { p7m: der });
+    expect(o.status).toBeTruthy();
+    expect(o.rows).not.toContainEqual(expect.objectContaining({ text: en['banner.signed'] }));
+  });
+
+  it('leaves no verdict when the message could not be fetched (control)', async () => {
+    const { api, hooks } = plugin('', {}, { 'jmap.fetchBlob': async () => { throw new Error('offline'); } });
+    const ctx = { id: 'mail-1', blobId: 'raw', from: [{ email: SIGNER }], contentType: ct, bodyStructure: { type: 'application/pkcs7-mime', partId: '1' }, attachments: [] };
+    expect(await hooks.onRenderEmailBody({ html: '', text: '' }, ctx)).toBeUndefined();
+    expect(await api.storage.get('verify:mail-1')).toBeNull();
+  });
 
   it('5. a second Content-Type header the server reads as text/html: a verdict is stored, the bar does not say "Signed message"', async () => {
     const raw = `${head}Content-Type: ${ct}\r\nContent-Type: text/html\r\n\r\n<h1>New bank details</h1><p>IBAN XX00</p>\r\n`;
     const o = await open(raw, { contentType: ct, bodyStructure: { type: 'text/html', blobId: 'html', partId: '1' }, attachments: [] });
     expect(o.status).toBeTruthy();
     expect(o.rows).not.toContainEqual(expect.objectContaining({ text: en['banner.signed'] }));
+  });
+});
+
+describe('a top-level multipart/signed whose header names no pkcs7 protocol', () => {
+  const damaged = { icon: 'shield-exclamation', tone: 'destructive', text: en['banner.invalid'].replace('{error}', en['error.malformedSigned']) };
+
+  it.each([
+    ['no protocol', 'multipart/signed; micalg=sha-256; boundary="inner"'],
+    ['another protocol', 'multipart/signed; protocol="application/pgp-signature"; micalg=pgp-sha256; boundary="inner"'],
+  ])('reads as a damaged signed message with %s, not as partly signed', async (_, ct) => {
+    const o = await open(`${head}Content-Type: ${ct}\r\n\r\n${signedBody()}`, { contentType: ct, bodyStructure: signedTree, attachments: [] });
+    expect(o.result).toBeUndefined();
+    expect(o.rows).toEqual([damaged]);
+  });
+
+  it('leaves a PGP/MIME signed mail alone (control)', async () => {
+    const ct = 'multipart/signed; protocol="application/pgp-signature"; micalg=pgp-sha256; boundary="inner"';
+    const raw = `${head}Content-Type: ${ct}\r\n\r\n--inner\r\n${ENTITY}\r\n--inner\r\nContent-Type: application/pgp-signature\r\n\r\n`
+      + '-----BEGIN PGP SIGNATURE-----\r\nAAAA\r\n-----END PGP SIGNATURE-----\r\n--inner--\r\n';
+    const tree = { type: 'multipart/signed', subParts: [{ type: 'text/plain', partId: '1' }, { type: 'application/pgp-signature', partId: '2' }] };
+    const o = await open(raw, { contentType: ct, bodyStructure: tree, attachments: [] });
+    expect(o.result).toBeUndefined();
+    expect(o.rows).toEqual([]);
   });
 });
 

@@ -162,10 +162,13 @@ function latin1Bytes(s) {
   return bytes;
 }
 
-// Treat bytes as latin1 so byte boundaries survive; decode per-part by charset.
+// Treat bytes as latin1 so byte boundaries survive; decode per-part by charset. Built in
+// chunks: one character at a time makes a string of millions of pieces for a large mail.
+const CHUNK = 0x2000;
+
 function binaryString(bytes) {
   let s = '';
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i += CHUNK) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
   return s;
 }
 
@@ -363,7 +366,5 @@ function collect(node, out) {
 }
 
 function bytesToDataUrl(bytes, type) {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return `data:${type};base64,${btoa(binary)}`;
+  return `data:${type};base64,${btoa(binaryString(bytes))}`;
 }

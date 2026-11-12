@@ -35,6 +35,11 @@ export function detectSmime(contentType, bodyStructure) {
       ? PKCS7_SIGNATURE.has(params.protocol)
       : !!bodyStructure.subParts?.some(isSignaturePart);
     if (pkcs7) return { type: 'detached-sig', supported: true };
+    // Signed as a whole with a pkcs7 signature by the server's reading, under a header that
+    // names another protocol or none (RFC 1847 requires it): damaged, not partly signed.
+    if (parseContentType(bodyStructure?.type).media === 'multipart/signed' && bodyStructure.subParts?.some(isSignaturePart)) {
+      return { type: 'malformed-signed', supported: false };
+    }
   }
 
   if (bodyStructure && hasSignedPart(bodyStructure)) return { type: 'partly-signed', supported: false };

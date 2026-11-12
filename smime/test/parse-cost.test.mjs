@@ -10,7 +10,7 @@
 //   Linear work gives a factor near 8, quadratic work near 64; the limit is 24.
 import { describe, expect, it } from 'vitest';
 import { normalizeCmsBytes } from '../src/smime-decrypt.js';
-import { parseMime } from '../src/mime-parse.js';
+import { parseMime, extractDetachedSigned } from '../src/mime-parse.js';
 
 const enc = new TextEncoder();
 
@@ -191,5 +191,38 @@ describe('what the MIME reader and normalizeCmsBytes read', () => {
     const message = part([...received, 'Content-Type: application/pkcs7-mime; smime-type=enveloped-data', 'Content-Transfer-Encoding: base64'], b64);
     expect(message.indexOf('Content-Type')).toBeGreaterThan(8192);
     expect(new Uint8Array(normalizeCmsBytes(enc.encode(message).buffer)).length).toBe(300);
+  });
+});
+
+describe('the strings the MIME reader builds from a large mail', () => {
+  /** How often `run` calls String.fromCharCode. */
+  function fromCharCodeCalls(run) {
+    const saved = String.fromCharCode;
+    let calls = 0;
+    String.fromCharCode = function (...codes) {
+      calls++;
+      return saved.apply(String, codes);
+    };
+    try {
+      run();
+    } finally {
+      String.fromCharCode = saved;
+    }
+    return calls;
+  }
+
+  it('are built in chunks, not one character at a time', () => {
+    const size = 1 << 20;
+    const mail = enc.encode('Content-Type: multipart/mixed; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhello\r\n'
+      + `--b\r\nContent-Type: application/octet-stream; name="a.bin"\r\nContent-Disposition: attachment; filename="a.bin"\r\n\r\n${'x'.repeat(size)}\r\n--b--\r\n`);
+    let out;
+    const calls = fromCharCodeCalls(() => {
+      out = parseMime(mail);
+      extractDetachedSigned(mail);
+    });
+    expect(out.text).toBe('hello');
+    expect(out.attachments.map((a) => [a.name, a.size])).toEqual([['a.bin', size]]);
+    expect(atob(out.attachments[0].dataUrl.split(',')[1])).toBe('x'.repeat(size));
+    expect(calls).toBeLessThan(size / 1000);
   });
 });
