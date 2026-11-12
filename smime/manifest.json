@@ -16,7 +16,8 @@
     "ui:composer-toolbar",
     "ui:email-banner",
     "ui:settings-section",
-    "app:lifecycle"
+    "app:lifecycle",
+    "account:read"
   ],
   "optionalPermissions": [
     "keystore"

@@ -45,6 +45,13 @@ material ever leaves the device.
   signed mail without any check stay in the list, marked "not verified", with
   one button to remove them all. The sender's own address needs no stored
   certificate: the own copy is encrypted to the sender's certificate.
+- **Accounts.** The stores belong to the webmail's origin, so keys, recipient
+  certificates, trusted issuers, trusted certificates and certificate choices
+  carry the account they belong to: the host's account id with its server, from
+  `api.user.getAccounts` (permission `account:read`). Each account sees and
+  removes only its own. A record an older version wrote without an account goes
+  to the first account that reads it, once. If the host names no account, the
+  stores stay shared as before.
 - **Privileged tier.** Declares `tier: "privileged"` + `crypto:full`. Per
   `resolvePluginTier`, the same-origin tier is only granted to a **signed,
   admin-approved (managed)** bundle after high-risk consent. A self-uploaded

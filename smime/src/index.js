@@ -50,13 +50,40 @@ import {
   saveKeyRecord, listKeyRecords, deleteKeyRecord,
   savePublicCert, listPublicCerts, deletePublicCert,
   saveSessionKeys, getSessionKeys, deleteSessionKeys, clearSessionKeys,
-  saveTrusted, listTrusted, deleteTrusted, getChoice, saveChoice,
+  saveTrusted, listTrusted, deleteTrusted, getChoice, saveChoice, setAccountResolver,
 } from './key-storage.js';
 import { unlockedDecryptMaps, forgetRebuiltKeys } from './session-keys.js';
 import { certValidNow, createOsKeys, keystoreCode, keystoreStops, senderKeys } from './os-keys.js';
 
 const t = translator(host);
 const osKeys = createOsKeys(host);
+
+// ─── The open account (key-storage.js scopes the stores by it) ────────
+
+// The host's id for the active account (user and server host) together with the
+// server's address, from api.user.getAccounts (permission account:read, webmail 1.15.0
+// and later). Without an answer the stores stay shared (key-storage.js). Asked again
+// after a second, and after an account switch.
+const ACCOUNT_MS = 1000;
+let accountCache = null;
+
+async function activeAccount() {
+  if (accountCache && Date.now() - accountCache.at < ACCOUNT_MS) return accountCache.promise;
+  const promise = (async () => {
+    if (typeof host.user?.getAccounts !== 'function') return null;
+    const accounts = await host.user.getAccounts();
+    const active = Array.isArray(accounts) ? accounts.find((a) => a && a.isActive) : null;
+    return active && active.id ? `${active.id} ${active.serverUrl || ''}`.trim() : null;
+  })().catch(() => null);
+  accountCache = { at: Date.now(), promise };
+  return promise;
+}
+
+function forgetAccount() {
+  accountCache = null;
+}
+
+setAccountResolver(activeAccount);
 
 // ─── Shared preferences (api.storage; shared across iframes) ──────────
 
@@ -1050,6 +1077,7 @@ export const hooks = {
   async onAfterLogout() {
     osKeys.forget();
     forgetRenders();
+    forgetAccount();
     if (settings().lockOnLogout === false) return;
     forgetRebuiltKeys();
     try { await clearSessionKeys(); } catch (err) { host.log.warn('clearSessionKeys failed', err); }
@@ -1057,6 +1085,7 @@ export const hooks = {
   async onAccountSwitch() {
     osKeys.forget();
     forgetRenders();
+    forgetAccount();
     if (settings().lockOnLogout === false) return;
     forgetRebuiltKeys();
     try { await clearSessionKeys(); } catch (err) { host.log.warn('clearSessionKeys failed', err); }

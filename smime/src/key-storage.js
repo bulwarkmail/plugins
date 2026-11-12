@@ -78,6 +78,63 @@ function txPromise(db, storeName, mode, fn) {
   });
 }
 
+// ── Accounts ────────────────────────────────────────────────────────
+// The stores belong to the webmail's origin, not to an account, so every record
+// except the session keys carries the account it belongs to (`accountId`).
+// index.js says which account is open (setAccountResolver). With an account
+// known, reads return that account's records only, writes set it, and a delete
+// leaves another account's record alone. A record without an account (written
+// by a version that kept none) goes to the first account that reads it, once,
+// and is that account's from then on. Without an account (the host doesn't
+// say), everything is shared as before and nothing is claimed.
+
+let resolveAccount = async () => null;
+
+export function setAccountResolver(fn) {
+  resolveAccount = fn;
+}
+
+async function currentAccount() {
+  try { return (await resolveAccount()) || null; } catch { return null; }
+}
+
+// The records of `all` that belong to `account`; unowned ones are claimed for it.
+async function owned(db, storeName, all, account) {
+  if (!account) return all.filter(Boolean);
+  const mine = [];
+  for (const record of all) {
+    if (!record) continue;
+    if (record.accountId === account) {
+      mine.push(record);
+    } else if (!record.accountId) {
+      const claimed = { ...record, accountId: account };
+      await txPromise(db, storeName, 'readwrite', (s) => s.put(claimed));
+      mine.push(claimed);
+    }
+  }
+  return mine;
+}
+
+async function putOwned(db, storeName, record) {
+  const account = await currentAccount();
+  const stored = account && !record.accountId ? { ...record, accountId: account } : record;
+  await txPromise(db, storeName, 'readwrite', (s) => s.put(stored));
+}
+
+async function getOwned(db, storeName, id) {
+  const record = await txPromise(db, storeName, 'readonly', (s) => s.get(id));
+  return (await owned(db, storeName, [record], await currentAccount()))[0];
+}
+
+async function listOwned(db, storeName) {
+  return owned(db, storeName, await txPromise(db, storeName, 'readonly', (s) => s.getAll()), await currentAccount());
+}
+
+async function deleteOwned(db, storeName, id) {
+  if (!(await getOwned(db, storeName, id))) return;
+  await txPromise(db, storeName, 'readwrite', (s) => s.delete(id));
+}
+
 // ── Key record CRUD ─────────────────────────────────────────────────
 
 // What a key can do comes from its certificate on every load. Records saved
@@ -91,45 +148,43 @@ function withCapabilities(record) {
   }
 }
 
+// A claimed key record is written back with the account added and nothing else
+// changed: the wrapped private key stays as it is.
 export async function saveKeyRecord(record) {
   const db = await openDB();
-  await txPromise(db, KEY_RECORDS_STORE, 'readwrite', (s) => s.put(record));
+  await putOwned(db, KEY_RECORDS_STORE, record);
 }
 
 export async function getKeyRecord(id) {
   const db = await openDB();
-  return withCapabilities(await txPromise(db, KEY_RECORDS_STORE, 'readonly', (s) => s.get(id)));
+  return withCapabilities(await getOwned(db, KEY_RECORDS_STORE, id));
 }
 
-export async function listKeyRecords(accountId) {
+export async function listKeyRecords() {
   const db = await openDB();
-  const all = (await txPromise(db, KEY_RECORDS_STORE, 'readonly', (s) => s.getAll())).map(withCapabilities);
-  if (!accountId) return all;
-  return all.filter((r) => r.accountId === accountId || !r.accountId);
+  return (await listOwned(db, KEY_RECORDS_STORE)).map(withCapabilities);
 }
 
 export async function deleteKeyRecord(id) {
   const db = await openDB();
-  await txPromise(db, KEY_RECORDS_STORE, 'readwrite', (s) => s.delete(id));
+  await deleteOwned(db, KEY_RECORDS_STORE, id);
 }
 
 // ── Public cert CRUD ────────────────────────────────────────────────
 
 export async function savePublicCert(cert) {
   const db = await openDB();
-  await txPromise(db, PUBLIC_CERTS_STORE, 'readwrite', (s) => s.put(cert));
+  await putOwned(db, PUBLIC_CERTS_STORE, cert);
 }
 
-export async function listPublicCerts(accountId) {
+export async function listPublicCerts() {
   const db = await openDB();
-  const all = await txPromise(db, PUBLIC_CERTS_STORE, 'readonly', (s) => s.getAll());
-  if (!accountId) return all;
-  return all.filter((c) => c.accountId === accountId || !c.accountId);
+  return listOwned(db, PUBLIC_CERTS_STORE);
 }
 
 export async function deletePublicCert(id) {
   const db = await openDB();
-  await txPromise(db, PUBLIC_CERTS_STORE, 'readwrite', (s) => s.delete(id));
+  await deleteOwned(db, PUBLIC_CERTS_STORE, id);
 }
 
 // ── Trusted issuers and trusted signer certificates ────────────────
@@ -154,32 +209,39 @@ function openTrustDB() {
 
 export async function saveTrusted(record) {
   const db = await openTrustDB();
-  await txPromise(db, TRUSTED_STORE, 'readwrite', (s) => s.put(record));
+  await putOwned(db, TRUSTED_STORE, record);
 }
 
 export async function listTrusted() {
   const db = await openTrustDB();
-  return txPromise(db, TRUSTED_STORE, 'readonly', (s) => s.getAll());
+  return listOwned(db, TRUSTED_STORE);
 }
 
 export async function deleteTrusted(id) {
   const db = await openTrustDB();
-  await txPromise(db, TRUSTED_STORE, 'readwrite', (s) => s.delete(id));
+  await deleteOwned(db, TRUSTED_STORE, id);
 }
 
 // ── Recipient certificate choices ───────────────────────────────────
-// { id, email, fingerprint, among, at }: which certificate the user chose for an address
-// at send time, and the candidates it was chosen among (fingerprints).
+// { id, accountId, email, fingerprint, among, at }: which certificate the user chose
+// for an address at send time, and the candidates it was chosen among (fingerprints).
+// The id holds the account, so each account keeps its own choice per address.
+
+async function choiceId(email) {
+  const account = await currentAccount();
+  const address = String(email).toLowerCase();
+  return account ? `${account}\n${address}` : address;
+}
 
 export async function getChoice(email) {
   const db = await openTrustDB();
-  return txPromise(db, CHOICES_STORE, 'readonly', (s) => s.get(String(email).toLowerCase()));
+  return getOwned(db, CHOICES_STORE, await choiceId(email));
 }
 
 export async function saveChoice(email, fingerprint, among) {
   const db = await openTrustDB();
-  const id = String(email).toLowerCase();
-  await txPromise(db, CHOICES_STORE, 'readwrite', (s) => s.put({ id, email: id, fingerprint, among, at: Date.now() }));
+  const id = await choiceId(email);
+  await putOwned(db, CHOICES_STORE, { id, email: String(email).toLowerCase(), fingerprint, among, at: Date.now() });
 }
 
 // ── Session (unlocked) key CRUD ─────────────────────────────────────
