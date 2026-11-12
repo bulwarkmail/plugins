@@ -29,7 +29,9 @@ import { smimeVerify, smimeVerifyDetached } from './smime-verify.js';
 import {
   smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, isSignedData, SmimeKeyLockedError, SmimeNoKeyError,
 } from './smime-decrypt.js';
-import { detectSmime, serverReadsSignedWhole, serverReadsPkcs7Mime } from './smime-detect.js';
+import {
+  detectSmime, serverReadsSignedWhole, serverReadsPkcs7Mime, serverPartIsEntity, serverPartIsMessage,
+} from './smime-detect.js';
 import { parseMime, extractDetachedSigned, opaqueBody } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
 import { parseCertificatePemOrDer, extractCertificateInfo } from './certificate-utils.js';
@@ -172,19 +174,20 @@ class FetchFailedError extends Error {
 
 /**
  * The CMS of a message that is application/pkcs7-mime as a whole, as DER. It is read
- * from the raw message, whose header has to read one way and say pkcs7-mime; throws
+ * from the raw message, whose header has to read one way and say pkcs7-mime, and which
+ * the server has to read as that one part (ctx's body structure and attachments); throws
  * MalformedMessageError when it doesn't, FetchFailedError when it can't be fetched.
  */
-async function fetchCms(blobId) {
+async function fetchCms(blobId, ctx) {
   let raw;
   try {
     raw = await host.jmap.fetchBlob(blobId);
   } catch (err) {
     throw new FetchFailedError(err);
   }
-  const body = opaqueBody(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
-  if (!body) throw new MalformedMessageError();
-  return normalizeCmsBytes(bytesArrayBuffer(body));
+  const message = opaqueBody(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
+  if (!message || !serverPartIsMessage(ctx.bodyStructure, ctx.attachments, message.shape)) throw new MalformedMessageError();
+  return normalizeCmsBytes(bytesArrayBuffer(message.body));
 }
 
 /** Wrap a CMS blob as a nested MIME entity (for sign-then-encrypt). */
@@ -709,7 +712,9 @@ async function onRenderEmailBody(body, ctx) {
     }
     try {
       const signed = extractDetachedSigned(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
-      if (!signed) {
+      // The server's signed part has to be the entity verified here: the webmail lists the
+      // server's attachments, and the verdict must not stand above parts it doesn't cover.
+      if (!signed || !serverPartIsEntity(ctx.bodyStructure, ctx.attachments, signed.entity)) {
         await invalid(MALFORMED_SIGNED);
         return undefined;
       }
@@ -743,7 +748,7 @@ async function onRenderEmailBody(body, ctx) {
   const loadCms = () => {
     if (!cms) {
       cms = serverReadsPkcs7Mime(ctx.bodyStructure, ctx.attachments)
-        ? fetchCms(blobId)
+        ? fetchCms(blobId, ctx)
         : Promise.reject(new MalformedMessageError());
     }
     return cms;
