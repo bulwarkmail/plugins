@@ -455,32 +455,37 @@ async function recipientCertsFor(emails, ownAddresses) {
   const trust = await loadTrust();
   const missing = [];
   const unusable = [];
+  // Addresses whose only usable certificates the user declined (it names other addresses or
+  // its key is short): the message says so rather than call them unusable.
+  const declined = [];
   const pending = [];
   for (const email of [...new Set(emails.map((e) => e.toLowerCase()))]) {
     if (ownAddresses.has(email)) continue;
     const stored = certs.filter((c) => String(c.email || '').toLowerCase() === email);
     if (stored.length === 0) { missing.push(email); continue; }
     const usable = [];
+    let refused = 0;
     for (const d of await Promise.all(stored.map((c) => describeRecipientCert(c, trust)))) {
       if (!d || !d.usable) continue;
       if (d.concerns.length) {
         // The user answered for this address and certificate before, about the same concerns.
         const answer = await getCertificateAnswer(email, d.fingerprint).catch(() => null);
         const covered = answer && d.concerns.every((c) => (answer.covers || ['address']).includes(c));
-        if (covered && answer.accepted === false) continue;
+        if (covered && answer.accepted === false) { refused++; continue; }
         if (covered && answer.accepted === true) d.concerns = [];
       }
       usable.push(d);
     }
-    if (usable.length === 0) { unusable.push(email); continue; }
+    if (usable.length === 0) { (refused ? declined : unusable).push(email); continue; }
     pending.push([email, usable]);
   }
   if (missing.length > 0) {
     host.toast.error(t('send.missingCertificates', { emails: missing.join(', ') }));
     return null;
   }
-  if (unusable.length > 0) {
-    host.toast.error(t('send.noUsableCertificate', { emails: unusable.join(', ') }));
+  if (unusable.length > 0 || declined.length > 0) {
+    if (unusable.length > 0) host.toast.error(t('send.noUsableCertificate', { emails: unusable.join(', ') }));
+    if (declined.length > 0) host.toast.error(t('send.declinedCertificate', { emails: declined.join(', ') }));
     return null;
   }
   const found = [];
@@ -507,7 +512,7 @@ async function recipientCertsFor(emails, ownAddresses) {
       agreed.push(d);
     }
     if (agreed.length === 0) {
-      host.toast.error(t('send.noUsableCertificate', { emails: email }));
+      host.toast.error(t('send.declinedCertificate', { emails: email }));
       return null;
     }
     // A certificate the user imported always comes before one from a signed message.

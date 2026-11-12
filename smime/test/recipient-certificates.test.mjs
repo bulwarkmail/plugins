@@ -350,10 +350,29 @@ describe('a stored certificate that does not name the recipient', () => {
     const first = plugin({ answers: [false] });
     await expect(encryptTo(first.hooks, BOB)).resolves.toEqual(ABORT);
     expect(first.sent).toHaveLength(0);
-    expect(first.api.calls('toast.error').at(-1).args[0]).toBe(en['send.noUsableCertificate'].replace('{emails}', BOB));
+    // The message says the user declined it, not that it is unusable.
+    const declined = en['send.declinedCertificate'].replace('{emails}', BOB);
+    expect(first.api.calls('toast.error').at(-1).args[0]).toBe(declined);
     const again = plugin({ answers: [true] });
     await expect(encryptTo(again.hooks, BOB)).resolves.toEqual(ABORT);
     expect(again.confirms).toEqual([]);
+    expect(again.api.calls('toast.error').map((c) => c.args[0])).toEqual([declined]);
+  });
+
+  it('declined for one address, unusable for another: both are named, each with its reason', async () => {
+    await store(carols, BOB, 'manual');
+    const expired = await makeLeaf(null, { emails: ['dan@example.org'], notBefore: new Date(Date.now() - 60 * DAY), notAfter: new Date(Date.now() - DAY) });
+    await store(expired, 'dan@example.org', 'manual');
+    await saveCertificateAnswer(BOB, await computeFingerprint(carols.der), false, ['address']);
+    const { hooks, sent, api } = plugin();
+    await expect(hooks.onComposeSend({
+      identityId: 'identity', fromEmail: FROM, to: [BOB, 'dan@example.org'], subject: 'Figures', textBody: 'The figures.', sign: false, encrypt: true,
+    })).resolves.toEqual(ABORT);
+    expect(sent).toHaveLength(0);
+    expect(api.calls('toast.error').map((c) => c.args[0])).toEqual([
+      en['send.noUsableCertificate'].replace('{emails}', 'dan@example.org'),
+      en['send.declinedCertificate'].replace('{emails}', BOB),
+    ]);
   });
 
   it('imported by hand and refused: a certificate that names the recipient is still used', async () => {
