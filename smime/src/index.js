@@ -26,9 +26,13 @@ import {
 import { smimeSign, smimeSignDetached } from './smime-sign.js';
 import { smimeEncrypt } from './smime-encrypt.js';
 import { smimeVerify, smimeVerifyDetached } from './smime-verify.js';
-import { smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, SmimeKeyLockedError, SmimeNoKeyError } from './smime-decrypt.js';
-import { detectSmime } from './smime-detect.js';
-import { parseMime, extractDetachedSigned } from './mime-parse.js';
+import {
+  smimeDecrypt, findDecryptionCandidates, normalizeCmsBytes, isSignedData, SmimeKeyLockedError, SmimeNoKeyError,
+} from './smime-decrypt.js';
+import {
+  detectSmime, serverReadsSignedWhole, serverReadsPkcs7Mime, serverPartIsEntity, serverPartIsMessage,
+} from './smime-detect.js';
+import { parseMime, extractDetachedSigned, opaqueBody } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
 import { parseCertificatePemOrDer, extractCertificateInfo } from './certificate-utils.js';
 import { generateUUID } from './util.js';
@@ -147,6 +151,43 @@ async function blobToBytes(blob) {
 }
 function bytesArrayBuffer(u8) {
   return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+}
+
+// What the banner shows for a signed message whose structure the plugin can't rely on
+// (i18n.js translates it).
+const MALFORMED_SIGNED = 'Malformed multipart/signed message';
+
+class MalformedMessageError extends Error {
+  constructor() {
+    super(MALFORMED_SIGNED);
+    this.name = 'MalformedMessageError';
+  }
+}
+
+// The message couldn't be fetched: says nothing about the message itself.
+class FetchFailedError extends Error {
+  constructor(cause) {
+    super(cause && cause.message ? cause.message : String(cause));
+    this.name = 'FetchFailedError';
+  }
+}
+
+/**
+ * The CMS of a message that is application/pkcs7-mime as a whole, as DER. It is read
+ * from the raw message, whose header has to read one way and say pkcs7-mime, and which
+ * the server has to read as that one part (ctx's body structure and attachments); throws
+ * MalformedMessageError when it doesn't, FetchFailedError when it can't be fetched.
+ */
+async function fetchCms(blobId, ctx) {
+  let raw;
+  try {
+    raw = await host.jmap.fetchBlob(blobId);
+  } catch (err) {
+    throw new FetchFailedError(err);
+  }
+  const message = opaqueBody(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
+  if (!message || !serverPartIsMessage(ctx.bodyStructure, ctx.attachments, message.shape)) throw new MalformedMessageError();
+  return normalizeCmsBytes(bytesArrayBuffer(message.body));
 }
 
 /** Wrap a CMS blob as a nested MIME entity (for sign-then-encrypt). */
@@ -442,6 +483,20 @@ async function persistVerifyStatus(emailId, status) {
   try { await host.storage.set(VERIFY_PREFIX + emailId, { ...status, at: Date.now() }); } catch { /* ignore */ }
 }
 
+// For a message the plugin leaves alone: a verdict stored for it before must not stay
+// above it. It becomes an empty one first, so a banner already showing it stops
+// waiting, and goes the next time.
+async function clearVerifyStatus(emailId) {
+  if (!emailId) return;
+  const key = VERIFY_PREFIX + emailId;
+  try {
+    const stored = await host.storage.get(key);
+    if (!stored) return;
+    if (Object.keys(stored).some((k) => k !== 'at')) await persistVerifyStatus(emailId, {});
+    else await host.storage.remove(key);
+  } catch { /* ignore */ }
+}
+
 // Of the hook's 5 s. Listing holds no timer, so what's left here has to cover the rest of the hook.
 const RENDER_LIST_BUDGET_MS = 3500;
 
@@ -511,7 +566,7 @@ function forgetRenders() {
   renderShares.clear();
 }
 
-async function renderEncrypted(body, ctx, blobId, fromEmail, started, asked) {
+async function renderEncrypted(body, ctx, loadCms, fromEmail, started, asked) {
   const failed = (decryptionError) => {
     const status = { isEncrypted: true, decryptionSuccess: false, decryptionError };
     return persistVerifyStatus(ctx.id, status).then(() => ({ ...body, handledBy: 'smime', html: '', text: '', attachments: [], verification: status }));
@@ -522,11 +577,13 @@ async function renderEncrypted(body, ctx, blobId, fromEmail, started, asked) {
 
   let der;
   try {
-    const raw = await host.jmap.fetchBlob(blobId);
-    der = normalizeCmsBytes(bytesArrayBuffer(raw instanceof Uint8Array ? raw : new Uint8Array(raw)));
+    der = await loadCms();
   } catch (err) {
     host.log.error('onRenderEmailBody failed', err);
-    await persistVerifyStatus(ctx.id, { isEncrypted: true, decryptionSuccess: false, decryptionError: err && err.message ? err.message : String(err) });
+    // A message whose structure can't be relied on is not opened, and the banner says it is
+    // damaged rather than sending the reader to look for a key that fits.
+    const decryptionError = err instanceof MalformedMessageError ? 'damaged' : err && err.message ? err.message : String(err);
+    await persistVerifyStatus(ctx.id, { isEncrypted: true, decryptionSuccess: false, decryptionError });
     return { result: undefined, keep: false }; // fall back to host rendering on unexpected failure
   }
 
@@ -605,8 +662,23 @@ async function onRenderEmailBody(body, ctx) {
   const started = Date.now();
   if (!(await isCapable())) return undefined; // can't decrypt/verify without the privileged tier
 
-  const detection = detectSmime(ctx.contentType, ctx.bodyStructure, ctx.attachments);
-  if (!detection.type) return undefined;
+  const detection = detectSmime(ctx.contentType, ctx.bodyStructure);
+  if (!detection.type) {
+    await clearVerifyStatus(ctx.id);
+    return undefined;
+  }
+
+  if (detection.type === 'partly-signed') {
+    // A signed part below the top level covers only itself: the message is shown as
+    // it is, with a note, and nothing from that part is verified or kept.
+    await persistVerifyStatus(ctx.id, { partlySigned: true });
+    return undefined;
+  }
+
+  if (detection.type === 'malformed-signed') {
+    await persistVerifyStatus(ctx.id, { isSigned: true, isEncrypted: false, signatureValid: false, signatureError: MALFORMED_SIGNED });
+    return undefined;
+  }
 
   if (!detection.supported) {
     const status = {
@@ -623,13 +695,6 @@ async function onRenderEmailBody(body, ctx) {
   if (detection.type === 'detached-sig') {
     // Verify against the raw message — the host's decoded parts are not byte-exact.
     if (!ctx.blobId) return undefined;
-    let raw;
-    try {
-      raw = await host.jmap.fetchBlob(ctx.blobId);
-    } catch (err) {
-      host.log.error('failed to fetch the signed message', err);
-      return undefined; // transient; don't record a verdict
-    }
     // A broken signature must read as invalid, not as a neutral "Signed message".
     const invalid = (signatureError) => persistVerifyStatus(ctx.id, {
       isSigned: true,
@@ -637,10 +702,23 @@ async function onRenderEmailBody(body, ctx) {
       signatureValid: false,
       signatureError,
     });
+    if (!serverReadsSignedWhole(ctx.bodyStructure, ctx.attachments)) {
+      await invalid(MALFORMED_SIGNED);
+      return undefined;
+    }
+    let raw;
+    try {
+      raw = await host.jmap.fetchBlob(ctx.blobId);
+    } catch (err) {
+      host.log.error('failed to fetch the signed message', err);
+      return undefined; // transient; don't record a verdict
+    }
     try {
       const signed = extractDetachedSigned(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
-      if (!signed) {
-        await invalid('Malformed multipart/signed message');
+      // The server's signed part has to be the entity verified here: the webmail lists the
+      // server's attachments, and the verdict must not stand above parts it doesn't cover.
+      if (!signed || !serverPartIsEntity(ctx.bodyStructure, ctx.attachments, signed.entity)) {
+        await invalid(MALFORMED_SIGNED);
         return undefined;
       }
       const v = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, fromEmail);
@@ -663,18 +741,38 @@ async function onRenderEmailBody(body, ctx) {
     }
   }
 
-  const blobId = detection.blobId || ctx.blobId;
+  // The raw message: its own header decides, as for a detached signature.
+  const blobId = ctx.blobId;
   if (!blobId) return undefined;
 
-  if (detection.type === 'enveloped-data') {
-    return shareRender(`${ctx.id}|${blobId}`, ctx, (asked) => renderEncrypted(body, ctx, blobId, fromEmail, started, asked));
+  // Fetched once, for the look inside and for reading it, and only when the server
+  // reads the message as one pkcs7-mime part too.
+  let cms;
+  const loadCms = () => {
+    if (!cms) {
+      cms = serverReadsPkcs7Mime(ctx.bodyStructure, ctx.attachments)
+        ? fetchCms(blobId, ctx)
+        : Promise.reject(new MalformedMessageError());
+    }
+    return cms;
+  };
+
+  let type = detection.type;
+  if (type === 'pkcs7-mime') {
+    // No smime-type parameter: the CMS content type inside says signed or encrypted.
+    let signedData = false;
+    try { signedData = isSignedData(await loadCms()); } catch { /* reported where the blob is read */ }
+    type = signedData ? 'signed-data' : 'enveloped-data';
+  }
+
+  if (type === 'enveloped-data') {
+    return shareRender(`${ctx.id}|${blobId}`, ctx, (asked) => renderEncrypted(body, ctx, loadCms, fromEmail, started, asked));
   }
 
   try {
-    const raw = await host.jmap.fetchBlob(blobId);
-    const der = normalizeCmsBytes(bytesArrayBuffer(raw instanceof Uint8Array ? raw : new Uint8Array(raw)));
+    const der = await loadCms();
 
-    if (detection.type === 'signed-data') {
+    if (type === 'signed-data') {
       const v = await smimeVerify(der, fromEmail);
       v.status.format = 'opaque';
       await maybeAutoImportSigner(v.status);
@@ -691,7 +789,15 @@ async function onRenderEmailBody(body, ctx) {
     }
   } catch (err) {
     host.log.error('onRenderEmailBody failed', err);
-    return undefined; // fall back to host rendering on unexpected failure
+    // As for a detached signature: what fails to verify reads as invalid, not as the
+    // neutral "Signed message" the banner guesses from the header. A failed fetch says
+    // nothing about the message, so it leaves no verdict.
+    if (!(err instanceof FetchFailedError)) {
+      await persistVerifyStatus(ctx.id, {
+        isSigned: true, isEncrypted: false, signatureValid: false, signatureError: err && err.message ? err.message : String(err),
+      });
+    }
+    return undefined; // the host renders the message itself
   }
 
   return undefined;

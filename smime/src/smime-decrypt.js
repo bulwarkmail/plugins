@@ -17,6 +17,7 @@ import { keystoreCode } from './os-keys.js';
 export { UnsupportedAlgorithmError };
 
 const OID_ENVELOPED_DATA = '1.2.840.113549.1.7.3';
+const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';
 const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 
 // Content ciphers pkijs + webcrypto-liner decrypt in EnvelopedData. Anything
@@ -212,7 +213,9 @@ export function findDecryptionCandidates(cmsBytes, keyRecords) {
 
 /**
  * Normalize raw blob bytes into DER-encoded CMS data.
- * JMAP may return raw DER, base64 DER, a full MIME part, or PEM.
+ * JMAP may return raw DER, base64 DER, a full MIME part, or PEM. The input is read
+ * once: what is neither DER nor one base64 block (after the MIME headers, or inside
+ * PEM armour) is refused.
  */
 export function normalizeCmsBytes(raw) {
   if (raw.byteLength === 0) return raw;
@@ -233,12 +236,10 @@ export function normalizeCmsBytes(raw) {
     return printable / sample.length > 0.85;
   })();
 
-  const headerEndMatch = text.match(/\r?\n\r?\n/);
-  const hasMimeHeaderHints = /content-type:|content-transfer-encoding:|mime-version:/i.test(
-    text.slice(0, Math.min(text.length, 8192)),
-  );
-  if (looksMostlyText && headerEndMatch && headerEndMatch.index !== undefined && hasMimeHeaderHints) {
-    text = text.substring(headerEndMatch.index + headerEndMatch[0].length);
+  // A MIME entity: its body starts after the first empty line, found with one forward search.
+  const headerEnd = text.match(/\r?\n\r?\n/);
+  if (looksMostlyText && headerEnd && /content-type:|content-transfer-encoding:|mime-version:/i.test(text.slice(0, headerEnd.index))) {
+    text = text.slice(headerEnd.index + headerEnd[0].length);
   }
 
   text = text
@@ -246,50 +247,23 @@ export function normalizeCmsBytes(raw) {
     .replace(/-----END [A-Z0-9 ]+-----/g, '')
     .replace(/\s/g, '');
 
-  if (text.length === 0) return raw;
-
   try {
     const binary = atob(text);
     const decoded = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) decoded[i] = binary.charCodeAt(i);
     if (decoded.length > 0 && decoded[0] === 0x30) return decoded.buffer;
-  } catch { /* not DER, continue */ }
+  } catch { /* not base64 */ }
 
-  if (looksMostlyText) {
-    const originalText = new TextDecoder().decode(raw);
-    const sectionRegex = /content-transfer-encoding:\s*base64[\s\S]*?\r?\n\r?\n([\s\S]*?)(?:\r?\n--[^\r\n]+|$)/ig;
-    const sectionBlocks = [];
-    let sectionMatch;
-    while ((sectionMatch = sectionRegex.exec(originalText)) !== null) sectionBlocks.push(sectionMatch[1]);
+  throw new Error('Invalid ASN.1 data - cannot parse CMS envelope');
+}
 
-    for (const block of sectionBlocks) {
-      const cleaned = block.replace(/\s/g, '');
-      if (cleaned.length < 8 || !/^[A-Za-z0-9+/=]+$/.test(cleaned)) continue;
-      try {
-        const binary = atob(cleaned);
-        const decoded = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) decoded[i] = binary.charCodeAt(i);
-        if (decoded.length > 0 && decoded[0] === 0x30) return decoded.buffer;
-      } catch { /* next section */ }
-    }
-
-    const base64Blocks = originalText.match(/[A-Za-z0-9+/=\r\n]{128,}/g) || [];
-    const cleaned = base64Blocks
-      .map((block) => block.replace(/\s/g, ''))
-      .filter((block) => block.length >= 128 && /^[A-Za-z0-9+/=]+$/.test(block));
-    cleaned.sort((a, b) => b.length - a.length);
-
-    for (const block of cleaned) {
-      try {
-        const binary = atob(block);
-        const decoded = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) decoded[i] = binary.charCodeAt(i);
-        if (decoded.length > 0 && decoded[0] === 0x30) return decoded.buffer;
-      } catch { /* next block */ }
-    }
+/** Whether DER bytes are CMS SignedData (false for any other content type, or no CMS at all). */
+export function isSignedData(der) {
+  try {
+    return parseContentInfo(der).contentType === OID_SIGNED_DATA;
+  } catch {
+    return false;
   }
-
-  return raw;
 }
 
 function parseContentInfo(der) {

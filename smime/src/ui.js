@@ -129,6 +129,10 @@ const settled = (status, since) => !!status && !stillWaiting(status) && (status.
 const VERIFY_WAIT_MS = [100, 150, 250, 400, 600, 1000, 1500, 2000];
 const VERIFY_WAIT_LATER_MS = 3000;
 
+const PKCS7_PART = /^application\/(x-)?pkcs7-(signature|mime)$/;
+const hasPkcs7Attachment = (email) => (email.attachments || [])
+  .some((att) => PKCS7_PART.test(String(att.type || '').split(';')[0].trim().toLowerCase()));
+
 /** The info bars for a stored verify status. Exported for tests. */
 export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
   const rows = [];
@@ -139,6 +143,8 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
     else if (status.decryptionError === 'os-ask') rows.push({ icon: 'lock', eyebrow, text: t('banner.osAsk'), tone: 'info', action: 'retry', actionLabel: 'banner.openWithSystem' });
     else if (OS_DECRYPT_BANNERS[status.decryptionError]) rows.push({ icon: 'lock', eyebrow, text: t(OS_DECRYPT_BANNERS[status.decryptionError]), tone: 'warning', action: 'retry' });
     else if (status.decryptionError === 'os-list-denied') rows.push({ icon: 'lock', eyebrow, text: t('banner.osListDenied'), tone: 'warning' });
+    // Not opened because its structure can't be relied on: no key would have helped.
+    else if (status.decryptionError === 'damaged') rows.push({ icon: 'lock', eyebrow, text: t('banner.encryptedDamaged'), tone: 'destructive' });
     else if (status.decryptionError) {
       // As smime-decrypt.js UnsupportedAlgorithmError words it.
       const algorithm = String(status.decryptionError).match(/^Unsupported encryption algorithm (.+)$/)?.[1];
@@ -174,6 +180,8 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
       rows.push({ icon: 'shield-check', eyebrow, text: t('banner.signed'), tone: 'info' });
     }
   }
+  // Only a part below the top level is signed: unverified, and the rest of the message is outside it.
+  if (status.partlySigned) rows.push({ icon: 'alert-triangle', eyebrow: t('banner.signature'), text: t('banner.partlySigned'), tone: 'warning' });
   if (status.unsupportedReason) rows.push({ icon: 'info-circle', eyebrow: 'S/MIME', text: errorText(t, status.unsupportedReason), tone: 'info' });
   return rows;
 }
@@ -249,19 +257,24 @@ export function makeUi(host, deps) {
         if (!alive) return;
         // No render-hook result yet: best-effort detect from headers.
         const ct = email.headers && (email.headers['Content-Type'] || email.headers['content-type']);
-        const det = deps.detectSmime(Array.isArray(ct) ? ct[0] : ct, undefined, undefined);
+        const det = deps.detectSmime(Array.isArray(ct) ? ct[0] : ct);
         const guess = det.type === 'enveloped-data' ? { isEncrypted: true }
           : det.type === 'signed-data' || det.type === 'detached-sig' ? { isSigned: true }
           : null;
         setStatus(stored ?? guess);
         setLoaded(true);
-        if (!stored && !guess) return;
+        // Nothing to guess from the header, but a pkcs7 attachment: the hook may still report
+        // on the message (a signed part inside it, a damaged signed message). Look for its
+        // verdict for a while, not for good, as most such mail gets none.
+        const briefly = !stored && !guess && hasPkcs7Attachment(email);
+        if (!stored && !guess && !briefly) return;
         // The render hook is often still at work in the background instance when this
         // banner mounts, and what's stored may be from the last time the message was
         // open. Keep looking until it has this opening's verdict, so the banner never
         // sits on an old one.
         let current = stored;
         for (let i = 0; !settled(current, since); i++) {
+          if (briefly && !current && i >= VERIFY_WAIT_MS.length) break;
           await new Promise((resolve) => setTimeout(resolve, VERIFY_WAIT_MS[i] ?? VERIFY_WAIT_LATER_MS));
           if (!alive) return;
           let next = null;
