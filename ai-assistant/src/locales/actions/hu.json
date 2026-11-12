@@ -87,7 +87,7 @@
   "do.settings.invitations": "Válasz meghívásokra",
   "do.settings.invitations_hint": "Mindig előbb megkérdez. A válaszod a szervezőhöz kerül.",
   "do.settings.events": "Események módosítása és törlése",
-  "do.settings.events_hint": "Törlés előtt és olyan esemény módosítása előtt, amelyen mások is részt vesznek, mindig megkérdez. A meghívottakon soha nem változtat.",
+  "do.settings.events_hint": "Esemény törlése előtt mindig megkérdez, és akkor is, ha olyan eseményt módosítana, amelyen mások is részt vesznek, amely egy veled megosztott naptárban van, vagy amelyre meghívtak. A meghívottakon soha nem változtat.",
   "do.settings.tags": "Üzenetek címkézése",
   "do.settings.tags_hint": "Felteszi és leveszi a címkéidet.",
   "do.settings.vacation": "Távolléti válasz",

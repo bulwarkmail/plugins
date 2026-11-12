@@ -87,7 +87,7 @@
   "do.settings.invitations": "Svare på invitasjoner",
   "do.settings.invitations_hint": "Spør alltid først. Svaret ditt går til arrangøren.",
   "do.settings.events": "Endre og slette hendelser",
-  "do.settings.events_hint": "Spør alltid før sletting og før endring av en hendelse som andre deltar i. Endrer aldri hvem som er invitert.",
+  "do.settings.events_hint": "Spør alltid før sletting av en hendelse, og før endring av en hendelse som andre deltar i, som ligger i en kalender noen har delt med deg, eller som du er invitert til. Endrer aldri hvem som er invitert.",
   "do.settings.tags": "Gi meldinger etiketter",
   "do.settings.tags_hint": "Legger til og fjerner etikettene dine.",
   "do.settings.vacation": "Fraværsmelding",

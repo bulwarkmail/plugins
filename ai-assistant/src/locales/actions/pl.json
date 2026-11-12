@@ -87,7 +87,7 @@
   "do.settings.invitations": "Odpowiadanie na zaproszenia",
   "do.settings.invitations_hint": "Zawsze najpierw pyta. Twoja odpowiedź trafia do organizatora.",
   "do.settings.events": "Zmienianie i usuwanie wydarzeń",
-  "do.settings.events_hint": "Przed usunięciem i przed zmianą wydarzenia, w którym biorą udział inne osoby, zawsze pyta. Nigdy nie zmienia listy zaproszonych.",
+  "do.settings.events_hint": "Zawsze pyta przed usunięciem wydarzenia, a także przed zmianą wydarzenia, w którym biorą udział inne osoby, które jest w kalendarzu udostępnionym ci przez kogoś lub na które cię zaproszono. Nigdy nie zmienia listy zaproszonych.",
   "do.settings.tags": "Oznaczanie wiadomości tagami",
   "do.settings.tags_hint": "Dodaje i usuwa Twoje tagi.",
   "do.settings.vacation": "Odpowiedź o nieobecności",

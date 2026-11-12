@@ -211,7 +211,9 @@ needs them.
 Answering an invitation, deleting an event, the out-of-office reply,
 filters, many messages at once, settings and contacts **always ask you
 first**, even in automatic mode, and so does any change to an event that
-other people take part in. The card says what will happen
+isn't yours alone: other people take part in it, it is in a calendar
+someone shared with you, or you are listed in it but not as its
+organiser. The card says what will happen
 ("Archive 12 messages?" with the first five subjects, "Change Time
 format: 12-hour → 24-hour?", the filter in plain words). Undo puts things
 back: the event, the filter, the messages, the setting and the contact
@@ -327,7 +329,7 @@ settings. Set up one or both services:
 | Let users connect their own API key | Off by default |
 | More context | Attachments and images of the open message, the whole conversation, the messages selected in the list, and @-mentioned messages, contacts and files. On by default |
 | Anthropic: images, OpenAI-compatible: images | Whether that service's model gets images. Automatic: yes for Anthropic and api.openai.com (apart from text-only models), no for other servers such as Ollama. Without images the model gets the file name only |
-| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once, contacts. On by default. All but changing an event and tags always ask the user first; changing an event asks first when other people take part in it |
+| More actions | Answer invitations, change and delete events, tag messages, out-of-office, filters, many messages at once, contacts. On by default. All but changing an event and tags always ask the user first; changing an event asks first unless it is the user's alone (nobody else in it, in the user's own calendar) |
 | Most messages per batch | 1 to 200, default 50 |
 | Change settings | Let users allow the assistant to change their app settings (appearance, reading, composing, list, notifications, calendar view). Off by default |
 | Files | Find, read and attach the user's files, save attachments to Files, create files and folders. Never deletes or shares. On by default |

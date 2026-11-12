@@ -87,7 +87,7 @@
   "do.settings.invitations": "초대에 답변",
   "do.settings.invitations_hint": "항상 먼저 물어봅니다. 답변은 주최자에게 전송됩니다.",
   "do.settings.events": "일정 변경 및 삭제",
-  "do.settings.events_hint": "삭제하거나 다른 사람이 참여하는 일정을 변경할 때는 항상 먼저 물어봅니다. 초대 대상은 바꾸지 않습니다.",
+  "do.settings.events_hint": "일정을 삭제하거나, 다른 사람이 참여하는 일정, 다른 사람이 공유한 캘린더의 일정, 초대받은 일정을 변경할 때는 항상 먼저 물어봅니다. 초대 대상은 바꾸지 않습니다.",
   "do.settings.tags": "메시지에 태그 달기",
   "do.settings.tags_hint": "태그를 추가하거나 제거합니다.",
   "do.settings.vacation": "부재중 답장",
