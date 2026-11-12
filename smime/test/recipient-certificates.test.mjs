@@ -21,10 +21,10 @@ import { fakeApi } from '../../test-utils/fake-api.mjs';
 import * as kit from '../../test-utils/ui-kit.mjs';
 import { fakeKeystore } from './helpers/fake-keystore.mjs';
 import { sortedIndexedDB } from './helpers/sorted-indexeddb.mjs';
-import { makeCa, makeLeaf, signedCms, opaqueMessage, OPAQUE_SIGNED } from './helpers/test-certificates.mjs';
+import { makeCa, makeLeaf, rsaKey, signedCms, opaqueMessage, OPAQUE_SIGNED } from './helpers/test-certificates.mjs';
 import { computeFingerprint } from '../src/certificate-utils.js';
 import { importPkcs12, unlockPrivateKey } from '../src/pkcs12.js';
-import { savePublicCert, listPublicCerts, listKeyRecords, saveTrusted } from '../src/key-storage.js';
+import { savePublicCert, listPublicCerts, listKeyRecords, saveTrusted, saveCertificateAnswer } from '../src/key-storage.js';
 import { toHex } from '../src/util.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -391,5 +391,81 @@ describe('a stored certificate that does not name the recipient', () => {
     await expect(encryptTo(hooks, BOB)).resolves.toBe(false);
     expect(confirms).toEqual([]);
     expect(recipientsOf(sent[0])).toEqual([serialOf(both)]);
+  });
+});
+
+describe('a stored certificate with a key under the floor', () => {
+  // RSA certificates that may encrypt: 1024 bits (under the floor) and 2048 bits.
+  const rsa = (bits) => ({ algorithm: rsaKey(bits), keyUsage: ['digitalSignature', 'keyEncipherment'] });
+  let shortFromCa;
+  let longFromCa;
+  let shortSelf;
+  let shortCarol;
+  beforeAll(async () => {
+    shortFromCa = await makeLeaf(ca, { cn: 'Bob', emails: [BOB], ...rsa(1024) });
+    longFromCa = await makeLeaf(ca, { cn: 'Bob', emails: [BOB], ...rsa(2048) });
+    shortSelf = await makeLeaf(null, { cn: 'Bob', emails: [BOB], ...rsa(1024) });
+    shortCarol = await makeLeaf(null, { cn: 'Carol', emails: [CAROL], ...rsa(1024) });
+  }, 60_000);
+
+  it('from a signed message: never used, and nobody is asked, though its issuer is trusted', async () => {
+    await trustCa();
+    await store(shortFromCa, BOB, 'signed-email');
+    const { hooks, sent, confirms, api } = plugin({ answers: [true, true] });
+    await expect(encryptTo(hooks, BOB)).resolves.toEqual(ABORT);
+    expect(sent).toHaveLength(0);
+    expect(confirms).toEqual([]);
+    expect(api.calls('toast.error').at(-1).args[0]).toBe(en['send.noUsableCertificate'].replace('{emails}', BOB));
+  });
+
+  it('from a signed message with a 2048-bit key: used after its first-use question (control)', async () => {
+    await trustCa();
+    await store(longFromCa, BOB, 'signed-email');
+    const { hooks, sent, confirms } = plugin({ answers: [true] });
+    await expect(encryptTo(hooks, BOB)).resolves.toBe(false);
+    expect(confirms).toHaveLength(1);
+    expect(recipientsOf(sent[0])).toEqual([serialOf(longFromCa)]);
+  });
+
+  it('imported by hand: the user is asked once, told the key is short, and the answer is kept', async () => {
+    await store(shortSelf, BOB, 'manual');
+    const first = plugin({ answers: [true] });
+    await expect(encryptTo(first.hooks, BOB)).resolves.toBe(false);
+    expect(first.confirms).toHaveLength(1);
+    expect(first.confirms[0].message).toContain(en['send.shortKey'].replace('{email}', BOB));
+    expect(first.confirms[0].message).toContain(await computeFingerprint(shortSelf.der));
+    expect(recipientsOf(first.sent[0])).toEqual([serialOf(shortSelf)]);
+
+    const again = plugin();
+    await expect(encryptTo(again.hooks, BOB)).resolves.toBe(false);
+    expect(again.confirms).toEqual([]);
+  });
+
+  it('imported by hand and refused: nothing is sent, now or later', async () => {
+    await store(shortSelf, BOB, 'manual');
+    const first = plugin({ answers: [false] });
+    await expect(encryptTo(first.hooks, BOB)).resolves.toEqual(ABORT);
+    expect(first.sent).toHaveLength(0);
+    const again = plugin({ answers: [true] });
+    await expect(encryptTo(again.hooks, BOB)).resolves.toEqual(ABORT);
+    expect(again.confirms).toEqual([]);
+  });
+
+  it('imported by hand for an address it doesn\'t name: one question says both', async () => {
+    await store(shortCarol, BOB, 'manual');
+    const { hooks, sent, confirms } = plugin({ answers: [true] });
+    await expect(encryptTo(hooks, BOB)).resolves.toBe(false);
+    expect(confirms).toHaveLength(1);
+    expect(confirms[0].message).toContain(en['send.addressMismatchShortKey'].replace('{email}', BOB).replace('{addresses}', CAROL));
+    expect(recipientsOf(sent[0])).toEqual([serialOf(shortCarol)]);
+  });
+
+  it('a yes given about the address alone doesn\'t cover the short key: asked again, about both', async () => {
+    await store(shortCarol, BOB, 'manual');
+    await saveCertificateAnswer(BOB, await computeFingerprint(shortCarol.der), true);
+    const { hooks, confirms } = plugin({ answers: [true] });
+    await expect(encryptTo(hooks, BOB)).resolves.toBe(false);
+    expect(confirms).toHaveLength(1);
+    expect(confirms[0].message).toContain('Its key is also short');
   });
 });

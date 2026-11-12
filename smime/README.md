@@ -50,9 +50,10 @@ material ever leaves the device.
   expired one, one that may not encrypt, or one from a signed message that no
   trusted issuer or trusted certificate vouches for today is not used: the send
   stops and names the recipient. A certificate counts only for an address it
-  names (any of its addresses); one the user imported for an address it doesn't
-  name is used only after the user agrees once, seeing the addresses it does
-  name. With more than one candidate, or the first time
+  names (any of its addresses), and only with a key at or above the floor (RSA
+  2048 bits, curves of 256 bits). One from a signed message that misses either
+  is never used. One the user imported is used after the user agrees once per
+  address, told which it misses (the addresses it does name, or the short key). With more than one candidate, or the first time
   a certificate from a signed message is used, the user chooses, with issuer,
   fingerprint, validity and source shown; the answer is kept per address until
   another candidate turns up. Certificates versions 1.0 to 1.5 stored from
