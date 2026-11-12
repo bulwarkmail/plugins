@@ -79,6 +79,11 @@ describe('the path search over the certificates a message carries', () => {
     expect(six).toBeLessThan(200);
   });
 
+  it('checks each of n same-name, same-key certificates once at most', { timeout: 120_000 }, async () => {
+    const trust = makeTrust({ issuers: [(await makeCa('A trusted CA')).der] });
+    for (const n of [2, 3, 4, 5, 6]) expect(await checksFor(n, trust), `n = ${n}`).toBeLessThanOrEqual(n + 1);
+  });
+
   // Certificates with the issuer's name but other keys: each costs one check, once.
   async function withDecoys(n) {
     const root = await makeCa('Example Root');

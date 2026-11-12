@@ -99,8 +99,9 @@ const KNOWN_CRITICAL = new Set([
   '2.5.29.36', '2.5.29.37', '2.5.29.54',
 ]);
 // Bounds on the path search. A message can carry many certificates, made so that each
-// verifies as the issuer of the others; the search drops duplicates, remembers which
-// certificates led nowhere, and stops at these. Reaching one reads "not verified".
+// verifies as the issuer of the others; the search checks a signature once for a group of
+// certificates with the same subject, issuer name and key, remembers which certificates
+// led nowhere, and stops at these. Reaching one reads "not verified" with the reason.
 export const MAX_PATH = 8; // certificates in a path, the signer's and the trusted issuer's included
 export const MAX_CHECKS = 64; // signature checks for one certificate's path
 export const MAX_POOL = 32; // certificates of a message the search looks at (the first ones)
@@ -136,70 +137,103 @@ const selfIssued = (cert) => cert.subject.isEqual(cert.issuer);
 
 const hex = (buffer) => Array.from(new Uint8Array(buffer), (b) => b.toString(16).padStart(2, '0')).join('');
 
-// Certificates with the same subject, issuer and key are interchangeable as links.
+// Certificates with the same subject, issuer name and key: as an issuer they verify the
+// same signatures, so one signature check serves the whole group.
 const linkKey = (cert) => [
   hex(cert.subject.toSchema().toBER(false)),
   hex(cert.issuer.toSchema().toBER(false)),
   hex(cert.subjectPublicKeyInfo.toSchema().toBER(false)),
 ].join('|');
 
-// One certificate per subject, issuer and key, the first one in its dates where there is one.
-function distinct(certs, now) {
-  const kept = new Map();
+// The certificates grouped by subject, issuer name and key, each group in the order given,
+// repeats of the same certificate dropped. The members of a group can still differ in who
+// signed them, their dates and their extensions (a copy of an intermediate signed by
+// another key, say), so each member is tried as a link of its own.
+function groupLinks(certs) {
+  const groups = new Map();
   for (const cert of certs) {
     const key = linkKey(cert);
-    const earlier = kept.get(key);
-    if (!earlier || (!withinDates(earlier, now) && withinDates(cert, now))) kept.set(key, cert);
+    if (!groups.has(key)) groups.set(key, []);
+    const members = groups.get(key);
+    if (!members.some((m) => sameCert(m, cert))) members.push(cert);
   }
-  return [...kept.values()];
+  return [...groups.values()];
+}
+
+// A member that led nowhere at some pathLen count and path length leads nowhere at any
+// larger ones either (fewer options), so it isn't tried there again. When MAX_PATH played
+// no part in its failure, the path length doesn't matter (depth 0).
+function deadEnd(search, cert, below, depth) {
+  return (search.deadEnds.get(cert) || []).some((d) => d.below <= below && d.depth <= depth);
+}
+
+// Whether `cert` is signed by the key of `group`, checked at most once per verification.
+// Returns undefined when the checks are used up.
+async function signedBy(search, cert, group) {
+  if (!search.signatures.has(cert)) search.signatures.set(cert, new Map());
+  const known = search.signatures.get(cert);
+  if (known.has(group)) return known.get(group);
+  if (search.checks >= MAX_CHECKS) return undefined;
+  search.checks++;
+  let signed = false;
+  try { signed = await cert.verify(group[0], nativeEngine()); } catch { signed = false; }
+  known.set(group, signed);
+  return signed;
 }
 
 /**
  * The trusted issuer a path from `cert` ends at, or null. `path` is the path so far, from
  * the signer to `cert`. `below` counts the certificates under `cert` that use up a
- * pathLenConstraint (not self-issued ones, RFC 5280 6.1.4). `search` holds the anchors,
- * the message's certificates, the signature checks made, the certificates that led
- * nowhere (with the smallest `below` they were tried at) and the problems seen.
+ * pathLenConstraint (not self-issued ones, RFC 5280 6.1.4). `search` holds the anchor and
+ * message certificate groups, the signature checks made, the members that led nowhere,
+ * and the problems seen. Reaching MAX_PATH or MAX_CHECKS adds 'limit'; running out of
+ * checks ends the whole search (`exhausted`).
  */
 async function pathToAnchor(cert, path, below, search) {
-  if (path.length >= MAX_PATH) return null;
-  const candidates = [...search.anchors.map((c) => [c, true]), ...search.pool.map((c) => [c, false])];
-  for (const [issuer, isAnchor] of candidates) {
-    if (path.some((p) => sameCert(p, issuer))) continue;
-    if (!cert.issuer.isEqual(issuer.subject)) continue;
-    const next = below + (selfIssued(issuer) ? 0 : 1);
-    const key = linkKey(issuer);
-    if (!isAnchor && search.deadEnds.has(key) && search.deadEnds.get(key) <= next) continue;
-    // A CA with name constraints is checked like the others, so the details can say it was
-    // the one in the way, and then not used.
-    const { isCa, pathLength, constrained } = issuerCapabilities(issuer);
-    if (!isCa || !withinDates(issuer, search.now) || unknownCritical(issuer)) continue;
-    if (pathLength !== undefined && below > pathLength) continue;
-    if (search.checks >= MAX_CHECKS) {
-      search.problems.add('limit');
-      return null;
+  if (path.length >= MAX_PATH) {
+    search.problems.add('limit');
+    search.cuts++;
+    return null;
+  }
+  const candidates = [...search.anchors.map((g) => [g, true]), ...search.pool.map((g) => [g, false])];
+  for (const [group, isAnchor] of candidates) {
+    if (!cert.issuer.isEqual(group[0].subject)) continue;
+    for (const issuer of group) {
+      if (path.some((p) => sameCert(p, issuer))) continue;
+      const next = below + (selfIssued(issuer) ? 0 : 1);
+      if (!isAnchor && deadEnd(search, issuer, next, path.length + 1)) continue;
+      // A CA with name constraints is checked like the others, so the details can say it was
+      // the one in the way, and then not used.
+      const { isCa, pathLength, constrained } = issuerCapabilities(issuer);
+      if (!isCa || !withinDates(issuer, search.now) || unknownCritical(issuer)) continue;
+      if (pathLength !== undefined && below > pathLength) continue;
+      const signed = await signedBy(search, cert, group);
+      if (signed === undefined) {
+        search.problems.add('limit');
+        search.exhausted = true;
+        return null;
+      }
+      if (!signed) break;
+      if (constrained) {
+        search.problems.add('constraints');
+        continue;
+      }
+      if (weakSignatureAlgorithm(cert.signatureAlgorithm)) {
+        search.problems.add('digest');
+        break;
+      }
+      if (weakKey(issuer)) {
+        search.problems.add('weakKey');
+        break;
+      }
+      if (isAnchor) return issuer;
+      const cutsBefore = search.cuts;
+      const found = await pathToAnchor(issuer, [...path, issuer], next, search);
+      if (found) return found;
+      if (search.exhausted) return null;
+      if (!search.deadEnds.has(issuer)) search.deadEnds.set(issuer, []);
+      search.deadEnds.get(issuer).push({ below: next, depth: search.cuts > cutsBefore ? path.length + 1 : 0 });
     }
-    search.checks++;
-    let signed = false;
-    try { signed = await cert.verify(issuer, nativeEngine()); } catch { signed = false; }
-    if (!signed) continue;
-    if (constrained) {
-      search.problems.add('constraints');
-      continue;
-    }
-    if (weakSignatureAlgorithm(cert.signatureAlgorithm)) {
-      search.problems.add('digest');
-      continue;
-    }
-    if (weakKey(issuer)) {
-      search.problems.add('weakKey');
-      continue;
-    }
-    if (isAnchor) return issuer;
-    const found = await pathToAnchor(issuer, [...path, issuer], next, search);
-    if (found) return found;
-    if (search.problems.has('limit')) return null;
-    search.deadEnds.set(key, Math.min(search.deadEnds.get(key) ?? Infinity, next));
   }
   return null;
 }
@@ -211,16 +245,22 @@ async function pathToAnchor(cert, path, below, search) {
  * or 'issuer', and 'constraints' when a CA on the way carries name constraints, 'limit'
  * when the search stopped at one of its bounds, 'digest' when a link was signed with
  * SHA-1 or MD5, 'weakKey' when an issuer's key is too short. Of `pool` only the first
- * MAX_POOL distinct certificates are used.
+ * MAX_POOL certificates (repeats and the certificate itself left out) are used.
  */
 export async function vouchedFor(cert, { fingerprint, pool = [], trust, now = new Date() }) {
   if (trust && trust.pinned.has(String(fingerprint).toLowerCase())) return { via: 'signer', reasons: [] };
-  const others = distinct(pool.filter((c) => c && c.tbsView && !sameCert(c, cert)), now);
+  const others = [];
+  for (const c of pool) {
+    if (c && c.tbsView && !sameCert(c, cert) && !others.some((o) => sameCert(o, c))) others.push(c);
+  }
   const search = {
-    anchors: distinct(trust ? trust.anchors : [], now),
-    pool: others.slice(0, MAX_POOL),
+    anchors: groupLinks(trust ? trust.anchors : []),
+    pool: groupLinks(others.slice(0, MAX_POOL)),
     now,
     checks: 0,
+    signatures: new Map(),
+    exhausted: false,
+    cuts: 0,
     deadEnds: new Map(),
     problems: new Set(),
   };
