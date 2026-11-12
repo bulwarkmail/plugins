@@ -24,6 +24,7 @@ import { fakeKeystore } from './helpers/fake-keystore.mjs';
 import { fakeIndexedDB } from './helpers/fake-indexeddb.mjs';
 import { smimeSign } from '../src/smime-sign.js';
 import { smimeVerify } from '../src/smime-verify.js';
+import { listPublicCerts } from '../src/key-storage.js';
 import { bannerRows } from '../src/ui.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,7 @@ const manifest = JSON.parse(readFileSync(path.join(here, '../manifest.json'), 'u
 const fixture = (name) => readFileSync(path.join(here, 'fixtures', name));
 
 const VICTIM = 'ceo@victim.example';
+const ELSEWHERE = 'someone@elsewhere.example';
 const OPAQUE_CT = 'application/pkcs7-mime; smime-type=signed-data; name=smime.p7m';
 const MESSAGE = new TextEncoder().encode(
   'Content-Type: text/plain; charset=utf-8\r\n\r\nPlease pay the attached invoice today. Regards, the CEO\r\n',
@@ -175,5 +177,40 @@ describe('a signature made with a certificate nobody vouches for', () => {
     const result = await hooks.onRenderEmailBody({ html: '', text: '' }, signedMail(VICTIM));
     const shown = bannerRows(result.verification, { t: (key, vars) => api.i18n.t(key, vars), warnSelfSigned: false });
     expect(shown.map((r) => r.tone)).not.toContain('success');
+  });
+
+  it('is not kept as the certificate of the address it names when the mail came from someone else', async () => {
+    const { hooks } = plugin({ 'jmap.fetchBlob': async () => cms });
+    const result = await hooks.onRenderEmailBody({ html: '', text: '' }, signedMail(ELSEWHERE));
+    expect(result.verification.signerEmailMatch).toBe(false);
+    const kept = (await listPublicCerts()).filter((c) => c.email === VICTIM);
+    expect(kept).toEqual([]);
+  });
+
+  it('is not used to encrypt later mail to the address it names', async () => {
+    const { hooks, sent } = plugin({ 'jmap.fetchBlob': async () => cms });
+    // The user only opens the mail.
+    await hooks.onRenderEmailBody({ html: '', text: '' }, signedMail(VICTIM));
+    // Later the user writes an encrypted mail to that address.
+    const outcome = await hooks.onComposeSend({
+      identityId: 'identity', fromEmail: 'smime-test@example.com', to: [VICTIM],
+      subject: 'Confidential', textBody: 'The numbers before the announcement', sign: false, encrypt: true,
+    });
+    expect(outcome).toEqual({ abort: true });
+    expect(sent).toHaveLength(0);
+  });
+
+  it('is not kept either when the mail claims to come from the address it names', async () => {
+    const { hooks } = plugin({ 'jmap.fetchBlob': async () => cms });
+    await hooks.onRenderEmailBody({ html: '', text: '' }, signedMail(VICTIM));
+    expect((await listPublicCerts()).filter((c) => c.email === VICTIM)).toEqual([]);
+  });
+
+  it('is not kept when it is self-signed', async () => {
+    const self = await mintedFor(VICTIM, { selfSigned: true });
+    const selfCms = await signedCms(self);
+    const { hooks } = plugin({ 'jmap.fetchBlob': async () => selfCms });
+    await hooks.onRenderEmailBody({ html: '', text: '' }, signedMail(VICTIM));
+    expect((await listPublicCerts()).filter((c) => c.email === VICTIM)).toEqual([]);
   });
 });

@@ -10,7 +10,7 @@ material ever leaves the device.
 | Capability | How |
 |---|---|
 | **Sign** outgoing mail | `onComposeSend` builds the MIME and signs it with CMS `SignedData`, then submits via `api.jmap.sendRaw`. The *Signature format* setting picks detached (`multipart/signed`, readable without S/MIME; the default) or opaque (`application/pkcs7-mime`). |
-| **Encrypt** outgoing mail | `onComposeSend` builds CMS `EnvelopedData` to every recipient (AES-256-GCM by default; AES-128 optional) plus the sender, then submits raw. Sign + Encrypt does proper sign-then-encrypt. |
+| **Encrypt** outgoing mail | `onComposeSend` builds CMS `EnvelopedData` to every recipient (AES-256-GCM by default; AES-128 optional) plus the sender, then submits raw. Sign + Encrypt does proper sign-then-encrypt. Which certificate a recipient gets: see *Recipient certificates* below. |
 | **Verify** incoming signatures | `onRenderEmailBody` fetches the raw message (`api.jmap.fetchBlob`), so the signed part is checked byte-for-byte, checks the signature and the certificate's validity dates, and renders the inner body. The banner names the signer as verified (green, "Valid signature by …") only when the certificate chains to a trusted issuer or is a certificate the user trusts, may sign mail, the digest is not SHA-1 or MD5, and the From address is one of the certificate's addresses (see *Trust* below). Any other intact signature reads "Signature matches, signer not verified", with the reason in the details. Only a message signed as a whole counts: its own top-level type is `multipart/signed` (with exactly the signed part and the signature) or `application/pkcs7-mime`, in a header every parser reads the same way (one Content-Type field, each parameter once), with the boundary only on its delimiter lines, and the mail server has to read the parts the plugin verifies: the same tree of parts with the same names and sizes, and no attachment outside the signed part. Anything else reads as a damaged signed message. A signed part inside another message is not verified; the banner says that part of the message is signed. |
 | **Decrypt** incoming mail | `onRenderEmailBody` decrypts with your unlocked key: `EnvelopedData` with AES-CBC (128/192/256), 3DES or DES, and `AuthEnvelopedData` with AES-GCM (128/256) or ChaCha20-Poly1305. That covers Thunderbird, Outlook and all four modes of Stalwart's encryption at rest. The content key can be wrapped with RSAES-PKCS1-v1_5, RSA-OAEP (SHA-256 in `EnvelopedData`, or any of these with an OS key; SHA-1, SHA-256, SHA-384 or SHA-512 in `AuthEnvelopedData`), or ECDH-ES on P-256, P-384 or P-521 with AES key wrap. Mail in anything else, such as RC2, gets a banner that names the algorithm. |
 | **Key management** | `settings-section` slot: import PKCS#12 (`.p12`/`.pfx`), unlock/lock, delete, import recipient certificates and trusted issuers, set sign/encrypt defaults. |
@@ -32,6 +32,19 @@ material ever leaves the device.
   signed under a public CA reads "signer not verified" until the user or the
   admin adds that CA. Revocation is not checked (nothing is fetched), and the
   details say so.
+- **Recipient certificates.** Opening a signed message stores the signer's
+  certificate for the From address only when the signer is verified and the
+  certificate may encrypt (*Auto-save signer certificates*). At send time a
+  certificate the user imported comes before one from a signed message, and an
+  expired one, one that may not encrypt, or one from a signed message that no
+  trusted issuer or trusted certificate vouches for today is not used: the send
+  stops and names the recipient. With more than one candidate, or the first time
+  a certificate from a signed message is used, the user chooses, with issuer,
+  fingerprint, validity and source shown; the answer is kept per address until
+  another candidate turns up. Certificates versions 1.0 to 1.5 stored from
+  signed mail without any check stay in the list, marked "not verified", with
+  one button to remove them all. The sender's own address needs no stored
+  certificate: the own copy is encrypted to the sender's certificate.
 - **Privileged tier.** Declares `tier: "privileged"` + `crypto:full`. Per
   `resolvePluginTier`, the same-origin tier is only granted to a **signed,
   admin-approved (managed)** bundle after high-risk consent. A self-uploaded

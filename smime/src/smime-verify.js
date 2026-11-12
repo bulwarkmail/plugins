@@ -13,24 +13,23 @@ import { arraysEqual, toArrayBuffer, toHex } from './util.js';
 /**
  * Verify a CMS SignedData structure and extract the encapsulated content.
  * `trust` (trust.js makeTrust) decides whether the signer is verified; without it
- * nobody is.
- * @returns { mimeBytes: Uint8Array, status: SmimeStatus }
+ * nobody is. `chain` holds the message's other certificates (DER), which a stored signer
+ * certificate keeps for building its path again later.
+ * @returns { mimeBytes: Uint8Array, status: SmimeStatus, chain: ArrayBuffer[] }
  */
 export async function smimeVerify(cmsBytes, fromHeader, trust) {
   const contentInfo = parseContentInfo(cmsBytes);
   const signedData = extractSignedData(contentInfo);
 
   const innerContent = extractInnerContent(signedData);
+  const status = await verifyStatus(signedData, { signer: 0, checkChain: false }, fromHeader, trust);
 
-  return {
-    mimeBytes: innerContent,
-    status: await verifyStatus(signedData, { signer: 0, checkChain: false }, fromHeader, trust),
-  };
+  return { mimeBytes: innerContent, status, chain: otherCertificates(signedData) };
 }
 
 /**
  * Verify a detached signature over the signed entity's raw bytes.
- * @returns { mimeBytes: Uint8Array, status: SmimeStatus }
+ * @returns { mimeBytes: Uint8Array, status: SmimeStatus, chain: ArrayBuffer[] }
  */
 export async function smimeVerifyDetached(signatureDer, entityBytes, fromHeader, trust) {
   const signedData = extractSignedData(parseContentInfo(signatureDer));
@@ -48,7 +47,15 @@ export async function smimeVerifyDetached(signatureDer, entityBytes, fromHeader,
     if (retry.cryptoValid) status = retry;
   }
 
-  return { mimeBytes: entityBytes, status };
+  return { mimeBytes: entityBytes, status, chain: otherCertificates(signedData) };
+}
+
+// The DER of the message's certificates other than the signer's.
+function otherCertificates(signedData) {
+  const signer = extractSignerCertificate(signedData);
+  return (signedData.certificates || [])
+    .filter((c) => c instanceof pkijs.Certificate && c !== signer)
+    .map((c) => c.toSchema(true).toBER(false));
 }
 
 async function verifyStatus(signedData, verifyParams, fromHeader, trust) {
@@ -105,6 +112,7 @@ async function verifyStatus(signedData, verifyParams, fromHeader, trust) {
     fingerprint: certInfo.fingerprint,
     serialNumber: certInfo.serialNumber,
     algorithm: certInfo.algorithm,
+    canEncrypt: certInfo.capabilities.canEncrypt,
     source: 'signed-email',
   };
 

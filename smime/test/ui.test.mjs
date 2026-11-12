@@ -164,6 +164,27 @@ describe('settings section', () => {
     expect(saved).toEqual([{ defaultSign: true, defaultEncrypt: false }]);
     expect(told).toBe(1);
   });
+
+  it('marks certificates from signed mail nobody vouches for, and removes all of them in one go', async () => {
+    let certs = [
+      { id: 'c1', email: 'bob@x.org', source: 'manual', notAfter: '2999-01-01' },
+      { id: 'c2', email: 'carol@x.org', source: 'signed-email', notAfter: '2999-01-01' },
+      { id: 'c3', email: 'dan@x.org', source: 'signed-email', notAfter: '2999-01-01' },
+      { id: 'c4', email: 'erin@x.org', source: 'signed-email', notAfter: '2999-01-01' },
+    ];
+    const { SettingsSection } = makeUi(fakeApi(), deps({
+      listPublicCerts: async () => certs,
+      unverifiedFromMail: async (list) => new Set(list.filter((c) => c.id === 'c3' || c.id === 'c4').map((c) => c.id)),
+      deletePublicCert: async (id) => { certs = certs.filter((c) => c.id !== id); },
+    }));
+    await act(async () => { render(React.createElement(SettingsSection)); });
+    const rowOf = (email) => screen.getByText(email).closest('[role=listitem]');
+    expect(rowOf('carol@x.org').textContent).toMatch(/from a signed message ·/);
+    expect(rowOf('dan@x.org').textContent).toMatch(/from a signed message, not verified/);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Remove unverified certificates from signed mail' })); });
+    expect(certs.map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(screen.queryByRole('button', { name: 'Remove unverified certificates from signed mail' })).toBeNull();
+  });
 });
 
 describe('trusted issuers and certificates', () => {

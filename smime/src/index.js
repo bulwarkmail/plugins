@@ -35,13 +35,14 @@ import {
 import { parseMime, extractDetachedSigned, opaqueBody } from './mime-parse.js';
 import { importPkcs12, unlockPrivateKey } from './pkcs12.js';
 import {
-  parseCertificatePemOrDer, extractCertificateInfo, computeFingerprint, issuerCapabilities, pemCertificates,
+  parseCertificatePemOrDer, parseCertificateDer, extractCertificateInfo, computeFingerprint, issuerCapabilities,
+  pemCertificates, classifyCapabilities, rdnToString,
 } from './certificate-utils.js';
-import { makeTrust } from './trust.js';
+import { makeTrust, vouchedFor } from './trust.js';
 import { generateUUID } from './util.js';
 import { rawSendOptions } from './send-options.js';
-import { makeUi } from './ui.js';
-import { errorMessage, translator } from './i18n.js';
+import { makeUi, fmtDate } from './ui.js';
+import { errorMessage, localeOf, translator } from './i18n.js';
 import {
   INTENT_KEY, publishComposeActions, resetComposeIntent, handleComposeAction,
 } from './compose-actions.js';
@@ -49,7 +50,7 @@ import {
   saveKeyRecord, listKeyRecords, deleteKeyRecord,
   savePublicCert, listPublicCerts, deletePublicCert,
   saveSessionKeys, getSessionKeys, deleteSessionKeys, clearSessionKeys,
-  saveTrusted, listTrusted, deleteTrusted,
+  saveTrusted, listTrusted, deleteTrusted, getChoice, saveChoice,
 } from './key-storage.js';
 import { unlockedDecryptMaps, forgetRebuiltKeys } from './session-keys.js';
 import { certValidNow, createOsKeys, keystoreCode, keystoreStops, senderKeys } from './os-keys.js';
@@ -319,16 +320,131 @@ async function withSigningKey(records, sign) {
   return null;
 }
 
-async function recipientCertsFor(emails) {
-  const certs = await listPublicCerts();
-  const found = [];
-  const missing = [];
-  for (const email of emails) {
-    const c = certs.find((pc) => pc.email.toLowerCase() === email.toLowerCase());
-    if (c) found.push(c.certificate);
-    else missing.push(email);
+// ─── Recipient certificates ────────────────────────────────────────────
+
+/**
+ * A stored recipient certificate as the send path needs it: parsed, with its
+ * fingerprint, and whether it may be used today (in its dates, may encrypt and, when it
+ * came from a signed message, a trusted issuer or a certificate the user trusts vouches
+ * for it now). Null when it doesn't parse.
+ */
+async function describeRecipientCert(record, trust) {
+  try {
+    const cert = parseCertificateDer(record.certificate);
+    const fingerprint = await computeFingerprint(record.certificate);
+    const now = new Date();
+    const inDates = !(cert.notBefore.value > now) && !(cert.notAfter.value < now);
+    let vouched = true;
+    if (fromSignedMail(record)) {
+      const pool = (record.chain || []).map((der) => { try { return parseCertificateDer(der); } catch { return null; } }).filter(Boolean);
+      vouched = !!(await vouchedFor(cert, { fingerprint, pool, trust, now })).via;
+    }
+    return {
+      record,
+      fingerprint,
+      issuer: rdnToString(cert.issuer),
+      notAfter: cert.notAfter.value.toISOString(),
+      usable: inDates && classifyCapabilities(cert).canEncrypt && vouched,
+      vouched,
+    };
+  } catch {
+    return null;
   }
-  return { found, missing };
+}
+
+/** The ids of certificates from signed messages that nobody the user trusts vouches for now. */
+async function unverifiedFromMail(certs) {
+  const trust = await loadTrust();
+  const out = new Set();
+  for (const c of certs.filter(fromSignedMail)) {
+    const d = await describeRecipientCert(c, trust);
+    if (!d || !d.vouched) out.add(c.id);
+  }
+  return out;
+}
+
+const certDetails = (d) => t('send.certDetails', {
+  issuer: d.issuer,
+  fingerprint: d.fingerprint,
+  date: fmtDate(d.notAfter, localeOf(host)),
+  source: t(fromSignedMail(d.record) ? 'certificates.sourceSignedEmail' : 'certificates.sourceManual'),
+});
+
+/**
+ * The certificate to encrypt to for `email`, out of `candidates` (usable ones, hand-imported
+ * first). One certificate the user imported is used as it is. Otherwise the user
+ * decides: a certificate from a signed message is shown before its first use, and with
+ * several candidates each is offered in turn with issuer, fingerprint, validity and
+ * source. The answer is kept per address and stands while no other candidate appears.
+ * Null when the user picked none.
+ */
+async function pickRecipientCert(email, candidates) {
+  if (candidates.length === 1 && !fromSignedMail(candidates[0].record)) return candidates[0];
+  const fingerprints = candidates.map((d) => d.fingerprint);
+  const choice = await getChoice(email).catch(() => null);
+  if (choice && fingerprints.includes(choice.fingerprint) && fingerprints.every((fp) => (choice.among || []).includes(fp))) {
+    return candidates.find((d) => d.fingerprint === choice.fingerprint);
+  }
+  // A fixed order to offer them in, so the list looks the same each time: the one valid
+  // longest first.
+  const offered = [...candidates].sort((a, b) => b.notAfter.localeCompare(a.notAfter) || a.fingerprint.localeCompare(b.fingerprint));
+  for (const [i, d] of offered.entries()) {
+    const lead = offered.length > 1
+      ? t('send.chooseMany', { email, count: offered.length, position: i + 1 })
+      : t('send.chooseFromMail', { email });
+    const yes = await host.ui.confirm({
+      title: t('send.chooseTitle', { email }),
+      message: `${lead}\n\n${certDetails(d)}`,
+      confirmLabel: t('send.chooseConfirm'),
+      ...(i < offered.length - 1 ? { cancelLabel: t('send.chooseNext') } : {}),
+    });
+    if (yes) {
+      await saveChoice(email, d.fingerprint, fingerprints).catch((err) => host.log.warn('saving the certificate choice failed', err));
+      return d;
+    }
+  }
+  return null;
+}
+
+/**
+ * The certificates to encrypt to, one per recipient, or null when the send has to stop
+ * (the user has been told why). The sender's own addresses need none: the sender's
+ * certificate goes into every encrypted message for their own copy.
+ */
+async function recipientCertsFor(emails, ownAddresses) {
+  const certs = await listPublicCerts();
+  const trust = await loadTrust();
+  const missing = [];
+  const unusable = [];
+  const pending = [];
+  for (const email of [...new Set(emails.map((e) => e.toLowerCase()))]) {
+    if (ownAddresses.has(email)) continue;
+    const stored = certs.filter((c) => String(c.email || '').toLowerCase() === email);
+    if (stored.length === 0) { missing.push(email); continue; }
+    const usable = (await Promise.all(stored.map((c) => describeRecipientCert(c, trust)))).filter((d) => d && d.usable);
+    if (usable.length === 0) { unusable.push(email); continue; }
+    // A certificate the user imported always comes before one from a signed message.
+    const imported = usable.filter((d) => !fromSignedMail(d.record));
+    pending.push([email, imported.length ? imported : usable]);
+  }
+  if (missing.length > 0) {
+    host.toast.error(t('send.missingCertificates', { emails: missing.join(', ') }));
+    return null;
+  }
+  if (unusable.length > 0) {
+    host.toast.error(t('send.noUsableCertificate', { emails: unusable.join(', ') }));
+    return null;
+  }
+  const found = [];
+  for (const [email, candidates] of pending) {
+    const picked = await pickRecipientCert(email, candidates);
+    if (!picked) {
+      host.toast.error(t('send.notChosen', { email }));
+      return null;
+    }
+    found.push(picked.record.certificate);
+  }
+  return found;
 }
 
 // ─── Compose-send takeover ─────────────────────────────────────────────
@@ -464,6 +580,16 @@ async function onComposeSend(req) {
 async function buildOpaqueMessage(mimeInput, { sign, encrypt, keys, allRecipientEmails }) {
   let payloadBytes = buildMimeMessage(mimeInput);
 
+  // 0. Whom to encrypt to, before anything asks for a key: a send that stops here asks
+  // for no signature. The sender's own address is covered by the own copy when one of
+  // their certificates can decrypt.
+  let recipients = [];
+  if (encrypt) {
+    const own = new Set(keys.ownCopyReadable ? [String(mimeInput.from.email).toLowerCase()] : []);
+    recipients = await recipientCertsFor(allRecipientEmails, own);
+    if (!recipients) return null;
+  }
+
   // 1. Sign (opaque). If we'll also encrypt, nest the signed CMS as a MIME entity.
   if (sign) {
     // Locked keys are normally unlocked in onBeforeEmailSend. This is a
@@ -482,13 +608,8 @@ async function buildOpaqueMessage(mimeInput, { sign, encrypt, keys, allRecipient
   // 2. Encrypt (envelope). Always includes the sender cert so Sent is readable.
   let smimeType = sign ? 'signed-data' : null;
   if (encrypt) {
-    const { found, missing } = await recipientCertsFor(allRecipientEmails);
-    if (missing.length > 0) {
-      host.toast.error(t('send.missingCertificates', { emails: missing.join(', ') }));
-      return null;
-    }
     if (!keys.ownCopyReadable) host.toast.warning(t('send.ownCopyUnreadable'));
-    const envBlob = await smimeEncrypt(payloadBytes, found, keys.encrypting.certificate, useAes128());
+    const envBlob = await smimeEncrypt(payloadBytes, recipients, keys.encrypting.certificate, useAes128());
     payloadBytes = await blobToBytes(envBlob);
     smimeType = 'enveloped-data';
   }
@@ -499,17 +620,24 @@ async function buildOpaqueMessage(mimeInput, { sign, encrypt, keys, allRecipient
 
 // ─── Render-body takeover (verify / decrypt) ───────────────────────────
 
-async function maybeAutoImportSigner(status) {
+// The signer's certificate becomes the From address's recipient certificate only for a
+// verified signer (which includes that From is one of the certificate's addresses), and
+// only when the certificate may encrypt. `chain` (the message's other certificates) is
+// kept so its path can be checked again at send time. A certificate the user imported
+// still comes first there.
+async function maybeAutoImportSigner(status, chain = []) {
   if (settings().autoImportSignerCerts === false) return;
   const cert = status && status.signerCert;
-  if (!cert || !status.signatureValid || !cert.email) return;
+  const email = String((status && status.fromEmail) || '').toLowerCase();
+  if (!cert || !status.signatureValid || status.signerVerified !== true || cert.canEncrypt !== true || !email) return;
   try {
-    const existing = (await listPublicCerts()).some((c) => c.fingerprint === cert.fingerprint);
+    const existing = (await listPublicCerts()).some((c) => c.fingerprint === cert.fingerprint && String(c.email).toLowerCase() === email);
     if (!existing) {
       await savePublicCert({
         id: generateUUID(),
-        email: cert.email,
+        email,
         certificate: cert.certificate,
+        chain,
         issuer: cert.issuer,
         subject: cert.subject,
         notBefore: cert.notBefore,
@@ -671,7 +799,7 @@ async function renderEncrypted(body, ctx, loadCms, fromEmail, started, asked) {
         v.status.format = 'opaque';
         innerBytes = v.mimeBytes;
         Object.assign(verification, v.status, { isEncrypted: true, decryptionSuccess: true });
-        await maybeAutoImportSigner(v.status);
+        await maybeAutoImportSigner(v.status, v.chain);
       } catch { /* not actually signed; keep decrypted content as-is */ }
     }
 
@@ -771,7 +899,7 @@ async function onRenderEmailBody(body, ctx) {
       }
       const v = await smimeVerifyDetached(signed.signatureDer, signed.entityBytes, fromEmail, await loadTrust());
       v.status.format = 'detached';
-      await maybeAutoImportSigner(v.status);
+      await maybeAutoImportSigner(v.status, v.chain);
       const parsed = parseMime(v.mimeBytes);
       await persistVerifyStatus(ctx.id, v.status);
       return {
@@ -823,7 +951,7 @@ async function onRenderEmailBody(body, ctx) {
     if (type === 'signed-data') {
       const v = await smimeVerify(der, fromEmail, await loadTrust());
       v.status.format = 'opaque';
-      await maybeAutoImportSigner(v.status);
+      await maybeAutoImportSigner(v.status, v.chain);
       const parsed = parseMime(v.mimeBytes);
       await persistVerifyStatus(ctx.id, v.status);
       return {
@@ -872,7 +1000,7 @@ const { EmailBanner, SettingsSection } = makeUi(host, {
   settings, isCapable, getPrefs, setPrefs, detectSmime, ensureKeyUnlocked,
   listKeyRecords, saveKeyRecord, deleteKeyRecord, getSessionKeys, saveSessionKeys, deleteSessionKeys,
   listPublicCerts, savePublicCert, deletePublicCert,
-  listTrusted, saveTrusted, deleteTrusted, adminIssuers,
+  listTrusted, saveTrusted, deleteTrusted, adminIssuers, unverifiedFromMail,
   osKeys, FRESH_PREFIX,
   importPkcs12, unlockPrivateKey, parseCertificatePemOrDer, extractCertificateInfo, generateUUID,
   issuerCapabilities, pemCertificates,

@@ -26,6 +26,14 @@
  *             notBefore, notAfter, emails?, addedAt }. kind 'issuer' is a
  *             trusted issuer (with its certificate), kind 'signer' a single
  *             trusted signer certificate, kept by fingerprint.
+ *  - choices: the recipient certificate the user chose for an address.
+ *
+ * public-certs records carry `source`: 'manual' for one the user imported,
+ * 'signed-email' for one taken from a signed message. The plugin stores the
+ * latter only for a verified signer, with `chain` (the message's other
+ * certificates). Every 'signed-email' record, including those versions 1.0
+ * to 1.5 stored without any check, is used only when it verifies at send
+ * time (index.js).
  */
 
 import { classifyCapabilities, parseCertificateDer } from './certificate-utils.js';
@@ -129,6 +137,7 @@ export async function deletePublicCert(id) {
 const TRUST_DB_NAME = 'smime-plugin-trust';
 const TRUST_DB_VERSION = 1;
 const TRUSTED_STORE = 'trusted';
+const CHOICES_STORE = 'choices';
 
 function openTrustDB() {
   return new Promise((resolve, reject) => {
@@ -136,6 +145,7 @@ function openTrustDB() {
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(TRUSTED_STORE)) db.createObjectStore(TRUSTED_STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(CHOICES_STORE)) db.createObjectStore(CHOICES_STORE, { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -155,6 +165,21 @@ export async function listTrusted() {
 export async function deleteTrusted(id) {
   const db = await openTrustDB();
   await txPromise(db, TRUSTED_STORE, 'readwrite', (s) => s.delete(id));
+}
+
+// ── Recipient certificate choices ───────────────────────────────────
+// { id, email, fingerprint, among, at }: which certificate the user chose for an address
+// at send time, and the candidates it was chosen among (fingerprints).
+
+export async function getChoice(email) {
+  const db = await openTrustDB();
+  return txPromise(db, CHOICES_STORE, 'readonly', (s) => s.get(String(email).toLowerCase()));
+}
+
+export async function saveChoice(email, fingerprint, among) {
+  const db = await openTrustDB();
+  const id = String(email).toLowerCase();
+  await txPromise(db, CHOICES_STORE, 'readwrite', (s) => s.put({ id, email: id, fingerprint, among, at: Date.now() }));
 }
 
 // ── Session (unlocked) key CRUD ─────────────────────────────────────

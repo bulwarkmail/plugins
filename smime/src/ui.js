@@ -382,6 +382,8 @@ export function makeUi(host, deps) {
     const [capable, setCapable] = useState(true);
     const [trusted, setTrusted] = useState([]);
     const [adminTrusted, setAdminTrusted] = useState([]);
+    // Ids of recipient certificates from signed messages that nobody the user trusts vouches for.
+    const [unverified, setUnverified] = useState(new Set());
     const fileRef = useRef(null);
     const certFileRef = useRef(null);
     const issuerFileRef = useRef(null);
@@ -405,6 +407,7 @@ export function makeUi(host, deps) {
         deps.listTrusted ? deps.listTrusted() : [], describeAdminIssuers(),
       ]);
       setKeys(k); setCerts(c); setPrefsState(p); setTrusted(tr); setAdminTrusted(admin);
+      setUnverified(deps.unverifiedFromMail ? await deps.unverifiedFromMail(c) : new Set());
       const u = {};
       for (const rec of k) u[rec.id] = !!(await deps.getSessionKeys(rec.id));
       setUnlocked(u);
@@ -547,6 +550,11 @@ export function makeUi(host, deps) {
       await refresh();
     }
 
+    async function removeUnverified() {
+      for (const c of certs) if (unverified.has(c.id)) await deps.deletePublicCert(c.id);
+      await refresh();
+    }
+
     // A PEM file may hold several certificates; a DER file holds one. Only certificates
     // that may issue certificates are kept as issuers.
     async function importIssuerFile() {
@@ -621,7 +629,8 @@ export function makeUi(host, deps) {
       r.fingerprint ? `SHA-256 ${r.fingerprint}` : '',
     ].filter(Boolean).join(' · ');
     const SOURCE_KEYS = { manual: 'certificates.sourceManual', 'signed-email': 'certificates.sourceSignedEmail' };
-    const source = (c) => (SOURCE_KEYS[c.source] ? t(SOURCE_KEYS[c.source]) : c.source);
+    const source = (c) => (unverified.has(c.id) ? t('certificates.sourceUnverified')
+      : SOURCE_KEYS[c.source] ? t(SOURCE_KEYS[c.source]) : c.source);
 
     // The browser's file picker stays hidden; the kit button opens it.
     const picker = (ref, accept, onChange, label) => h('input', {
@@ -678,7 +687,8 @@ export function makeUi(host, deps) {
       },
       picker(certFileRef, '.pem,.crt,.cer,.der', importCertFile, t('certificates.file')),
       h(Row, null,
-        h(Button, { variant: 'secondary', icon: 'upload', busy, onClick: () => certFileRef.current && certFileRef.current.click() }, t('certificates.import'))),
+        h(Button, { variant: 'secondary', icon: 'upload', busy, onClick: () => certFileRef.current && certFileRef.current.click() }, t('certificates.import')),
+        unverified.size > 0 && h(Button, { variant: 'secondary', icon: 'trash', busy, onClick: removeUnverified }, t('certificates.removeUnverified'))),
       certs.length === 0
         ? h(EmptyState, { compact: true, icon: 'certificate', title: t('certificates.empty') })
         : h(List, { label: t('certificates.title') },

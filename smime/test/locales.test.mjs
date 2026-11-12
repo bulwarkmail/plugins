@@ -254,12 +254,15 @@ describe('S/MIME in another language', () => {
       listPublicCerts: async () => [
         { id: 'c1', email: 'bob@x.org', source: 'manual', notAfter: '2999-01-01' },
         { id: 'c2', email: 'eve@x.org', source: 'signed-email', notAfter: '2000-01-01' },
+        { id: 'c3', email: 'dan@x.org', source: 'signed-email', notAfter: '2999-01-01' },
       ],
+      unverifiedFromMail: async () => new Set(['c3']),
     }));
     await act(async () => { render(React.createElement(SettingsSection)); });
     const text = document.body.textContent;
     for (const key of ['keys.title', 'keys.description', 'keys.import', 'keys.valid', 'keys.canSign', 'keys.canEncrypt', 'badge.expired', 'badge.unlocked', 'keys.lock',
       'certificates.title', 'certificates.description', 'certificates.import', 'certificates.sourceManual', 'certificates.sourceSignedEmail', 'certificates.expires',
+      'certificates.sourceUnverified', 'certificates.removeUnverified',
       'defaults.title', 'defaults.sign', 'defaults.signHelp', 'defaults.encrypt', 'defaults.encryptHelp']) {
       expect(text, key).toContain(`‹${key}›`);
     }

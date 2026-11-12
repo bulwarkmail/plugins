@@ -96,32 +96,32 @@ async function pathToAnchor(cert, pool, anchors, now, seen, below, problems) {
 }
 
 /**
+ * Who vouches for `cert`: { via: 'signer' } when its fingerprint is a trusted signer
+ * certificate, { via: 'issuer', anchor } when a path from it leads to a trusted issuer
+ * (`pool`: other certificates that may be intermediates), else { reasons } with 'self'
+ * or 'issuer' (and 'digest' when a link was signed with SHA-1 or MD5).
+ */
+export async function vouchedFor(cert, { fingerprint, pool = [], trust, now = new Date() }) {
+  if (trust && trust.pinned.has(String(fingerprint).toLowerCase())) return { via: 'signer', reasons: [] };
+  const problems = new Set();
+  const others = pool.filter((c) => c && c.tbsView && !sameCert(c, cert));
+  const anchor = trust && trust.anchors.length && !unknownCritical(cert)
+    ? await pathToAnchor(cert, others, trust.anchors, now, [], 0, problems)
+    : null;
+  if (anchor) return { via: 'issuer', anchor, reasons: [] };
+  return { reasons: [selfIssued(cert) ? 'self' : 'issuer', ...problems] };
+}
+
+/**
  * Whether the signer of `signedData` (signer 0, whose certificate is `signerCert`) is
  * verified. `fingerprint` is the signer certificate's, `addresses` all addresses it
  * names (lower case). Returns { verified, via: 'issuer' | 'signer' | undefined, anchor
- * (the trusted issuer's subject, for the details), reasons }.
+ * (the trusted issuer's certificate, for the details), reasons }.
  */
 export async function evaluateSigner({ signedData, signerCert, fingerprint, addresses, fromEmail, trust, now = new Date() }) {
-  const reasons = new Set();
-  let via;
-  let anchor;
-
-  if (trust && trust.pinned.has(String(fingerprint).toLowerCase())) {
-    via = 'signer';
-  } else {
-    const pool = (signedData.certificates || []).filter((c) => c && c.tbsView && !sameCert(c, signerCert));
-    const problems = new Set();
-    const found = trust && trust.anchors.length && !unknownCritical(signerCert)
-      ? await pathToAnchor(signerCert, pool, trust.anchors, now, [], 0, problems)
-      : null;
-    if (found) {
-      via = 'issuer';
-      anchor = found;
-    } else {
-      reasons.add(selfIssued(signerCert) ? 'self' : 'issuer');
-      for (const p of problems) reasons.add(p);
-    }
-  }
+  const vouched = await vouchedFor(signerCert, { fingerprint, pool: signedData.certificates || [], trust, now });
+  const reasons = new Set(vouched.reasons);
+  const { via, anchor } = vouched;
 
   if (!classifyCapabilities(signerCert).canSign) reasons.add('usage');
 
