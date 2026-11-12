@@ -161,8 +161,9 @@ Actions has two modes:
   first anyway.
 
 Some actions ask first in both modes, because text in a message could
-ask the model for them: moving a message to the trash or junk folder,
-moving or archiving any message other than the one you have open (in the
+ask the model for them: moving a message to the trash or junk folder or
+out of the junk folder (also archiving it from there), moving or
+archiving any message other than the one you have open (in the
 composer, every message), adding a contact whose address you didn't type
 in the chat and that isn't the sender or a recipient of the open
 message, and opening a new message to such an address. Only what you type

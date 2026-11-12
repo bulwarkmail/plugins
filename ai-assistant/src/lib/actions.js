@@ -11,9 +11,9 @@
 //
 // Most of them follow the user's mode. These always ask first, since the
 // user would hardly notice them otherwise and the model may act on what a
-// message it reads says: a move to Trash or Junk, moving or archiving any
-// message other than the open one, and a new contact, a new message or a
-// reply whose address the user didn't name.
+// message it reads says: a move to Trash or Junk or out of Junk, moving or
+// archiving any message other than the open one, and a new contact, a new
+// message or a reply whose address the user didn't name.
 
 import { areaAction, areaActions, offered } from './areas/index.js';
 
@@ -79,6 +79,19 @@ async function replyRecipients(api, email, all) {
 
 /** Folders a move to always asks first: what lands there is out of the user's sight. */
 const ASK_FOLDER_ROLES = new Set(['trash', 'junk']);
+
+/**
+ * Whether `email` is in the junk folder (by role). A move out of it puts a
+ * message back in sight that the server or the user put away, so it asks
+ * first; a message whose folders the view doesn't name counts as in it.
+ */
+function inJunk(email, mailboxes) {
+  const raw = email?.mailboxIds;
+  if (!raw || typeof raw !== 'object') return true;
+  const ids = Array.isArray(raw) ? raw : Object.keys(raw).filter((id) => raw[id]);
+  const junk = new Set((mailboxes ?? []).filter((m) => m?.role === 'junk').map((m) => m.id));
+  return ids.some((id) => junk.has(id));
+}
 
 /** Whether `email` is the message open next to the panel (the composer has none). */
 const isOpenMessage = (email, ctx = {}) => !!ctx.openEmailId && String(email?.id) === String(ctx.openEmailId);
@@ -274,16 +287,21 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
   switch (name) {
     case 'archive_message': {
       const email = await messageFor(api, args.id);
-      // Only the open message follows the mode: the user doesn't see another one go.
-      return { summary: t('action.archive', { subject: email.subject || '…' }), plan: { name, email }, alwaysAsk: !isOpenMessage(email, ctx) };
+      // Only the open message follows the mode: the user doesn't see another
+      // one go. Out of the junk folder always asks (also when the folders
+      // can't be read).
+      let fromJunk;
+      try { fromJunk = inJunk(email, (await api.mailboxes.list()) ?? []); } catch { fromJunk = true; }
+      return { summary: t('action.archive', { subject: email.subject || '…' }), plan: { name, email }, alwaysAsk: fromJunk || !isOpenMessage(email, ctx) };
     }
     case 'move_message': {
       const email = await messageFor(api, args.id);
       const mailboxes = (await api.mailboxes.list()) ?? [];
       const folder = findFolder(mailboxes, args.folder);
       if (!folder) throw new Error(`no folder "${text(args.folder, 100)}"; the folders are: ${mailboxes.map((m) => m.name).join(', ')}`);
-      // By the folder's role, whatever it is called ("Spam", "Papierkorb").
-      const alwaysAsk = ASK_FOLDER_ROLES.has(folder.role) || !isOpenMessage(email, ctx);
+      // By the folder's role, whatever it is called ("Spam", "Papierkorb"):
+      // into Trash or Junk, or out of Junk.
+      const alwaysAsk = ASK_FOLDER_ROLES.has(folder.role) || inJunk(email, mailboxes) || !isOpenMessage(email, ctx);
       return { summary: t('action.move', { subject: email.subject || '…', folder: folder.name }), plan: { name, email, folder }, alwaysAsk };
     }
     case 'mark_message': {
