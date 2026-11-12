@@ -1,7 +1,7 @@
 /**
  * S/MIME with a key from CurrentUser\My, through plugin, webmail and desktop shell. Sends
- * a signed mail to itself, which also files its certificate, then an encrypted one, and
- * reads both. Windows only. It needs an app built with the keystore host API and the
+ * a signed mail to itself, then an encrypted one (the sender's own address needs no stored
+ * certificate), and reads both. Windows only. It needs an app built with the keystore host API and the
  * helper, so it runs from repos/desktop and not with this repo's Playwright config (the
  * name keeps that config from picking it up):
  *
@@ -169,12 +169,13 @@ test.describe('S/MIME with a key from CurrentUser\\My', () => {
     expect(asked.filter((prompt) => /certificate/i.test(`${prompt.message} ${prompt.detail}`))).toEqual([]);
   });
 
-  test('signs with the OS key: the shell asks, and the signature verifies', async () => {
+  test('signs with the OS key: the shell asks, and the signature matches', async () => {
     const { page, app } = launched;
     const subject = `OS key signed ${run}`;
     await compose(page, subject, [/sign \(s\/mime\)/i]);
     await openMail(page, subject);
-    await expectBanner(page, /valid signature/i);
+    // The test certificate is self-signed and nobody trusts it, so the signer reads as not verified.
+    await expectBanner(page, /signature matches, signer not verified/i);
     // The shell's dialog names the certificate. The run id is the last word of its subject.
     const runId = cert.subject.split(' ').pop()!;
     const asked = await prompts(app);
@@ -183,7 +184,7 @@ test.describe('S/MIME with a key from CurrentUser\\My', () => {
 
   test('decrypts with the OS key', async () => {
     const { page } = launched;
-    // Reading the signed mail filed its certificate as the recipient's.
+    // Sent to itself: the own copy, encrypted to the OS key's certificate, is what it reads.
     const subject = `OS key encrypted ${run}`;
     await compose(page, subject, [/encrypt \(s\/mime\)/i]);
     await openMail(page, subject);

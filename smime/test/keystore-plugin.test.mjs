@@ -175,9 +175,10 @@ describe('sending', () => {
     ['ECDH', EC, 'smime-ec@example.com', 'agree'],
   ])('can read its own signed and encrypted mail with the same %s OS key', async (_, spec, from, method) => {
     const { ks, sent, hooks } = plugin({ specs: [spec], handlers: { 'jmap.fetchBlob': async () => sent[0].bytes } });
+    // Stored for the address the certificate names: a certificate counts only for its own addresses.
     const recipient = new X509Certificate(fixture('ec-p384-cert.pem')).raw;
-    await savePublicCert({ id: 'c', email: 'someone@example.org', certificate: recipient.buffer.slice(recipient.byteOffset, recipient.byteOffset + recipient.byteLength) });
-    await expect(hooks.onComposeSend(sendRequest({ encrypt: true, fromEmail: from }))).resolves.toBe(false);
+    await savePublicCert({ id: 'c', email: 'smime-ec@example.com', certificate: recipient.buffer.slice(recipient.byteOffset, recipient.byteOffset + recipient.byteLength) });
+    await expect(hooks.onComposeSend(sendRequest({ encrypt: true, fromEmail: from, to: ['smime-ec@example.com'] }))).resolves.toBe(false);
     expect(ks.calls.sign).toHaveLength(1);
 
     const result = await hooks.onRenderEmailBody(bodyOf(), encryptedMail({ from: [from] }));
@@ -306,8 +307,8 @@ describe('sending', () => {
   it('warns when the own copy will be unreadable', async () => {
     const { api, sent, hooks } = plugin({ specs: [{ ...EC, canAgree: false }] });
     const recipient = new X509Certificate(fixture('cert.pem')).raw;
-    await savePublicCert({ id: 'c', email: 'someone@example.org', certificate: recipient.buffer.slice(recipient.byteOffset, recipient.byteOffset + recipient.byteLength) });
-    await expect(hooks.onComposeSend(sendRequest({ encrypt: true, fromEmail: 'smime-ec@example.com' }))).resolves.toBe(false);
+    await savePublicCert({ id: 'c', email: 'smime-test@example.com', certificate: recipient.buffer.slice(recipient.byteOffset, recipient.byteOffset + recipient.byteLength) });
+    await expect(hooks.onComposeSend(sendRequest({ encrypt: true, fromEmail: 'smime-ec@example.com', to: ['smime-test@example.com'] }))).resolves.toBe(false);
     expect(sent).toHaveLength(1);
     expect(toasts(api, 'warning')).toEqual([en['send.ownCopyUnreadable']]);
   });

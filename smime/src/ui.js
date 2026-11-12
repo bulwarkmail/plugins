@@ -54,25 +54,50 @@ export function signatureChecks(status, t, locale) {
   else if (certNotYetValid) checks.push({ tone: 'bad', text: t('check.notYetValid', { date: fmtDateTime(cert.notBefore, locale) }) });
   else checks.push({ tone: 'ok', text: t('check.validUntil', { date: fmtDate(cert.notAfter, locale) }) });
 
-  // Without a chain check anyone can mint a certificate for any address, so say
-  // what the certificate claims, not who it belongs to.
+  // The From address against every address the certificate names.
+  const emails = cert.emails || (cert.email ? [cert.email] : []);
+  const reasons = Array.isArray(status.trustReasons) ? status.trustReasons : [];
   if (status.signerEmailMatch === true) {
-    checks.push({ tone: 'ok', text: t('check.senderMatch', { email: cert.email }) });
-  } else if (status.signerEmailMatch === false) {
+    checks.push({ tone: 'ok', text: t('check.senderMatch', { email: status.fromEmail || cert.email }) });
+  } else if (status.signerEmailMatch === false || reasons.includes('from')) {
     checks.push({
       tone: 'warn',
-      text: cert.email && status.fromEmail
-        ? t('check.senderMismatch', { signer: cert.email, from: status.fromEmail })
-        : t('check.senderMismatchUnknown'),
+      text: emails.length === 0 ? t('certificates.noEmail')
+        : status.fromEmail ? t('check.senderMismatch', { signer: emails.join(', '), from: status.fromEmail })
+          : t('check.senderMismatchUnknown'),
     });
   }
 
-  if (status.selfSigned) {
+  // Who vouches for the certificate (trust.js). A status stored by an older version has
+  // none of this and reads as not verified.
+  if (status.trustedVia === 'issuer') {
+    checks.push({ tone: 'ok', text: t('check.issuerTrusted', { issuer: status.trustAnchor || cert.issuer || '' }) });
+  } else if (status.trustedVia === 'signer') {
+    checks.push({ tone: 'ok', text: t('check.signerTrusted') });
+  } else if (status.selfSigned || reasons.includes('self')) {
     checks.push({ tone: 'warn', text: t('check.selfSigned') });
   } else {
-    checks.push({ tone: 'info', text: t('check.issuerUnchecked') });
+    checks.push({ tone: 'warn', text: t('check.issuerUntrusted') });
   }
+  if (reasons.includes('constraints')) checks.push({ tone: 'warn', text: t('check.nameConstraints') });
+  if (reasons.includes('limit')) checks.push({ tone: 'warn', text: t('check.pathLimit') });
+  if (reasons.includes('usage')) checks.push({ tone: 'warn', text: t('check.usage') });
+  if (reasons.includes('digest')) checks.push({ tone: 'warn', text: t('check.weakDigest') });
+  if (reasons.includes('weakKey')) checks.push({ tone: 'warn', text: t('check.weakKey') });
+  checks.push({ tone: 'info', text: t('check.revocation') });
   return checks;
+}
+
+/**
+ * Whether the details offer "Trust this certificate": the signature is intact and the
+ * only thing missing is someone vouching for the certificate. Trusting it would not help
+ * with another From address, a usage or a weak digest, so it isn't offered then.
+ */
+export function canTrust(status) {
+  const reasons = status.trustReasons;
+  return status.signatureValid === true && status.signerVerified !== true && status.trustedVia !== 'signer'
+    && Array.isArray(reasons) && reasons.length > 0 && reasons.every((r) => r === 'issuer' || r === 'self')
+    && !!status.signerCert?.fingerprint;
 }
 
 export function certificateFields(status, t, locale) {
@@ -94,7 +119,7 @@ export function certificateFields(status, t, locale) {
 const CHECK_ICON = { ok: 'circle-check', bad: 'circle-x', warn: 'alert-triangle', info: 'info-circle' };
 const CHECK_TONE = { ok: 'success', bad: 'danger', warn: 'default', info: 'muted' };
 
-function SignatureDetails({ status, t, locale }) {
+function SignatureDetails({ status, t, locale, onTrust, busy }) {
   return h(Stack, { gap: 3 },
     h(Stack, { gap: 1 },
       signatureChecks(status, t, locale).map((c, i) => h(Row, { key: i, gap: 2, wrap: false, align: 'start' },
@@ -108,7 +133,15 @@ function SignatureDetails({ status, t, locale }) {
         h(Text, { size: 'xs' }, v),
       )),
     ),
+    onTrust && canTrust(status) && h(Row, null,
+      h(Button, { size: 'sm', variant: 'secondary', icon: 'shield-check', busy, onClick: onTrust }, t('banner.trust'))),
   );
+}
+
+// The common name of a "CN=…, O=…" name, else the whole name.
+function commonName(name) {
+  const m = String(name || '').match(/(?:^|,\s*)CN=([^,]+)/);
+  return m ? m[1].trim() : String(name || '');
 }
 
 const BANNER_TONE = { success: 'success', warning: 'warning', destructive: 'danger', info: 'info' };
@@ -133,8 +166,11 @@ const PKCS7_PART = /^application\/(x-)?pkcs7-(signature|mime)$/;
 const hasPkcs7Attachment = (email) => (email.attachments || [])
   .some((att) => PKCS7_PART.test(String(att.type || '').split(';')[0].trim().toLowerCase()));
 
-/** The info bars for a stored verify status. Exported for tests. */
-export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
+/**
+ * The info bars for a stored verify status. Exported for tests. Callers may still pass
+ * `warnSelfSigned` (the former setting); it changes nothing.
+ */
+export function bannerRows(status, { t } = {}) {
   const rows = [];
   if (status.isEncrypted) {
     const eyebrow = t('banner.encryption');
@@ -156,28 +192,20 @@ export function bannerRows(status, { warnSelfSigned = true, t } = {}) {
   }
   if (status.isSigned || status.signerCert) {
     const eyebrow = t('banner.signature');
-    if (status.signatureValid) {
-      const selfSigned = warnSelfSigned && status.selfSigned;
-      const text = [
-        status.signerCert && status.signerCert.email ? t('banner.validBy', { email: status.signerCert.email }) : t('banner.valid'),
-        selfSigned ? t('banner.selfSigned') : null,
-        status.signerEmailMatch === false ? t('banner.signerMismatch') : null,
-      ].filter(Boolean).join(' · ');
-      // A valid signature only reads as trusted-green when it also chains to a
-      // CA and the signer matches the From. A self-signed cert or a signer≠From
-      // mismatch downgrades to an amber warning (still "valid", just untrusted).
-      const untrusted = status.signerEmailMatch === false || selfSigned;
-      rows.push({
-        icon: untrusted ? 'shield-exclamation' : 'shield-check',
-        eyebrow,
-        text,
-        tone: untrusted ? 'warning' : 'success',
-        details: true,
-      });
+    if (status.signatureValid && status.signerVerified === true) {
+      // Verified (trust.js): a trusted issuer or a trusted certificate, and the From address is
+      // one of the certificate's.
+      const email = status.fromEmail || (status.signerCert && status.signerCert.email) || '';
+      rows.push({ icon: 'shield-check', eyebrow, text: t('banner.validBy', { email }), tone: 'success', details: true });
+    } else if (status.signatureValid) {
+      // The signature matches the content, but nobody the user trusts vouches for the signer,
+      // or the certificate doesn't fit this mail. No setting makes this green; the details say why.
+      rows.push({ icon: 'shield-exclamation', eyebrow, text: t('banner.unverified'), tone: 'warning', details: true });
     } else if (status.signatureError) {
       rows.push({ icon: 'shield-exclamation', eyebrow, text: t('banner.invalid', { error: errorText(t, status.signatureError) }), tone: 'destructive', details: !!status.signerCert });
     } else {
-      rows.push({ icon: 'shield-check', eyebrow, text: t('banner.signed'), tone: 'info' });
+      // No verdict yet (the guess from the header): nothing about it reads as checked.
+      rows.push({ icon: 'signature', eyebrow, text: t('banner.signed'), tone: 'info' });
     }
   }
   // Only a part below the top level is signed: unverified, and the rest of the message is outside it.
@@ -246,6 +274,38 @@ export function makeUi(host, deps) {
       }
     }, [renderAfresh]);
 
+    // "Trust this certificate": keeps the signer certificate's fingerprint as a trusted
+    // signer certificate, after the user saw which addresses and which fingerprint, and
+    // verifies the message again.
+    const trustSigner = useCallback(async () => {
+      const cert = status && status.signerCert;
+      if (!cert || !cert.fingerprint || !deps.saveTrusted) return;
+      const emails = (cert.emails || [cert.email]).filter(Boolean);
+      const ok = await host.ui.confirm({
+        title: t('trust.title'),
+        message: t('trust.message', { emails: emails.join(', '), fingerprint: cert.fingerprint }),
+        confirmLabel: t('trust.confirm'),
+      });
+      if (!ok) return;
+      setBusy(true);
+      try {
+        await deps.saveTrusted({
+          id: deps.generateUUID(),
+          kind: 'signer',
+          fingerprint: cert.fingerprint,
+          subject: cert.subject,
+          issuer: cert.issuer,
+          notBefore: cert.notBefore,
+          notAfter: cert.notAfter,
+          emails,
+          addedAt: Date.now(),
+        });
+        await renderAfresh();
+      } catch {
+        setBusy(false);
+      }
+    }, [status, renderAfresh]);
+
     useEffect(() => {
       let alive = true;
       (async () => {
@@ -291,7 +351,7 @@ export function makeUi(host, deps) {
     }, [email && email.id, watch]);
 
     if (!loaded || !status) return null;
-    const rows = bannerRows(status, { warnSelfSigned: deps.settings().warnOnSelfSigned !== false, t });
+    const rows = bannerRows(status, { t });
     if (rows.length === 0) return null;
 
     return h(React.Fragment, null, rows.map((r, i) => h(InfoBar, {
@@ -310,7 +370,7 @@ export function makeUi(host, deps) {
       r.action === 'unlock' && h(BarButton, { icon: 'lock-open', busy, onClick: unlockNow }, t('banner.unlockNow')),
       r.action === 'retry' && h(BarButton, { icon: r.actionLabel ? 'lock-open' : 'refresh', busy, onClick: retryNow }, t(r.actionLabel ?? 'banner.tryAgain')),
     ),
-    r.details && detailsOpen && h(SignatureDetails, { status, t, locale: localeOf(host) }),
+    r.details && detailsOpen && h(SignatureDetails, { status, t, locale: localeOf(host), onTrust: deps.saveTrusted ? trustSigner : null, busy }),
     )));
   }
 
@@ -323,17 +383,38 @@ export function makeUi(host, deps) {
     const [osState, setOsState] = useState('idle');
     const [busy, setBusy] = useState(false);
     const [capable, setCapable] = useState(true);
+    const [trusted, setTrusted] = useState([]);
+    const [adminTrusted, setAdminTrusted] = useState([]);
+    // Ids of recipient certificates from signed messages that nobody the user trusts vouches for.
+    const [unverified, setUnverified] = useState(new Set());
     const fileRef = useRef(null);
     const certFileRef = useRef(null);
+    const issuerFileRef = useRef(null);
+
+    // The admin's trusted issuers, read from their PEM text for the list.
+    const describeAdminIssuers = useCallback(async () => {
+      const out = [];
+      for (const der of (await deps.adminIssuers?.()) || []) {
+        try {
+          const cert = deps.parseCertificatePemOrDer(der);
+          out.push(await deps.extractCertificateInfo(cert, cert.toSchema(true).toBER(false)));
+        } catch { /* not a certificate: not listed */ }
+      }
+      return out;
+    }, []);
 
     const refresh = useCallback(async () => {
       if (!(await deps.isCapable())) { setCapable(false); return; }
-      const [k, c, p] = await Promise.all([deps.listKeyRecords(), deps.listPublicCerts(), deps.getPrefs()]);
-      setKeys(k); setCerts(c); setPrefsState(p);
+      const [k, c, p, tr, admin] = await Promise.all([
+        deps.listKeyRecords(), deps.listPublicCerts(), deps.getPrefs(),
+        deps.listTrusted ? deps.listTrusted() : [], describeAdminIssuers(),
+      ]);
+      setKeys(k); setCerts(c); setPrefsState(p); setTrusted(tr); setAdminTrusted(admin);
+      setUnverified(deps.unverifiedFromMail ? await deps.unverifiedFromMail(c) : new Set());
       const u = {};
       for (const rec of k) u[rec.id] = !!(await deps.getSessionKeys(rec.id));
       setUnlocked(u);
-    }, []);
+    }, [describeAdminIssuers]);
 
     // Keys changed: reload the list and let the composer's Options menu know.
     const changed = useCallback(async () => {
@@ -472,6 +553,62 @@ export function makeUi(host, deps) {
       await refresh();
     }
 
+    async function removeUnverified() {
+      for (const c of certs) if (unverified.has(c.id)) await deps.deletePublicCert(c.id);
+      await refresh();
+    }
+
+    // A PEM file may hold several certificates; a DER file holds one. Only certificates
+    // that may issue certificates are kept as issuers.
+    async function importIssuerFile() {
+      const file = issuerFileRef.current && issuerFileRef.current.files && issuerFileRef.current.files[0];
+      if (!file) return;
+      setBusy(true);
+      try {
+        const buf = await file.arrayBuffer();
+        const pem = deps.pemCertificates(new TextDecoder().decode(buf));
+        const known = new Set(trusted.filter((r) => r.kind === 'issuer').map((r) => r.fingerprint));
+        const added = [];
+        // A CA with name constraints is refused: they aren't checked, so it would vouch beyond them.
+        let constrained = false;
+        for (const der of pem.length ? pem : [buf]) {
+          const cert = deps.parseCertificatePemOrDer(der);
+          const caps = deps.issuerCapabilities(cert);
+          if (caps.constrained && caps.isCa) constrained = true;
+          if (!caps.canIssue) continue;
+          const bytes = cert.toSchema(true).toBER(false);
+          const info = await deps.extractCertificateInfo(cert, bytes);
+          added.push(commonName(info.subject));
+          if (known.has(info.fingerprint)) continue;
+          known.add(info.fingerprint);
+          await deps.saveTrusted({
+            id: deps.generateUUID(),
+            kind: 'issuer',
+            certificate: bytes,
+            fingerprint: info.fingerprint,
+            subject: info.subject,
+            issuer: info.issuer,
+            notBefore: info.notBefore,
+            notAfter: info.notAfter,
+            addedAt: Date.now(),
+          });
+        }
+        if (added.length === 0) throw new Error(t(constrained ? 'issuers.nameConstraints' : 'issuers.notCa'));
+        host.toast.success(t('issuers.added', { name: added.join(', ') }));
+        await refresh();
+      } catch (err) {
+        host.toast.error(t('issuers.failed', { error: errorMessage(t, err) }));
+      } finally {
+        if (issuerFileRef.current) issuerFileRef.current.value = '';
+        setBusy(false);
+      }
+    }
+
+    async function removeTrusted(r) {
+      await deps.deleteTrusted(r.id);
+      await refresh();
+    }
+
     async function setPref(key, value) {
       const next = { ...prefs, [key]: value };
       setPrefsState(next);
@@ -494,8 +631,13 @@ export function makeUi(host, deps) {
       rec.capabilities.canEncrypt ? t('keys.canEncrypt') : '',
       rec.capabilities.canSign && !rec.capabilities.canEncrypt ? t('keys.signOnly') : '',
     ].filter(Boolean).join(' · ');
+    const trustedDetails = (r) => [
+      r.notBefore && r.notAfter ? t('keys.valid', { from: fmtDate(r.notBefore, locale), until: fmtDate(r.notAfter, locale) }) : '',
+      r.fingerprint ? `SHA-256 ${r.fingerprint}` : '',
+    ].filter(Boolean).join(' · ');
     const SOURCE_KEYS = { manual: 'certificates.sourceManual', 'signed-email': 'certificates.sourceSignedEmail' };
-    const source = (c) => (SOURCE_KEYS[c.source] ? t(SOURCE_KEYS[c.source]) : c.source);
+    const source = (c) => (unverified.has(c.id) ? t('certificates.sourceUnverified')
+      : SOURCE_KEYS[c.source] ? t(SOURCE_KEYS[c.source]) : c.source);
 
     // The browser's file picker stays hidden; the kit button opens it.
     const picker = (ref, accept, onChange, label) => h('input', {
@@ -509,6 +651,7 @@ export function makeUi(host, deps) {
       },
       picker(fileRef, '.p12,.pfx', importKeyFile, t('keys.file')),
       deps.osKeys?.available() && h(Text, { tone: 'muted' }, t('keys.systemHint')),
+      h(Text, { tone: 'muted' }, t('keys.sessionNote')),
       h(Row, null,
         h(Button, { icon: 'upload', busy, onClick: () => fileRef.current && fileRef.current.click() }, t('keys.import')),
         deps.osKeys?.available() && h(Button, {
@@ -552,7 +695,8 @@ export function makeUi(host, deps) {
       },
       picker(certFileRef, '.pem,.crt,.cer,.der', importCertFile, t('certificates.file')),
       h(Row, null,
-        h(Button, { variant: 'secondary', icon: 'upload', busy, onClick: () => certFileRef.current && certFileRef.current.click() }, t('certificates.import'))),
+        h(Button, { variant: 'secondary', icon: 'upload', busy, onClick: () => certFileRef.current && certFileRef.current.click() }, t('certificates.import')),
+        unverified.size > 0 && h(Button, { variant: 'secondary', icon: 'trash', busy, onClick: removeUnverified }, t('certificates.removeUnverified'))),
       certs.length === 0
         ? h(EmptyState, { compact: true, icon: 'certificate', title: t('certificates.empty') })
         : h(List, { label: t('certificates.title') },
@@ -564,6 +708,38 @@ export function makeUi(host, deps) {
               isExpired(c.notAfter) && h(Badge, { tone: 'danger' }, t('badge.expired'))),
             subtitle: [source(c), t('certificates.expires', { date: fmtDate(c.notAfter, locale) })].filter(Boolean).join(' · '),
             actions: h(RowAction, { icon: 'trash', label: t('certificates.remove'), danger: true, onClick: () => removeCert(c) }),
+          })),
+        ),
+      ),
+
+      h(Section, {
+        title: t('issuers.title'),
+        description: t('issuers.description'),
+      },
+      picker(issuerFileRef, '.pem,.crt,.cer,.der', importIssuerFile, t('issuers.file')),
+      h(Row, null,
+        h(Button, { variant: 'secondary', icon: 'upload', busy, onClick: () => issuerFileRef.current && issuerFileRef.current.click() }, t('issuers.import'))),
+      trusted.length === 0 && adminTrusted.length === 0
+        ? h(EmptyState, { compact: true, icon: 'shield-check', title: t('issuers.empty') })
+        : h(List, { label: t('issuers.title') },
+          adminTrusted.map((info) => h(ListRow, {
+            key: `admin-${info.fingerprint}`,
+            icon: h(Icon, { name: 'certificate' }),
+            title: h(Row, { gap: 2, wrap: false },
+              h('span', null, commonName(info.subject)),
+              isExpired(info.notAfter) && h(Badge, { tone: 'danger' }, t('badge.expired')),
+              h(Badge, { tone: 'info' }, t('issuers.fromAdmin'))),
+            subtitle: trustedDetails(info),
+          })),
+          trusted.map((r) => h(ListRow, {
+            key: r.id,
+            icon: h(Icon, { name: r.kind === 'signer' ? 'shield-check' : 'certificate' }),
+            title: h(Row, { gap: 2, wrap: false },
+              h('span', null, r.kind === 'signer' && r.emails?.length ? r.emails.join(', ') : commonName(r.subject)),
+              isExpired(r.notAfter) && h(Badge, { tone: 'danger' }, t('badge.expired')),
+              r.kind === 'signer' && h(Badge, { tone: 'info' }, t('issuers.single'))),
+            subtitle: trustedDetails(r),
+            actions: h(RowAction, { icon: 'trash', label: t('certificates.remove'), danger: true, onClick: () => removeTrusted(r) }),
           })),
         ),
       ),

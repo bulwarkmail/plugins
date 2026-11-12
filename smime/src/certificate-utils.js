@@ -29,6 +29,19 @@ export function isPem(data) {
   return /-----BEGIN (CERTIFICATE|PKCS12|ENCRYPTED PRIVATE KEY|PRIVATE KEY)-----/.test(data);
 }
 
+/**
+ * The DER of every CERTIFICATE block in a PEM text, as ArrayBuffers. Line breaks inside a
+ * block don't matter, so text pasted into a one-line field still reads.
+ */
+export function pemCertificates(text) {
+  const out = [];
+  for (const m of String(text || '').matchAll(/-----BEGIN CERTIFICATE-----([A-Za-z0-9+/=\s]*?)-----END CERTIFICATE-----/g)) {
+    const b64 = m[1].replace(/\s/g, '');
+    if (b64) out.push(Convert.FromBase64(b64));
+  }
+  return out;
+}
+
 // ── Certificate parsing ──────────────────────────────────────────────
 
 export function parseCertificateDer(der) {
@@ -53,7 +66,8 @@ export function parseCertificatePemOrDer(data) {
 
 // ── Metadata extraction ──────────────────────────────────────────────
 
-function rdnToString(rdn) {
+/** A name (subject or issuer) as "CN=…, O=…". */
+export function rdnToString(rdn) {
   return rdn.typesAndValues
     .map((tv) => `${oidToName(tv.type)}=${tv.value.valueBlock.value}`)
     .join(', ');
@@ -162,6 +176,28 @@ function extractEmailAddresses(cert) {
   }
 
   return emails;
+}
+
+/** Every address the certificate names (subject and alternative names), in lower case, once each. */
+export function certificateAddresses(cert) {
+  return [...new Set(extractEmailAddresses(cert).map((e) => String(e).toLowerCase()))];
+}
+
+/**
+ * Whether the certificate may issue certificates: basicConstraints with cA, keyCertSign
+ * when a keyUsage extension is there, and no name constraints extension, critical or
+ * not (`constrained`): the plugin doesn't check name constraints, so it relies on no CA
+ * that carries them. `isCa` is the first two alone. `pathLength` is the
+ * pathLenConstraint, undefined without one.
+ */
+export function issuerCapabilities(cert) {
+  const bc = cert.extensions?.find((e) => e.extnID === '2.5.29.19')?.parsedValue;
+  const ku = extractKeyUsage(cert);
+  const constrained = !!cert.extensions?.some((e) => e.extnID === '2.5.29.30');
+  const isCa = bc?.cA === true && (!ku || ku.includes('keyCertSign'));
+  // pkijs keeps a number too large to read as an Integer object: no limit worth counting.
+  const pathLength = typeof bc?.pathLenConstraint === 'number' ? bc.pathLenConstraint : undefined;
+  return { canIssue: isCa && !constrained, isCa, pathLength, constrained };
 }
 
 /** Determine signing/encryption capabilities from KU / EKU. Tolerant of absent extensions. */

@@ -20,7 +20,9 @@ import * as kit from '../../test-utils/ui-kit.mjs';
 import { fakeKeystore } from './helpers/fake-keystore.mjs';
 import { fakeIndexedDB } from './helpers/fake-indexeddb.mjs';
 import { smimeSign, smimeSignDetached } from '../src/smime-sign.js';
-import { listPublicCerts } from '../src/key-storage.js';
+import { listPublicCerts, saveTrusted } from '../src/key-storage.js';
+import { computeFingerprint } from '../src/certificate-utils.js';
+import { makeCa, makeLeaf } from './helpers/test-certificates.mjs';
 import { bannerRows } from '../src/ui.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -161,6 +163,62 @@ describe('a signed part inside an unsigned mail', () => {
     );
     expect(takenOver(wrapped.result)).toBe(false);
     expect(wrapped.rows.filter((r) => r.tone === 'success')).toEqual([]);
+  });
+
+  describe('signed under an issuer the user trusts', () => {
+    let ca;
+    let trustedPart;
+    beforeAll(async () => {
+      ca = await makeCa('Example Corp Mail CA');
+      const leaf = await makeLeaf(ca, { emails: [SIGNER] });
+      const entity = 'Content-Type: text/plain; charset=utf-8\r\n\r\nPlease see the attached document. Regards, the CEO';
+      const b64 = Buffer.from(await smimeSignDetached(enc.encode(entity), leaf.key.privateKey, leaf.der)).toString('base64').match(/.{1,76}/g).join('\r\n');
+      trustedPart = {
+        contentType: signedPart.contentType,
+        body: `--inner\r\n${entity}\r\n--inner\r\nContent-Type: application/pkcs7-signature; name="smime.p7s"\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}\r\n--inner--\r\n`,
+      };
+    });
+    beforeEach(async () => {
+      await saveTrusted({ id: 'issuer', kind: 'issuer', certificate: ca.der.buffer.slice(0), fingerprint: await computeFingerprint(ca.der) });
+    });
+
+    it('the mail signed as a whole gets the trusted verdict (control)', async () => {
+      const whole = await open(`${head}Content-Type: ${trustedPart.contentType}\r\n\r\n${trustedPart.body}`, {
+        contentType: trustedPart.contentType, bodyStructure: signedTree, attachments: [],
+      });
+      expect(whole.rows.map((r) => r.tone)).toEqual(['success']);
+    });
+
+    it('the signed part followed by an unsigned attachment still gets no trusted verdict', async () => {
+      const wrapped = await open(
+        `${head}Content-Type: multipart/mixed; boundary="outer"\r\n\r\n`
+        + `--outer\r\nContent-Type: ${trustedPart.contentType}\r\n\r\n${trustedPart.body}`
+        + `${attachmentPart}--outer--\r\n`,
+        {
+          contentType: 'multipart/mixed; boundary="outer"',
+          bodyStructure: { type: 'multipart/mixed', subParts: [signedTree, attachment] },
+          attachments: [attachment],
+        },
+      );
+      expect(takenOver(wrapped.result)).toBe(false);
+      expect(wrapped.rows.filter((r) => r.tone === 'success')).toEqual([]);
+    });
+
+    it('the signed part behind an unsigned text still gets no trusted verdict', async () => {
+      const wrapped = await open(
+        `${head}Content-Type: multipart/mixed; boundary="outer"\r\n\r\n`
+        + '--outer\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nNew bank details below, please use them from now on.\r\n'
+        + `--outer\r\nContent-Type: ${trustedPart.contentType}\r\n\r\n${trustedPart.body}`
+        + '--outer--\r\n',
+        {
+          contentType: 'multipart/mixed; boundary="outer"',
+          bodyStructure: { type: 'multipart/mixed', subParts: [{ type: 'text/plain', partId: '1' }, { ...signedTree, partId: '2' }] },
+          attachments: [],
+        },
+      );
+      expect(takenOver(wrapped.result)).toBe(false);
+      expect(wrapped.rows.filter((r) => r.tone === 'success')).toEqual([]);
+    });
   });
 });
 

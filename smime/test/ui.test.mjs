@@ -7,6 +7,8 @@ import path from 'node:path';
 import { fakeApi as bareFakeApi } from '../../test-utils/fake-api.mjs';
 import { makeUi, bannerRows } from '../src/ui.js';
 import { composeActions, handleComposeAction, publishComposeActions, resetComposeIntent, INTENT_KEY } from '../src/compose-actions.js';
+import { parseCertificatePemOrDer, extractCertificateInfo, issuerCapabilities, pemCertificates } from '../src/certificate-utils.js';
+import { makeCa, makeLeaf, pem } from './helpers/test-certificates.mjs';
 
 const manifest = JSON.parse(readFileSync(path.join(process.cwd(), 'smime', 'manifest.json'), 'utf8'));
 const fakeApi = (opts = {}) => bareFakeApi({ translations: manifest.locales, ...opts });
@@ -78,7 +80,7 @@ describe('composer Options entries', () => {
 describe('reader banner', () => {
   it('shows one info bar per status, in the status tone', async () => {
     const api = fakeApi();
-    await api.storage.set('verify:m1', { isEncrypted: true, decryptionSuccess: true, isSigned: true, signatureValid: true, signerCert: { email: 'a@x.org', notAfter: '2999-01-01', notBefore: '2000-01-01' }, signerEmailMatch: true });
+    await api.storage.set('verify:m1', { isEncrypted: true, decryptionSuccess: true, isSigned: true, signatureValid: true, signerVerified: true, fromEmail: 'a@x.org', signerCert: { email: 'a@x.org', notAfter: '2999-01-01', notBefore: '2000-01-01' }, signerEmailMatch: true });
     const { EmailBanner } = makeUi(api, deps());
     await act(async () => { render(React.createElement(EmailBanner, { email: { id: 'm1' } })); });
     const bars = document.querySelectorAll('.bk-infobar');
@@ -96,7 +98,7 @@ describe('reader banner', () => {
     await act(async () => { render(React.createElement(EmailBanner, { email })); });
     expect(document.querySelector('.bk-infobar').textContent).toMatch(/Signed message/);
     // The render hook in the background instance stores its result later.
-    await api.storage.set('verify:m2', { isSigned: true, signatureValid: true, signerCert: { email: 'a@x.org', notAfter: '2999-01-01', notBefore: '2000-01-01' }, signerEmailMatch: true });
+    await api.storage.set('verify:m2', { isSigned: true, signatureValid: true, signerVerified: true, fromEmail: 'a@x.org', signerCert: { email: 'a@x.org', notAfter: '2999-01-01', notBefore: '2000-01-01' }, signerEmailMatch: true });
     await waitFor(() => expect(document.querySelector('.bk-infobar').textContent).toMatch(/Valid signature by a@x.org/));
     expect(document.querySelector('.bk-infobar').getAttribute('data-tone')).toBe('success');
   });
@@ -161,5 +163,126 @@ describe('settings section', () => {
     await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'Sign new messages' })); });
     expect(saved).toEqual([{ defaultSign: true, defaultEncrypt: false }]);
     expect(told).toBe(1);
+  });
+
+  it('marks certificates from signed mail nobody vouches for, and removes all of them in one go', async () => {
+    let certs = [
+      { id: 'c1', email: 'bob@x.org', source: 'manual', notAfter: '2999-01-01' },
+      { id: 'c2', email: 'carol@x.org', source: 'signed-email', notAfter: '2999-01-01' },
+      { id: 'c3', email: 'dan@x.org', source: 'signed-email', notAfter: '2999-01-01' },
+      { id: 'c4', email: 'erin@x.org', source: 'signed-email', notAfter: '2999-01-01' },
+    ];
+    const { SettingsSection } = makeUi(fakeApi(), deps({
+      listPublicCerts: async () => certs,
+      unverifiedFromMail: async (list) => new Set(list.filter((c) => c.id === 'c3' || c.id === 'c4').map((c) => c.id)),
+      deletePublicCert: async (id) => { certs = certs.filter((c) => c.id !== id); },
+    }));
+    await act(async () => { render(React.createElement(SettingsSection)); });
+    const rowOf = (email) => screen.getByText(email).closest('[role=listitem]');
+    expect(rowOf('carol@x.org').textContent).toMatch(/from a signed message ·/);
+    expect(rowOf('dan@x.org').textContent).toMatch(/from a signed message, not verified/);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Remove unverified certificates from signed mail' })); });
+    expect(certs.map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(screen.queryByRole('button', { name: 'Remove unverified certificates from signed mail' })).toBeNull();
+  });
+});
+
+describe('trusted issuers and certificates', () => {
+  const certDeps = (over = {}) => {
+    const saved = [];
+    return {
+      saved,
+      d: deps({
+        listTrusted: async () => saved,
+        saveTrusted: async (r) => { saved.push(r); },
+        deleteTrusted: async () => {},
+        generateUUID: () => `id-${saved.length}`,
+        parseCertificatePemOrDer, extractCertificateInfo, issuerCapabilities, pemCertificates,
+        ...over,
+      }),
+    };
+  };
+  const pickFile = async (label, text) => {
+    const input = screen.getByLabelText(label);
+    Object.defineProperty(input, 'files', { value: [{ name: 'ca.pem', arrayBuffer: async () => new TextEncoder().encode(text).buffer }], configurable: true });
+    await act(async () => { fireEvent.change(input); });
+  };
+
+  it('imports a certificate authority from a PEM file as a trusted issuer', async () => {
+    const ca = await makeCa('Example Corp Mail CA');
+    const api = fakeApi();
+    const { d, saved } = certDeps();
+    const { SettingsSection } = makeUi(api, d);
+    await act(async () => { render(React.createElement(SettingsSection)); });
+    await pickFile('Issuer certificate file', pem(ca.der));
+    expect(saved).toEqual([expect.objectContaining({ kind: 'issuer', subject: 'CN=Example Corp Mail CA' })]);
+    expect(new Uint8Array(saved[0].certificate)).toEqual(ca.der);
+    expect(api.calls('toast.success')[0].args[0]).toBe('Trusted issuer added: Example Corp Mail CA');
+    expect(screen.getByText('Example Corp Mail CA')).toBeTruthy();
+  });
+
+  it('refuses a certificate that may not issue certificates', async () => {
+    const leaf = await makeLeaf(null, { emails: ['bob@example.org'] });
+    const api = fakeApi();
+    const { d, saved } = certDeps();
+    const { SettingsSection } = makeUi(api, d);
+    await act(async () => { render(React.createElement(SettingsSection)); });
+    await pickFile('Issuer certificate file', pem(leaf.der));
+    expect(saved).toEqual([]);
+    expect(api.calls('toast.error')[0].args[0]).toMatch(/^Couldn’t add the issuer: This certificate can’t issue certificates/);
+  });
+
+  it('refuses a certificate authority with name constraints, and says why', async () => {
+    const ca = await makeCa('Corp Constrained CA', { nameConstraints: 'corp.example' });
+    const api = fakeApi();
+    const { d, saved } = certDeps();
+    const { SettingsSection } = makeUi(api, d);
+    await act(async () => { render(React.createElement(SettingsSection)); });
+    await pickFile('Issuer certificate file', pem(ca.der));
+    expect(saved).toEqual([]);
+    expect(api.calls('toast.error')[0].args[0]).toMatch(/^Couldn’t add the issuer: This certificate authority limits which addresses it may vouch for \(name constraints\)/);
+  });
+
+  it('lists the issuers the admin set, without a way to remove them', async () => {
+    const ca = await makeCa('Admin Root');
+    const { d } = certDeps({ adminIssuers: async () => [ca.der.buffer.slice(0)] });
+    const { SettingsSection } = makeUi(fakeApi(), d);
+    await act(async () => { render(React.createElement(SettingsSection)); });
+    const row = (await screen.findByText('Admin Root')).closest('[role=listitem]');
+    expect(row.textContent).toMatch(/From your administrator/);
+    expect(row.querySelector('button')).toBeNull();
+  });
+
+  it('keeps the certificate of a signature as trusted after the user confirms, and verifies again', async () => {
+    const api = fakeApi({ handlers: { 'ui.confirm': async () => true, 'ui.rerenderEmail': async () => {} } });
+    await api.storage.set('verify:m5', {
+      isSigned: true, signatureValid: true, cryptoValid: true, signerEmailMatch: true, fromEmail: 'bob@example.org',
+      signerVerified: false, trustReasons: ['issuer'],
+      signerCert: { email: 'bob@example.org', emails: ['bob@example.org'], subject: 'CN=Bob', issuer: 'CN=Somebody', fingerprint: 'ab:cd', notAfter: '2999-01-01', notBefore: '2000-01-01' },
+    });
+    const { d, saved } = certDeps();
+    const { EmailBanner } = makeUi(api, d);
+    await act(async () => { render(React.createElement(EmailBanner, { email: { id: 'm5' } })); });
+    expect(document.querySelector('.bk-infobar').getAttribute('data-tone')).toBe('warning');
+    fireEvent.click(screen.getByRole('button', { name: /Show certificate details/ }));
+    expect(screen.getByText('Revocation is not checked')).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Trust this certificate' })); });
+    expect(api.calls('ui.confirm')[0].args[0].message).toContain('ab:cd');
+    expect(saved).toEqual([expect.objectContaining({ kind: 'signer', fingerprint: 'ab:cd', emails: ['bob@example.org'] })]);
+    expect(api.calls('ui.rerenderEmail')).toHaveLength(1);
+  });
+
+  it('keeps nothing when the user says no', async () => {
+    const api = fakeApi({ handlers: { 'ui.confirm': async () => false } });
+    await api.storage.set('verify:m6', {
+      isSigned: true, signatureValid: true, signerVerified: false, trustReasons: ['self'], fromEmail: 'bob@example.org', signerEmailMatch: true,
+      signerCert: { email: 'bob@example.org', fingerprint: 'ab:cd', notAfter: '2999-01-01', notBefore: '2000-01-01' },
+    });
+    const { d, saved } = certDeps();
+    const { EmailBanner } = makeUi(api, d);
+    await act(async () => { render(React.createElement(EmailBanner, { email: { id: 'm6' } })); });
+    fireEvent.click(screen.getByRole('button', { name: /Show certificate details/ }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Trust this certificate' })); });
+    expect(saved).toEqual([]);
   });
 });
