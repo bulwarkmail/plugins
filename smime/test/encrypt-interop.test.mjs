@@ -5,13 +5,14 @@
 // any key is tried. OpenSSL calls that "cipher parameter initialisation
 // error"; a .NET client reports it as a missing recipient. These tests pin the
 // baseline of RFC 8551 s2.3 and s2.7 instead.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as asn1js from 'asn1js';
 import { smimeEncrypt } from '../src/smime-encrypt.js';
+import { getLinerCryptoEngine } from '../src/crypto-engine.js';
 
 const OID_ENVELOPED_DATA = '1.2.840.113549.1.7.3';
 const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
@@ -86,6 +87,20 @@ describe('smimeEncrypt interoperability', () => {
       execFileSync('openssl', ['cms', '-decrypt', '-binary', '-inform', 'DER', '-in', file, '-out', out,
         '-recip', join(dir, `${who}.cer`), '-inkey', join(dir, `${who}.key`)], { stdio: ['ignore', 'ignore', 'pipe'] });
       expect(readFileSync(out, 'utf8')).toBe(MESSAGE);
+    }
+  });
+});
+
+describe('a recipient whose key could not be wrapped', () => {
+  it('stops the send instead of leaving that recipient without a key', async () => {
+    const engine = getLinerCryptoEngine();
+    const encrypt = engine.encrypt.bind(engine);
+    const spy = vi.spyOn(engine, 'encrypt').mockImplementation((algorithm, ...rest) => (
+      algorithm?.name === 'RSAES-PKCS1-v1_5' ? Promise.reject(new Error('no RSA here')) : encrypt(algorithm, ...rest)));
+    try {
+      await expect(encrypted()).rejects.toThrow('Could not encrypt the message key for every recipient');
+    } finally {
+      spy.mockRestore();
     }
   });
 });

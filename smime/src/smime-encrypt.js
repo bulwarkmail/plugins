@@ -25,12 +25,14 @@ export async function smimeEncrypt(mimeBytes, recipientCertsDer, senderCertDer, 
     : { name: 'AES-CBC', length: 256 };
 
   // Native WebCrypto has no RSAES-PKCS1-v1_5, so both steps run on the liner
-  // engine. Variant 1 is key transport: pkijs would otherwise pick OAEP for an
-  // RSA certificate, which far fewer clients accept (RFC 8551 s2.3).
+  // engine, which hands everything else to native WebCrypto. useOAEP: false picks
+  // RSAES-PKCS1-v1_5 for an RSA certificate; pkijs picks OAEP otherwise, which
+  // far fewer clients accept (RFC 8551 s2.3). pkijs takes the recipient type from
+  // the certificate: key transport for RSA, ECDH key agreement for EC.
   await withLinerEngine(async () => {
     const engine = getLinerCryptoEngine();
     for (const cert of recipientCerts) {
-      cmsEnveloped.addRecipientByCertificate(cert, { useOAEP: false }, 1, engine);
+      cmsEnveloped.addRecipientByCertificate(cert, { useOAEP: false }, undefined, engine);
     }
     await cmsEnveloped.encrypt(
       contentEncryptionAlgorithm,
@@ -38,6 +40,14 @@ export async function smimeEncrypt(mimeBytes, recipientCertsDer, senderCertDer, 
       engine,
     );
   });
+
+  // pkijs swallows a failed key transport and leaves that recipient's key empty,
+  // which would send mail that recipient can never open.
+  for (const { variant, value } of cmsEnveloped.recipientInfos) {
+    if (variant === 1 && value.encryptedKey.valueBlock.valueHexView.byteLength === 0) {
+      throw new Error('Could not encrypt the message key for every recipient');
+    }
+  }
 
   const cms = new pkijs.ContentInfo({
     contentType: '1.2.840.113549.1.7.3', // id-envelopedData
