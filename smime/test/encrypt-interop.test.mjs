@@ -5,9 +5,9 @@
 // any key is tried. OpenSSL calls that "cipher parameter initialisation
 // error"; a .NET client reports it as a missing recipient. These tests pin the
 // baseline of RFC 8551 s2.3 and s2.7 instead.
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as asn1js from 'asn1js';
@@ -22,15 +22,17 @@ const MESSAGE = 'Content-Type: text/plain; charset=utf-8\r\n\r\nInteroperability
 
 let dir;
 let recipientDer;
+let ecRecipientDer;
 let senderDer;
 
 const der = (file) => execFileSync('openssl', ['x509', '-in', file, '-outform', 'DER'], { maxBuffer: 1 << 20 });
 
-function makeKeypair(name) {
-  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048',
+function makeKeypair(name, { ec = false } = {}) {
+  const key = ec ? ['-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256'] : ['-newkey', 'rsa:2048'];
+  execFileSync('openssl', ['req', '-x509', ...key,
     '-keyout', join(dir, `${name}.key`), '-out', join(dir, `${name}.cer`),
     '-days', '1', '-nodes', '-subj', `/CN=${name}/emailAddress=${name}@example.invalid`,
-    '-addext', 'keyUsage=digitalSignature,keyEncipherment'], { stdio: 'ignore' });
+    '-addext', `keyUsage=digitalSignature,${ec ? 'keyAgreement' : 'keyEncipherment'}`], { stdio: 'ignore' });
   return new Uint8Array(der(join(dir, `${name}.cer`)));
 }
 
@@ -45,16 +47,19 @@ function oids(bytes) {
   return found;
 }
 
-async function encrypted({ aes128 = false } = {}) {
-  const blob = await smimeEncrypt(new TextEncoder().encode(MESSAGE), [recipientDer], senderDer, aes128);
+async function encrypted({ aes128 = false, recipients = [recipientDer] } = {}) {
+  const blob = await smimeEncrypt(new TextEncoder().encode(MESSAGE), recipients, senderDer, aes128);
   return new Uint8Array(await blob.arrayBuffer());
 }
 
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), 'smime-interop-'));
   recipientDer = makeKeypair('recipient');
+  ecRecipientDer = makeKeypair('ec-recipient', { ec: true });
   senderDer = makeKeypair('sender');
 });
+
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe('smimeEncrypt interoperability', () => {
   it('wraps the content key with RSAES-PKCS1-v1_5, not OAEP', async () => {
@@ -70,13 +75,17 @@ describe('smimeEncrypt interoperability', () => {
     expect(oids(await encrypted({ aes128: true }))).toContain(OID_AES_128_CBC);
   });
 
-  it('is decrypted by an independent implementation, for recipient and sender alike', async () => {
+  // -binary and -out keep OpenSSL's text mode from touching the line ends,
+  // which on Windows turns CRLF into CRCRLF.
+  it('is decrypted by an independent implementation, for every recipient and the sender', async () => {
     const file = join(dir, 'message.der');
-    writeFileSync(file, await encrypted());
-    for (const who of ['recipient', 'sender']) {
-      const out = execFileSync('openssl', ['cms', '-decrypt', '-inform', 'DER', '-in', file,
-        '-recip', join(dir, `${who}.cer`), '-inkey', join(dir, `${who}.key`)], { encoding: 'utf8' });
-      expect(out).toBe(MESSAGE);
+    const out = join(dir, 'message.eml');
+    writeFileSync(file, await encrypted({ recipients: [recipientDer, ecRecipientDer] }));
+    for (const who of ['recipient', 'ec-recipient', 'sender']) {
+      rmSync(out, { force: true });
+      execFileSync('openssl', ['cms', '-decrypt', '-binary', '-inform', 'DER', '-in', file, '-out', out,
+        '-recip', join(dir, `${who}.cer`), '-inkey', join(dir, `${who}.key`)], { stdio: ['ignore', 'ignore', 'pipe'] });
+      expect(readFileSync(out, 'utf8')).toBe(MESSAGE);
     }
   });
 });
