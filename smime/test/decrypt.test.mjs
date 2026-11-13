@@ -86,6 +86,18 @@ describe('decrypting after the session store round trip', () => {
   }, 30_000);
 });
 
+// smime 1.5.0 and earlier sent AES-256-GCM inside EnvelopedData, with the key
+// wrapped with RSA-OAEP SHA-256. Other clients can't open that, but Sent
+// folders are full of it, so it has to keep opening here.
+describe('mail sent by smime 1.5.0 and earlier', () => {
+  it('opens with an imported key and counts as integrity protected', async () => {
+    await unlock();
+    const result = await smimeDecrypt({ cmsBytes: normalizeCmsBytes(fixture('plugin-gcm.p7m')), ...(await unlockedDecryptMaps()) });
+    expect(new TextDecoder().decode(result.mimeBytes)).toBe(new TextDecoder().decode(MESSAGE));
+    expect(result.integrity).toBe(true);
+  }, 30_000);
+});
+
 describe('AES-256-GCM AuthEnvelopedData', () => {
   beforeEach(unlock);
 

@@ -14,6 +14,10 @@ encrypted to it. Nothing here protects anything.
   decrypt
 - `key.pem`: the key from `test.p12`, for the fake `api.keystore`
 - `oaep-sha1.p7m`: EnvelopedData, AES-256-CBC, key wrapped with RSA-OAEP SHA-1
+- `plugin-gcm.p7m`: EnvelopedData, AES-256-GCM, key wrapped with RSA-OAEP
+  SHA-256, as smime 1.5.0 and earlier sent mail. Made by that version's
+  smimeEncrypt (`git show smime@1.5.0:smime/src/smime-encrypt.js`) from
+  `plain.eml` to `cert.pem`; OpenSSL can't write it
 - `ec-<curve>-cert.pem`, `ec-<curve>-key.pem`, `ec-<curve>.p7m`: a throwaway EC
   key for smime-ec@example.com on P-256, P-384 and P-521, and EnvelopedData
   with AES-256-CBC, ECDH-ES and AES key wrap

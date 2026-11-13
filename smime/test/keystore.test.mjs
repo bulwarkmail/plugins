@@ -687,6 +687,7 @@ describe('integrity of what was decrypted', () => {
   it.each([
     ['AES-CBC EnvelopedData', 'cbc.p7m', false],
     ['AES-GCM AuthEnvelopedData', 'gcm.p7m', true],
+    ['AES-GCM EnvelopedData, as smime 1.5.0 and earlier sent it', 'plugin-gcm.p7m', true],
   ])('%s', async (_, file, integrity) => {
     const { osKeys, records } = await setup([RSA]);
     const { mimeBytes } = await smimeDecrypt({ cmsBytes: normalizeCmsBytes(bytes(file)), ...osKeys.addDecryptKeys(emptyMaps(), records) });
@@ -698,8 +699,8 @@ describe('integrity of what was decrypted', () => {
   // What this plugin sends is AES-CBC in EnvelopedData, the RFC 8551 baseline
   // every receiving client can open. CBC carries no integrity of its own, so
   // the banner has to say so; for a signed message the signature answers for
-  // the plaintext. Mail already sent with AES-GCM in EnvelopedData still reads,
-  // and still counts as protected, see the case above.
+  // the plaintext. Mail sent by smime 1.5.0 and earlier, AES-GCM in
+  // EnvelopedData, still reads and still counts as protected: plugin-gcm.p7m above.
   it('reports no integrity of its own for what this plugin sends', async () => {
     const { osKeys, records } = await setup([RSA]);
     const blob = await smimeEncrypt(new TextEncoder().encode(PLAINTEXT), [], records[0].certificate);
