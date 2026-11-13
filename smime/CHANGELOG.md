@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+### Changed
+- Encrypted mail that isn't also signed now opens with the note that it has no integrity protection, and external content stays off. That's the price of the format other mail programs read; signed and encrypted mail, the default, is not affected
+
 ### Fixed
-- Encrypted mail can be opened by other mail programs again: the message body is encrypted with AES-CBC and the content key is wrapped with RSAES-PKCS1-v1_5, the pairing S/MIME requires. Until now both were chosen in a combination that stopped most clients at the cipher, and they reported it as a missing recipient
+- Other mail programs can open encrypted mail sent from Bulwark. The body is encrypted with AES-CBC and the message key is wrapped with RSA PKCS#1 v1.5, the pairing every S/MIME client reads. Until now they stopped at the cipher and usually reported a missing recipient. Mail sent with earlier versions still opens in Bulwark #42 (thanks @b3rsrk)
 - A detached signature stays valid when a mail server or list rewrites the message's MIME framing: the signed part now ends with a line break of its own
 
 ## 1.5.0 (2026-11-07)
