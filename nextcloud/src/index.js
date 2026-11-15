@@ -98,6 +98,8 @@ const MB = 1024 * 1024;
  * its staged id). From the size in the settings on, offer to upload it to
  * Nextcloud and put a link in the message instead. Returns the composer's
  * ExternalAttachmentResult, or undefined to attach the file as usual.
+ * Closing the dialog cancels: an empty replacement makes the composer drop
+ * the file without adding anything to the message.
  */
 export async function offerLargeUpload(api, payload) {
   const fileId = typeof payload === 'string' ? payload : payload?.fileId;
@@ -119,7 +121,8 @@ export async function offerLargeUpload(api, payload) {
   if (result && result.externalAttachment === true && typeof result.html === 'string' && typeof result.text === 'string') {
     return { externalAttachment: true, html: result.html, text: result.text, fileId };
   }
-  return undefined;
+  if (result?.action === 'attach') return undefined;
+  return { externalAttachment: true, html: '', text: '', fileId };
 }
 
 export const hooks = {

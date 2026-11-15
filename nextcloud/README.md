@@ -61,7 +61,8 @@ The same link options apply. Files larger than 10 MB go up in 10 MB chunks
 (Nextcloud's chunked upload v2) with a progress bar. **Cancel** pauses the
 upload; **Resume upload** continues with the chunks the server already has,
 also after a failed chunk. Short network errors are retried by themselves.
-**Attach as usual** (or closing the dialog) attaches the file normally.
+**Attach as usual** attaches the file normally. Closing the dialog leaves the
+file out of the message.
 
 Uploads go to the upload folder, by default `Mail attachments/<date>`. A
 file with the same name gets " (2)" added.

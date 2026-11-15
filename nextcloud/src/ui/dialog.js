@@ -31,7 +31,10 @@ export function PluginDialog(props) {
   const View = VIEWS[props.view];
   if (!View) return null;
   if (connection.status !== 'connected' || !client) {
-    return h(ConnectionDialogBody, { api, connection, onCancel: () => props.onResult?.(null) });
+    // A large file whose offer can't go ahead (the sign-in expired): Cancel
+    // attaches it as usual rather than leaving it out of the message.
+    const cancelled = props.view === 'offload' ? { action: 'attach' } : null;
+    return h(ConnectionDialogBody, { api, connection, onCancel: () => props.onResult?.(cancelled) });
   }
   return h(View, { ...props, api, client, report: connection.report });
 }

@@ -33,9 +33,14 @@ describe('the large-file offer', () => {
     expect(api.calls('ui.openDialog')[0].args[0]).toMatchObject({ slot: 'plugin-dialog', extraProps: { view: 'offload', fileId: 'f1', name: 'video.mp4', size: 10 * MB } });
   });
 
-  it('attaches as usual when the user says so or closes the dialog', async () => {
+  it('attaches as usual when the user says so', async () => {
     expect(await offerLargeUpload(apiWith({ size: 50 * MB, result: { action: 'attach' } }), 'f1')).toBeUndefined();
-    expect(await offerLargeUpload(apiWith({ size: 50 * MB, result: null }), 'f1')).toBeUndefined();
+  });
+
+  it('drops the file when the dialog is closed', async () => {
+    const dropped = { externalAttachment: true, html: '', text: '', fileId: 'f1' };
+    expect(await offerLargeUpload(apiWith({ size: 50 * MB, result: null }), 'f1')).toEqual(dropped);
+    expect(await offerLargeUpload(apiWith({ size: 50 * MB, result: undefined }), 'f1')).toEqual(dropped);
   });
 
   it('respects the settings and needs a connected account', async () => {
