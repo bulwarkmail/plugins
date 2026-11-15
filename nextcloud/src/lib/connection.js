@@ -105,7 +105,9 @@ const sleepFor = (ms, signal) => new Promise((resolve, reject) => {
 
 /**
  * Step 3: wait until the user approved the app in Nextcloud. The proxy keeps
- * the app password; resolves once it did.
+ * the app password; resolves once it did. The answers are read as text:
+ * Nextcloud says "not yet" with a 404, and a reverse proxy in front of the
+ * webmail may swap that answer's body for its own HTML error page.
  */
 export async function pollLoginFlow(api, { endpoint, token }, { signal, intervalMs = POLL_INTERVAL_MS, timeoutMs = POLL_TIMEOUT_MS, sleep = sleepFor, now = Date.now } = {}) {
   const started = now();
@@ -115,12 +117,16 @@ export async function pollLoginFlow(api, { endpoint, token }, { signal, interval
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `token=${encodeURIComponent(token)}`,
-      responseType: 'json',
+      responseType: 'text',
       capture: { secret: 'appPassword', username: 'loginName' },
       signal,
     }, { accept: [404] });
     if (res.status === 200) {
-      if (res.body?.captured) return true;
+      let data = res.body;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch { data = null; }
+      }
+      if (data?.captured) return true;
       throw new NcError('bad_answer', { detail: 'no app password' });
     }
     if (now() - started > timeoutMs) throw new NcError('login_expired');

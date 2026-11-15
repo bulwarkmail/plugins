@@ -53,6 +53,24 @@ describe('Login Flow v2 through the proxy', () => {
     expect(init).toMatchObject({ method: 'POST', body: 'token=a%20b', capture: { secret: 'appPassword', username: 'loginName' } });
   });
 
+  it('keeps polling when a reverse proxy swaps the 404 answers for an HTML page', async () => {
+    const errorPage = '<html><body><h1>404 Not Found</h1></body></html>';
+    const answers = [
+      { status: 404, body: errorPage },
+      { status: 200, body: JSON.stringify({ server: ORIGIN, captured: true }) },
+    ];
+    // Like the host's proxy client: a JSON answer is parsed there and a
+    // body that isn't JSON throws.
+    const api = fakeApi({ handlers: { 'proxy.fetch': async (_cred, _url, init) => {
+      const { status, body } = answers.shift();
+      if (init.responseType === 'json') {
+        try { return proxyResponse(JSON.parse(body), { status }); } catch { throw new Error(`Response is not JSON (HTTP ${status})`); }
+      }
+      return proxyResponse(body, { status });
+    } } });
+    expect(await pollLoginFlow(api, { endpoint: `${ORIGIN}/login/v2/poll`, token: 't' }, { sleep: async () => {} })).toBe(true);
+  });
+
   it('gives up when the flow expired', async () => {
     let clock = 0;
     const api = fakeApi({ handlers: { 'proxy.fetch': async () => proxyResponse('', { status: 404 }) } });
