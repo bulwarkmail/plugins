@@ -73,6 +73,13 @@ async function verifyStatus(signedData, verifyParams, fromHeader, trust) {
   let signatureError;
   let verifyError;
 
+  // pkijs looks the signer's certificate up again in the message, by a looser comparison
+  // than extractSignerCertificate (case and spacing of the issuer's name don't count),
+  // and takes the first match. With another certificate ahead of the signer's it checked
+  // the signature against that one's key, while trust, the From address and the details
+  // are read from signerCert. So it is handed the one certificate the verdict is about.
+  const messageCertificates = signedData.certificates;
+  signedData.certificates = [signerCert];
   try {
     // checkChain:false: this checks the signature and digest against the certificate in
     // the message. Who vouches for that certificate is trust.js's question, answered
@@ -81,6 +88,9 @@ async function verifyStatus(signedData, verifyParams, fromHeader, trust) {
   } catch (err) {
     signatureError = err instanceof Error ? err.message : 'Signature verification failed';
     verifyError = signatureError;
+  } finally {
+    // The path to a trusted issuer is built from all of them.
+    signedData.certificates = messageCertificates;
   }
 
   const certDer = signerCert.toSchema(true).toBER(false);
