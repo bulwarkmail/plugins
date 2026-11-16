@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Send to Paperless has its own icon in the reader toolbar, the attachment menu and bulk actions, so it no longer looks like Archive #45 (thanks @mmomjian)
+
 ## 1.2.2 (2026-11-03)
 
 ### Fixed

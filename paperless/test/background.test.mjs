@@ -50,6 +50,9 @@ describe('registerUi', () => {
       ['reader-actions', ['send-message']],
       ['message-bulk-actions', ['send-bulk']],
     ]);
+    // Not the webmail's own Archive icon, which sits next to these in the reader toolbar.
+    const icons = a.calls('ui.setActions').flatMap((c) => c.args[1].map((x) => x.icon));
+    expect(icons).toEqual(['archive-restore', 'archive-restore', 'archive-restore']);
     expect(a.calls('ui.setPages')[0].args[0]).toEqual([{ id: 'documents', title: 'page.title', icon: 'archive' }]);
   });
 });
