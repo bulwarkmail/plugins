@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.4.0 (2026-11-16)
+
 ### Security
 - The meeting link in the event and its invitations no longer carries the organizer's Jitsi token. Until now every attendee could join with the organizer's name and moderator rights for 24 hours. Opening an older event in the form takes the token out of its link; save it to send the clean link. The sidecar has to be updated too #12
 
