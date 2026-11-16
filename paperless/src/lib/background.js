@@ -219,9 +219,9 @@ export function createBackground(api, { setTimer = setTimeout } = {}) {
   async function registerUi() {
     const label = t('action.send');
     const calls = [
-      api.ui.setActions('attachment-menu', [{ id: ACTION_ATTACHMENT, label, icon: 'archive' }]),
-      api.ui.setActions('reader-actions', [{ id: ACTION_MESSAGE, label, icon: 'archive' }]),
-      api.ui.setActions('message-bulk-actions', [{ id: ACTION_BULK, label, icon: 'archive' }]),
+      api.ui.setActions('attachment-menu', [{ id: ACTION_ATTACHMENT, label, icon: 'archive-upload' }]),
+      api.ui.setActions('reader-actions', [{ id: ACTION_MESSAGE, label, icon: 'archive-upload' }]),
+      api.ui.setActions('message-bulk-actions', [{ id: ACTION_BULK, label, icon: 'archive-upload' }]),
       api.ui.setPages([{ id: 'documents', title: t('page.title'), icon: 'archive' }]),
     ];
     await Promise.all(calls.map((p) => Promise.resolve(p).catch((err) => api.log?.warn?.('setup failed', err?.message))));
