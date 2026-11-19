@@ -113,8 +113,8 @@ function entityLines(input, terminateNestedMultiparts = false) {
     for (const att of input.attachments) {
       lines.push(`--${boundary}`);
       const disposition = att.cid ? 'inline' : 'attachment';
-      lines.push(`Content-Type: ${att.contentType}; name="${encodeHeaderValue(att.filename)}"`);
-      lines.push(`Content-Disposition: ${disposition}; filename="${encodeHeaderValue(att.filename)}"`);
+      lines.push(...contentTypeWithName(att.contentType, att.filename));
+      lines.push(...dispositionWithFilename(disposition, att.filename));
       lines.push('Content-Transfer-Encoding: base64');
       if (att.cid) lines.push(`Content-ID: <${att.cid}>`);
       lines.push('');
@@ -220,6 +220,61 @@ function encodeHeaderWords(value) {
   }
   if (current) words.push(`${prefix}${current}?=`);
   return words.join(' ');
+}
+
+const PRINTABLE_ASCII = /^[\x20-\x7e]*$/;
+
+/** A parameter value as a quoted string: a backslash before each quote and backslash. */
+function quotedString(value) {
+  return `"${value.replace(/[\\"]/g, '\\$&')}"`;
+}
+
+/**
+ * Content-Type with the attachment's name, as header lines. A non-ASCII name goes in as
+ * one RFC 2047 encoded word, for clients that read no RFC 2231, on a line of its own
+ * when it is long, and is left out when that line would pass 78 characters:
+ * Content-Disposition carries it.
+ */
+function contentTypeWithName(contentType, filename) {
+  if (PRINTABLE_ASCII.test(filename)) return [`Content-Type: ${contentType}; name=${quotedString(filename)}`];
+  const name = ` name="${encodeHeaderValue(filename)}"`;
+  if (name.length > 78) return [`Content-Type: ${contentType}`];
+  const single = `Content-Type: ${contentType};${name}`;
+  return single.length <= 78 ? [single] : [`Content-Type: ${contentType};`, name];
+}
+
+// What stands for itself in an RFC 2231 extended value (RFC 5987 attr-char).
+const ATTR_CHAR = /[A-Za-z0-9!#$&+\-.^_`|~]/;
+// So a line " filename*10*=...;" stays within 78 characters.
+const SECTION_LENGTH = 60;
+
+/**
+ * Content-Disposition with the attachment's file name, as header lines. A non-ASCII name
+ * is written by RFC 2231: `filename*=UTF-8''...` with each byte outside attr-char as
+ * %XX, and in numbered sections on lines of their own when it is long, each section
+ * holding whole characters.
+ */
+function dispositionWithFilename(disposition, filename) {
+  if (PRINTABLE_ASCII.test(filename)) return [`Content-Disposition: ${disposition}; filename=${quotedString(filename)}`];
+  const chars = Array.from(filename, (ch) => (ATTR_CHAR.test(ch)
+    ? ch
+    : Array.from(new TextEncoder().encode(ch), (b) => `%${b.toString(16).toUpperCase().padStart(2, '0')}`).join('')));
+  const single = `Content-Disposition: ${disposition}; filename*=UTF-8''${chars.join('')}`;
+  if (single.length <= 78) return [single];
+  const sections = [];
+  let current = "UTF-8''";
+  for (const ch of chars) {
+    if (current.length + ch.length > SECTION_LENGTH) {
+      sections.push(current);
+      current = '';
+    }
+    current += ch;
+  }
+  sections.push(current);
+  return [
+    `Content-Disposition: ${disposition};`,
+    ...sections.map((section, i) => ` filename*${i}*=${section}${i < sections.length - 1 ? ';' : ''}`),
+  ];
 }
 
 function encodeHeaderValue(value) {

@@ -14,6 +14,7 @@
 - Signed or encrypted content without MIME headers of its own, as `openssl cms -sign` writes it for plain text, is shown from its first line. Its first paragraph was taken for a header and left out
 - A signature that names its signer by key identifier is checked when the message carries the issuer's certificate too. It read "Invalid signature: The signer's certificate is missing from the signature" although the signature was intact
 - An image placed in the text of a message you sign or encrypt arrives in the text. It went out as an ordinary attachment, with an empty frame where it stood
+- An attachment whose name holds a quotation mark keeps its whole name in signed and encrypted mail; the name was cut at the mark. A long name with non-ASCII characters no longer makes a header line longer than mail servers have to accept
 
 ## 1.5.0 (2026-11-07)
 
