@@ -554,10 +554,13 @@ async function fetchAttachments(req) {
     if (!att || !att.blobId) continue;
     try {
       const bytes = await host.jmap.fetchBlob(att.blobId, { name: att.name, type: att.type });
+      // An image the HTML body shows with a cid: URL keeps its Content-ID.
+      const cid = typeof att.cid === 'string' ? att.cid.trim().replace(/^<|>$/g, '') : '';
       out.push({
         filename: att.name || 'attachment',
         contentType: att.type || 'application/octet-stream',
         content: bytesArrayBuffer(bytes),
+        ...(cid ? { cid } : {}),
       });
     } catch (err) {
       host.log.warn('attachment fetch failed', att.name, err);

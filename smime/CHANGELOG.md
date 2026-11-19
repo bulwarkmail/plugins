@@ -13,6 +13,7 @@
 - Signed and encrypted mail with more than one text part shows all of them. Of a message with text before and after an attachment, or with a footer in a text part of its own, only the last part was shown
 - Signed or encrypted content without MIME headers of its own, as `openssl cms -sign` writes it for plain text, is shown from its first line. Its first paragraph was taken for a header and left out
 - A signature that names its signer by key identifier is checked when the message carries the issuer's certificate too. It read "Invalid signature: The signer's certificate is missing from the signature" although the signature was intact
+- An image placed in the text of a message you sign or encrypt arrives in the text. It went out as an ordinary attachment, with an empty frame where it stood
 
 ## 1.5.0 (2026-11-07)
 
