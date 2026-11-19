@@ -42,91 +42,54 @@ function messageHeaderLines(input) {
 }
 
 function entityLines(input, terminateNestedMultiparts = false) {
-  const boundary = generateBoundary();
-  const lines = [];
-
   const hasText = !!input.textBody;
   const hasHtml = !!input.htmlBody;
-  const hasAttachments = !!input.attachments?.length;
+  const attachments = input.attachments || [];
+  // An image the HTML body shows with a cid: URL goes into multipart/related with that
+  // body (RFC 2387): Thunderbird looks a cid: URL up only there, and shows the image as
+  // one more attachment when it sits in multipart/mixed.
+  const inline = hasHtml ? attachments.filter((att) => att.cid) : [];
+  const attached = attachments.filter((att) => !inline.includes(att));
 
-  if (!hasAttachments && hasText && !hasHtml) {
-    lines.push('Content-Type: text/plain; charset=utf-8');
-    lines.push('Content-Transfer-Encoding: quoted-printable');
-    lines.push('');
-    lines.push(quotedPrintableEncode(input.textBody));
-  } else if (!hasAttachments && hasText && hasHtml) {
-    const altBoundary = generateBoundary();
-    lines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
-    lines.push('');
-    lines.push(`--${altBoundary}`);
-    lines.push('Content-Type: text/plain; charset=utf-8');
-    lines.push('Content-Transfer-Encoding: quoted-printable');
-    lines.push('');
-    lines.push(quotedPrintableEncode(input.textBody));
-    lines.push(`--${altBoundary}`);
-    lines.push('Content-Type: text/html; charset=utf-8');
-    lines.push('Content-Transfer-Encoding: quoted-printable');
-    lines.push('');
-    lines.push(quotedPrintableEncode(input.htmlBody));
-    lines.push(`--${altBoundary}--`);
-  } else if (!hasAttachments && !hasText && hasHtml) {
-    lines.push('Content-Type: text/html; charset=utf-8');
-    lines.push('Content-Transfer-Encoding: quoted-printable');
-    lines.push('');
-    lines.push(quotedPrintableEncode(input.htmlBody));
-  } else if (hasAttachments) {
-    lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-    lines.push('');
-
-    if (hasText && hasHtml) {
-      const altBoundary = generateBoundary();
-      lines.push(`--${boundary}`);
-      lines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
-      lines.push('');
-      lines.push(`--${altBoundary}`);
-      lines.push('Content-Type: text/plain; charset=utf-8');
-      lines.push('Content-Transfer-Encoding: quoted-printable');
-      lines.push('');
-      lines.push(quotedPrintableEncode(input.textBody));
-      lines.push(`--${altBoundary}`);
-      lines.push('Content-Type: text/html; charset=utf-8');
-      lines.push('Content-Transfer-Encoding: quoted-printable');
-      lines.push('');
-      lines.push(quotedPrintableEncode(input.htmlBody));
-      lines.push(`--${altBoundary}--`);
-      // Keep the nested entity's terminal CRLF separate from its parent boundary.
-      if (terminateNestedMultiparts) lines.push('');
-    } else if (hasText) {
-      lines.push(`--${boundary}`);
-      lines.push('Content-Type: text/plain; charset=utf-8');
-      lines.push('Content-Transfer-Encoding: quoted-printable');
-      lines.push('');
-      lines.push(quotedPrintableEncode(input.textBody));
-    } else if (hasHtml) {
-      lines.push(`--${boundary}`);
-      lines.push('Content-Type: text/html; charset=utf-8');
-      lines.push('Content-Transfer-Encoding: quoted-printable');
-      lines.push('');
-      lines.push(quotedPrintableEncode(input.htmlBody));
-    }
-
-    for (const att of input.attachments) {
-      lines.push(`--${boundary}`);
-      const disposition = att.cid ? 'inline' : 'attachment';
-      lines.push(...contentTypeWithName(att.contentType, att.filename));
-      lines.push(...dispositionWithFilename(disposition, att.filename));
-      lines.push('Content-Transfer-Encoding: base64');
-      if (att.cid) lines.push(`Content-ID: <${att.cid}>`);
-      lines.push('');
-      lines.push(base64Encode(att.content));
+  const multipart = (subtype, parts) => {
+    const boundary = generateBoundary();
+    const lines = [`Content-Type: multipart/${subtype}; boundary="${boundary}"`, ''];
+    for (const part of parts) {
+      lines.push(`--${boundary}`, ...part.lines);
+      // Keep a nested entity's terminal CRLF separate from its parent boundary.
+      if (part.nested && terminateNestedMultiparts) lines.push('');
     }
     lines.push(`--${boundary}--`);
-  } else {
-    lines.push('Content-Type: text/plain; charset=utf-8');
-    lines.push('');
+    return { lines, nested: true };
+  };
+  const text = (subtype, body) => ({
+    lines: [`Content-Type: text/${subtype}; charset=utf-8`, 'Content-Transfer-Encoding: quoted-printable', '', quotedPrintableEncode(body)],
+  });
+
+  let body = null;
+  if (hasHtml) {
+    const html = inline.length ? multipart('related', [text('html', input.htmlBody), ...inline.map(attachmentPart)]) : text('html', input.htmlBody);
+    body = hasText ? multipart('alternative', [text('plain', input.textBody), html]) : html;
+  } else if (hasText) {
+    body = text('plain', input.textBody);
   }
 
-  return lines;
+  if (attached.length) return multipart('mixed', [...(body ? [body] : []), ...attached.map(attachmentPart)]).lines;
+  return body ? body.lines : ['Content-Type: text/plain; charset=utf-8', ''];
+}
+
+/** One attachment as a MIME part: inline with its Content-ID when it has a cid. */
+function attachmentPart(att) {
+  return {
+    lines: [
+      ...contentTypeWithName(att.contentType, att.filename),
+      ...dispositionWithFilename(att.cid ? 'inline' : 'attachment', att.filename),
+      'Content-Transfer-Encoding: base64',
+      ...(att.cid ? [`Content-ID: <${att.cid}>`] : []),
+      '',
+      base64Encode(att.content),
+    ],
+  };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
