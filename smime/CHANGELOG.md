@@ -12,6 +12,7 @@
 - Attachments in signed and encrypted mail are listed under their names. A name with an umlaut or another non-ASCII character showed as it is written in the message, `=?UTF-8?Q?Bericht_M=C3=A4rz.pdf?=` for one, which was also how the names of attachments sent from Bulwark came back
 - Signed and encrypted mail with more than one text part shows all of them. Of a message with text before and after an attachment, or with a footer in a text part of its own, only the last part was shown
 - Signed or encrypted content without MIME headers of its own, as `openssl cms -sign` writes it for plain text, is shown from its first line. Its first paragraph was taken for a header and left out
+- A signature that names its signer by key identifier is checked when the message carries the issuer's certificate too. It read "Invalid signature: The signer's certificate is missing from the signature" although the signature was intact
 
 ## 1.5.0 (2026-11-07)
 
