@@ -520,20 +520,30 @@ function collect(node, out) {
 
   if (type.startsWith('multipart/') && !node.opaque) {
     if (type === 'multipart/alternative') {
-      // Prefer the richest alternative; collect text+html, last wins per type.
-      for (const child of node.children) collect(child, out);
+      // One body in several forms: of each kind the last form counts.
+      const body = { html: '', text: '' };
+      for (const child of node.children) {
+        const form = { html: '', text: '', attachments: out.attachments };
+        collect(child, form);
+        if (form.html) body.html = form.html;
+        if (form.text) body.text = form.text;
+      }
+      out.html = appended(out.html, body.html);
+      out.text = appended(out.text, body.text);
     } else {
       for (const child of node.children) collect(child, out);
     }
     return;
   }
 
+  // Outside multipart/alternative every text part is body: a message can carry text
+  // before and after an attachment, or a footer a list added as a part of its own.
   if (type === 'text/html' && !isAttachment) {
-    out.html = decodeText(node);
+    out.html = appended(out.html, decodeText(node));
     return;
   }
   if (type === 'text/plain' && !isAttachment) {
-    out.text = decodeText(node);
+    out.text = appended(out.text, decodeText(node));
     return;
   }
 
@@ -545,6 +555,12 @@ function collect(node, out) {
     size: bytes.length,
     dataUrl: bytesToDataUrl(bytes, type || 'application/octet-stream'),
   });
+}
+
+// One body part after another, each starting on a line of its own.
+function appended(body, part) {
+  if (!body || !part) return body || part;
+  return `${body}${body.endsWith('\n') ? '' : '\n'}${part}`;
 }
 
 function bytesToDataUrl(bytes, type) {

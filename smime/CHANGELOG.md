@@ -10,6 +10,7 @@
 - Other mail programs can open encrypted mail sent from Bulwark. The body is encrypted with AES-CBC and the message key is wrapped with RSA PKCS#1 v1.5, the pairing every S/MIME client reads. Until now they stopped at the cipher and usually reported a missing recipient. Mail sent with earlier versions still opens in Bulwark #42 (thanks @b3rsrk)
 - A detached signature stays valid when a mail server or list rewrites the message's MIME framing: the signed part now ends with a line break of its own
 - Attachments in signed and encrypted mail are listed under their names. A name with an umlaut or another non-ASCII character showed as it is written in the message, `=?UTF-8?Q?Bericht_M=C3=A4rz.pdf?=` for one, which was also how the names of attachments sent from Bulwark came back
+- Signed and encrypted mail with more than one text part shows all of them. Of a message with text before and after an attachment, or with a footer in a text part of its own, only the last part was shown
 
 ## 1.5.0 (2026-11-07)
 
