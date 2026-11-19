@@ -507,12 +507,10 @@ function decodeText(node) {
   }
 }
 
+// The name an attachment is shown under, decoded (see paramText): a name in an RFC 2047
+// encoded word or an RFC 2231 parameter is not shown as it is written.
 function filenameFor(node) {
-  const cd = node.headers['content-disposition'] || '';
-  const m = cd.match(/filename\*?=(?:"([^"]+)"|([^;]+))/i);
-  if (m) return (m[1] || m[2] || '').trim();
-  if (node.params.name) return node.params.name;
-  return 'attachment';
+  return listedName(node).trim() || 'attachment';
 }
 
 function collect(node, out) {
