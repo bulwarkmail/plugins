@@ -15,6 +15,7 @@
 - A signature that names its signer by key identifier is checked when the message carries the issuer's certificate too. It read "Invalid signature: The signer's certificate is missing from the signature" although the signature was intact
 - An image placed in the text of a message you sign or encrypt arrives in the text. It went out as an ordinary attachment, with an empty frame where it stood
 - An attachment whose name holds a quotation mark keeps its whole name in signed and encrypted mail; the name was cut at the mark. A long name with non-ASCII characters no longer makes a header line longer than mail servers have to accept
+- A line that starts with "From " and a stray carriage return in the text of a signed message are encoded, as a mail server may rewrite them on the way and break the signature
 
 ## 1.5.0 (2026-11-07)
 

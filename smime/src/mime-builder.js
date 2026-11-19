@@ -365,28 +365,32 @@ function cmsToBase64Blob(data) {
   return new Blob([new TextEncoder().encode(b64 + CRLF)]);
 }
 
-/** Encode string as quoted-printable (RFC 2045). */
+/**
+ * Encode string as quoted-printable (RFC 2045). A line break is CRLF or a bare LF. What
+ * a relay may rewrite under a signature is encoded: a CR that is no part of a line break
+ * (in the 7-bit and 8-bit data of RFC 8551 §1.2 a CR occurs only in CRLF), and the F of
+ * "From " at the start of a line (delivery agents write ">From "; RFC 3156 §3 suggests
+ * encoding it for that reason).
+ */
 export function quotedPrintableEncode(input) {
   const bytes = new TextEncoder().encode(input);
   const lines = [];
   let line = '';
 
-  for (const b of bytes) {
-    let encoded;
-    if (b === 0x0d || b === 0x0a) {
-      encoded = String.fromCharCode(b);
-    } else if (b === 0x09 || (b >= 0x20 && b <= 0x7e && b !== 0x3d)) {
-      encoded = String.fromCharCode(b);
-    } else {
-      encoded = '=' + b.toString(16).toUpperCase().padStart(2, '0');
-    }
-
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    // The CR of a CRLF: the LF that follows ends the line.
+    if (b === 0x0d && bytes[i + 1] === 0x0a) continue;
     if (b === 0x0a) {
-      if (line.endsWith('\r')) line = line.slice(0, -1);
       lines.push(...hardLine(line));
       line = '';
       continue;
     }
+
+    const encoded = b === 0x09 || (b >= 0x20 && b <= 0x7e && b !== 0x3d)
+      ? String.fromCharCode(b)
+      : '=' + b.toString(16).toUpperCase().padStart(2, '0');
+    if (line === 'From' && encoded === ' ') line = '=46rom';
 
     if (line.length + encoded.length > 75) {
       lines.push(line + '=');
