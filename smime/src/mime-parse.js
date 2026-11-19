@@ -354,9 +354,7 @@ const MAX_DEPTH = 32;
 // `base` is where `raw` starts in the text the reader was given: `bodyStart` and
 // `delimiters` (where each delimiter line this reader split at begins) count from there.
 function parseEntity(raw, depth = 1, base = 0) {
-  const sepMatch = raw.match(/\r?\n\r?\n/);
-  const headerText = sepMatch ? raw.slice(0, sepMatch.index) : raw;
-  const body = sepMatch ? raw.slice(sepMatch.index + sepMatch[0].length) : '';
+  const [headerText, body] = splitHeader(raw);
 
   const headers = parseHeaders(headerText);
   const ctRaw = headers['content-type'] || 'text/plain';
@@ -377,6 +375,18 @@ function parseEntity(raw, depth = 1, base = 0) {
     }
   }
   return node;
+}
+
+// An entity's header block and its body. The block is empty when the entity begins with
+// the blank line that ends it (RFC 2046 §5.1.1: such a part is text/plain), and when it
+// doesn't begin with a header field at all: content signed or encrypted without MIME
+// headers of its own. All of it is body then, not its first paragraph a header.
+function splitHeader(raw) {
+  const blank = raw.match(/^\r?\n/);
+  if (blank) return ['', raw.slice(blank[0].length)];
+  if (!/^[^\s:]+[ \t]*:/.test(raw)) return ['', raw];
+  const sep = raw.match(/\r?\n\r?\n/);
+  return sep ? [raw.slice(0, sep.index), raw.slice(sep.index + sep[0].length)] : [raw, ''];
 }
 
 function parseHeaders(headerText) {
