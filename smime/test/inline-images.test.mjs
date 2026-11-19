@@ -165,6 +165,47 @@ describe('sending a message with an image in its text', () => {
     expect(imagePart(sent)).toContain('Content-ID: <img1@bulwark>');
   });
 
+  // A forwarded attachment keeps the Content-ID it had in the message it came from. Only
+  // what the new text shows is an image in the text.
+  it('sends an attachment whose cid the text does not show as an ordinary attachment', async () => {
+    const { sent, hooks } = plugin();
+    await hooks.onComposeSend(request([
+      { name: 'logo.png', type: 'image/png', blobId: 'blob-1', cid: 'img1@bulwark' },
+      { name: 'report.pdf', type: 'application/pdf', blobId: 'blob-2', cid: 'part2@sender.example' },
+    ]));
+    const entity = new TextDecoder().decode(extractDetachedSigned(sent[0]).entityBytes);
+    expect(entity).toContain('Content-Disposition: attachment; filename="report.pdf"');
+    expect(entity).not.toContain('part2@sender.example');
+    expect(entity.match(/^Content-ID:/gim)).toHaveLength(1);
+    expect(entity).toMatch(/^Content-Type: multipart\/mixed;/);
+  });
+
+  it('does not take a cid for shown when it only begins like one the text shows', async () => {
+    const { sent, hooks } = plugin();
+    await hooks.onComposeSend(request([{ name: 'a.png', type: 'image/png', blobId: 'blob-1', cid: 'img1' }]));
+    expect(imagePart(sent).some((line) => /^Content-ID:/i.test(line))).toBe(false);
+  });
+
+  it.each([
+    ['a line break', 'img1@bulwark\r\nX-Injected: yes'],
+    ['a blank', 'img1@bulwark x'],
+    ['an angle bracket', 'img1@bulwark>\r\nX-Injected: yes\r\nX: <'],
+    ['a NUL', 'img1@bulwark\u0000'],
+  ])('writes no Content-ID for a cid with %s in it', async (_, cid) => {
+    const { sent, hooks } = plugin();
+    const over = request([{ name: 'logo.png', type: 'image/png', blobId: 'blob-1', cid }]);
+    // The text shows exactly that cid, as far as a cid: URL can hold it.
+    over.htmlBody = `<p><img src="cid:${cid}"></p>`;
+    await expect(hooks.onComposeSend(over)).resolves.toBe(false);
+    // The header block of the image's part: nothing of the cid stands in it.
+    const head = imagePart(sent);
+    expect(head).toEqual([
+      'Content-Type: image/png; name="logo.png"',
+      'Content-Disposition: attachment; filename="logo.png"',
+      'Content-Transfer-Encoding: base64',
+    ]);
+  });
+
   it('sends an ordinary attachment without one', async () => {
     const { sent, hooks } = plugin();
     await hooks.onComposeSend(request([{ name: 'photo.png', type: 'image/png', blobId: 'blob-1', cid: undefined }]));
