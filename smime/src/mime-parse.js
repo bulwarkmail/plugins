@@ -354,9 +354,7 @@ const MAX_DEPTH = 32;
 // `base` is where `raw` starts in the text the reader was given: `bodyStart` and
 // `delimiters` (where each delimiter line this reader split at begins) count from there.
 function parseEntity(raw, depth = 1, base = 0) {
-  const sepMatch = raw.match(/\r?\n\r?\n/);
-  const headerText = sepMatch ? raw.slice(0, sepMatch.index) : raw;
-  const body = sepMatch ? raw.slice(sepMatch.index + sepMatch[0].length) : '';
+  const [headerText, body] = splitHeader(raw);
 
   const headers = parseHeaders(headerText);
   const ctRaw = headers['content-type'] || 'text/plain';
@@ -377,6 +375,18 @@ function parseEntity(raw, depth = 1, base = 0) {
     }
   }
   return node;
+}
+
+// An entity's header block and its body. The block is empty when the entity begins with
+// the blank line that ends it (RFC 2046 §5.1.1: such a part is text/plain), and when it
+// doesn't begin with a header field at all: content signed or encrypted without MIME
+// headers of its own. All of it is body then, not its first paragraph a header.
+function splitHeader(raw) {
+  const blank = raw.match(/^\r?\n/);
+  if (blank) return ['', raw.slice(blank[0].length)];
+  if (!/^[^\s:]+[ \t]*:/.test(raw)) return ['', raw];
+  const sep = raw.match(/\r?\n\r?\n/);
+  return sep ? [raw.slice(0, sep.index), raw.slice(sep.index + sep[0].length)] : [raw, ''];
 }
 
 function parseHeaders(headerText) {
@@ -507,12 +517,10 @@ function decodeText(node) {
   }
 }
 
+// The name an attachment is shown under, decoded (see paramText): a name in an RFC 2047
+// encoded word or an RFC 2231 parameter is not shown as it is written.
 function filenameFor(node) {
-  const cd = node.headers['content-disposition'] || '';
-  const m = cd.match(/filename\*?=(?:"([^"]+)"|([^;]+))/i);
-  if (m) return (m[1] || m[2] || '').trim();
-  if (node.params.name) return node.params.name;
-  return 'attachment';
+  return listedName(node).trim() || 'attachment';
 }
 
 function collect(node, out) {
@@ -522,20 +530,30 @@ function collect(node, out) {
 
   if (type.startsWith('multipart/') && !node.opaque) {
     if (type === 'multipart/alternative') {
-      // Prefer the richest alternative; collect text+html, last wins per type.
-      for (const child of node.children) collect(child, out);
+      // One body in several forms: of each kind the last form counts.
+      const body = { html: '', text: '' };
+      for (const child of node.children) {
+        const form = { html: '', text: '', attachments: out.attachments };
+        collect(child, form);
+        if (form.html) body.html = form.html;
+        if (form.text) body.text = form.text;
+      }
+      out.html = appended(out.html, body.html);
+      out.text = appended(out.text, body.text);
     } else {
       for (const child of node.children) collect(child, out);
     }
     return;
   }
 
+  // Outside multipart/alternative every text part is body: a message can carry text
+  // before and after an attachment, or a footer a list added as a part of its own.
   if (type === 'text/html' && !isAttachment) {
-    out.html = decodeText(node);
+    out.html = appended(out.html, decodeText(node));
     return;
   }
   if (type === 'text/plain' && !isAttachment) {
-    out.text = decodeText(node);
+    out.text = appended(out.text, decodeText(node));
     return;
   }
 
@@ -547,6 +565,12 @@ function collect(node, out) {
     size: bytes.length,
     dataUrl: bytesToDataUrl(bytes, type || 'application/octet-stream'),
   });
+}
+
+// One body part after another, each starting on a line of its own.
+function appended(body, part) {
+  if (!body || !part) return body || part;
+  return `${body}${body.endsWith('\n') ? '' : '\n'}${part}`;
 }
 
 function bytesToDataUrl(bytes, type) {

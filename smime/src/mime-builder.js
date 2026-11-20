@@ -42,91 +42,54 @@ function messageHeaderLines(input) {
 }
 
 function entityLines(input, terminateNestedMultiparts = false) {
-  const boundary = generateBoundary();
-  const lines = [];
-
   const hasText = !!input.textBody;
   const hasHtml = !!input.htmlBody;
-  const hasAttachments = !!input.attachments?.length;
+  const attachments = input.attachments || [];
+  // An image the HTML body shows with a cid: URL goes into multipart/related with that
+  // body (RFC 2387): Thunderbird looks a cid: URL up only there, and shows the image as
+  // one more attachment when it sits in multipart/mixed.
+  const inline = hasHtml ? attachments.filter((att) => att.cid) : [];
+  const attached = attachments.filter((att) => !inline.includes(att));
 
-  if (!hasAttachments && hasText && !hasHtml) {
-    lines.push('Content-Type: text/plain; charset=utf-8');
-    lines.push('Content-Transfer-Encoding: quoted-printable');
-    lines.push('');
-    lines.push(quotedPrintableEncode(input.textBody));
-  } else if (!hasAttachments && hasText && hasHtml) {
-    const altBoundary = generateBoundary();
-    lines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
-    lines.push('');
-    lines.push(`--${altBoundary}`);
-    lines.push('Content-Type: text/plain; charset=utf-8');
-    lines.push('Content-Transfer-Encoding: quoted-printable');
-    lines.push('');
-    lines.push(quotedPrintableEncode(input.textBody));
-    lines.push(`--${altBoundary}`);
-    lines.push('Content-Type: text/html; charset=utf-8');
-    lines.push('Content-Transfer-Encoding: quoted-printable');
-    lines.push('');
-    lines.push(quotedPrintableEncode(input.htmlBody));
-    lines.push(`--${altBoundary}--`);
-  } else if (!hasAttachments && !hasText && hasHtml) {
-    lines.push('Content-Type: text/html; charset=utf-8');
-    lines.push('Content-Transfer-Encoding: quoted-printable');
-    lines.push('');
-    lines.push(quotedPrintableEncode(input.htmlBody));
-  } else if (hasAttachments) {
-    lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-    lines.push('');
-
-    if (hasText && hasHtml) {
-      const altBoundary = generateBoundary();
-      lines.push(`--${boundary}`);
-      lines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
-      lines.push('');
-      lines.push(`--${altBoundary}`);
-      lines.push('Content-Type: text/plain; charset=utf-8');
-      lines.push('Content-Transfer-Encoding: quoted-printable');
-      lines.push('');
-      lines.push(quotedPrintableEncode(input.textBody));
-      lines.push(`--${altBoundary}`);
-      lines.push('Content-Type: text/html; charset=utf-8');
-      lines.push('Content-Transfer-Encoding: quoted-printable');
-      lines.push('');
-      lines.push(quotedPrintableEncode(input.htmlBody));
-      lines.push(`--${altBoundary}--`);
-      // Keep the nested entity's terminal CRLF separate from its parent boundary.
-      if (terminateNestedMultiparts) lines.push('');
-    } else if (hasText) {
-      lines.push(`--${boundary}`);
-      lines.push('Content-Type: text/plain; charset=utf-8');
-      lines.push('Content-Transfer-Encoding: quoted-printable');
-      lines.push('');
-      lines.push(quotedPrintableEncode(input.textBody));
-    } else if (hasHtml) {
-      lines.push(`--${boundary}`);
-      lines.push('Content-Type: text/html; charset=utf-8');
-      lines.push('Content-Transfer-Encoding: quoted-printable');
-      lines.push('');
-      lines.push(quotedPrintableEncode(input.htmlBody));
-    }
-
-    for (const att of input.attachments) {
-      lines.push(`--${boundary}`);
-      const disposition = att.cid ? 'inline' : 'attachment';
-      lines.push(`Content-Type: ${att.contentType}; name="${encodeHeaderValue(att.filename)}"`);
-      lines.push(`Content-Disposition: ${disposition}; filename="${encodeHeaderValue(att.filename)}"`);
-      lines.push('Content-Transfer-Encoding: base64');
-      if (att.cid) lines.push(`Content-ID: <${att.cid}>`);
-      lines.push('');
-      lines.push(base64Encode(att.content));
+  const multipart = (subtype, parts) => {
+    const boundary = generateBoundary();
+    const lines = [`Content-Type: multipart/${subtype}; boundary="${boundary}"`, ''];
+    for (const part of parts) {
+      lines.push(`--${boundary}`, ...part.lines);
+      // Keep a nested entity's terminal CRLF separate from its parent boundary.
+      if (part.nested && terminateNestedMultiparts) lines.push('');
     }
     lines.push(`--${boundary}--`);
-  } else {
-    lines.push('Content-Type: text/plain; charset=utf-8');
-    lines.push('');
+    return { lines, nested: true };
+  };
+  const text = (subtype, body) => ({
+    lines: [`Content-Type: text/${subtype}; charset=utf-8`, 'Content-Transfer-Encoding: quoted-printable', '', quotedPrintableEncode(body)],
+  });
+
+  let body = null;
+  if (hasHtml) {
+    const html = inline.length ? multipart('related', [text('html', input.htmlBody), ...inline.map(attachmentPart)]) : text('html', input.htmlBody);
+    body = hasText ? multipart('alternative', [text('plain', input.textBody), html]) : html;
+  } else if (hasText) {
+    body = text('plain', input.textBody);
   }
 
-  return lines;
+  if (attached.length) return multipart('mixed', [...(body ? [body] : []), ...attached.map(attachmentPart)]).lines;
+  return body ? body.lines : ['Content-Type: text/plain; charset=utf-8', ''];
+}
+
+/** One attachment as a MIME part: inline with its Content-ID when it has a cid. */
+function attachmentPart(att) {
+  return {
+    lines: [
+      ...contentTypeWithName(att.contentType, att.filename),
+      ...dispositionWithFilename(att.cid ? 'inline' : 'attachment', att.filename),
+      'Content-Transfer-Encoding: base64',
+      ...(att.cid ? [`Content-ID: <${att.cid}>`] : []),
+      '',
+      base64Encode(att.content),
+    ],
+  };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -222,6 +185,61 @@ function encodeHeaderWords(value) {
   return words.join(' ');
 }
 
+const PRINTABLE_ASCII = /^[\x20-\x7e]*$/;
+
+/** A parameter value as a quoted string: a backslash before each quote and backslash. */
+function quotedString(value) {
+  return `"${value.replace(/[\\"]/g, '\\$&')}"`;
+}
+
+/**
+ * Content-Type with the attachment's name, as header lines. A non-ASCII name goes in as
+ * one RFC 2047 encoded word, for clients that read no RFC 2231, on a line of its own
+ * when it is long, and is left out when that line would pass 78 characters:
+ * Content-Disposition carries it.
+ */
+function contentTypeWithName(contentType, filename) {
+  if (PRINTABLE_ASCII.test(filename)) return [`Content-Type: ${contentType}; name=${quotedString(filename)}`];
+  const name = ` name="${encodeHeaderValue(filename)}"`;
+  if (name.length > 78) return [`Content-Type: ${contentType}`];
+  const single = `Content-Type: ${contentType};${name}`;
+  return single.length <= 78 ? [single] : [`Content-Type: ${contentType};`, name];
+}
+
+// What stands for itself in an RFC 2231 extended value (RFC 5987 attr-char).
+const ATTR_CHAR = /[A-Za-z0-9!#$&+\-.^_`|~]/;
+// So a line " filename*10*=...;" stays within 78 characters.
+const SECTION_LENGTH = 60;
+
+/**
+ * Content-Disposition with the attachment's file name, as header lines. A non-ASCII name
+ * is written by RFC 2231: `filename*=UTF-8''...` with each byte outside attr-char as
+ * %XX, and in numbered sections on lines of their own when it is long, each section
+ * holding whole characters.
+ */
+function dispositionWithFilename(disposition, filename) {
+  if (PRINTABLE_ASCII.test(filename)) return [`Content-Disposition: ${disposition}; filename=${quotedString(filename)}`];
+  const chars = Array.from(filename, (ch) => (ATTR_CHAR.test(ch)
+    ? ch
+    : Array.from(new TextEncoder().encode(ch), (b) => `%${b.toString(16).toUpperCase().padStart(2, '0')}`).join('')));
+  const single = `Content-Disposition: ${disposition}; filename*=UTF-8''${chars.join('')}`;
+  if (single.length <= 78) return [single];
+  const sections = [];
+  let current = "UTF-8''";
+  for (const ch of chars) {
+    if (current.length + ch.length > SECTION_LENGTH) {
+      sections.push(current);
+      current = '';
+    }
+    current += ch;
+  }
+  sections.push(current);
+  return [
+    `Content-Disposition: ${disposition};`,
+    ...sections.map((section, i) => ` filename*${i}*=${section}${i < sections.length - 1 ? ';' : ''}`),
+  ];
+}
+
 function encodeHeaderValue(value) {
   if (/^[\x20-\x7e]*$/.test(value)) return value;
   const encoded = Array.from(new TextEncoder().encode(value))
@@ -310,28 +328,32 @@ function cmsToBase64Blob(data) {
   return new Blob([new TextEncoder().encode(b64 + CRLF)]);
 }
 
-/** Encode string as quoted-printable (RFC 2045). */
+/**
+ * Encode string as quoted-printable (RFC 2045). A line break is CRLF or a bare LF. What
+ * a relay may rewrite under a signature is encoded: a CR that is no part of a line break
+ * (in the 7-bit and 8-bit data of RFC 8551 §1.2 a CR occurs only in CRLF), and the F of
+ * "From " at the start of a line (delivery agents write ">From "; RFC 3156 §3 suggests
+ * encoding it for that reason).
+ */
 export function quotedPrintableEncode(input) {
   const bytes = new TextEncoder().encode(input);
   const lines = [];
   let line = '';
 
-  for (const b of bytes) {
-    let encoded;
-    if (b === 0x0d || b === 0x0a) {
-      encoded = String.fromCharCode(b);
-    } else if (b === 0x09 || (b >= 0x20 && b <= 0x7e && b !== 0x3d)) {
-      encoded = String.fromCharCode(b);
-    } else {
-      encoded = '=' + b.toString(16).toUpperCase().padStart(2, '0');
-    }
-
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    // The CR of a CRLF: the LF that follows ends the line.
+    if (b === 0x0d && bytes[i + 1] === 0x0a) continue;
     if (b === 0x0a) {
-      if (line.endsWith('\r')) line = line.slice(0, -1);
       lines.push(...hardLine(line));
       line = '';
       continue;
     }
+
+    const encoded = b === 0x09 || (b >= 0x20 && b <= 0x7e && b !== 0x3d)
+      ? String.fromCharCode(b)
+      : '=' + b.toString(16).toUpperCase().padStart(2, '0');
+    if (line === 'From' && encoded === ' ') line = '=46rom';
 
     if (line.length + encoded.length > 75) {
       lines.push(line + '=');

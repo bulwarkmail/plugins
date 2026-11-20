@@ -547,17 +547,37 @@ async function resolveIntent(req) {
   return { sign: !!sign, encrypt: !!encrypt };
 }
 
+// A cid as the webmail reads one out of an HTML body (lib/attachment-visibility.ts).
+const CID_REFERENCE = /\bcid:([^"'\s)<>]+)/gi;
+
+/**
+ * The cid to send an attachment under, or '' to send it as an ordinary attachment. An
+ * attachment is an image in the text only when the HTML body shows it by that cid. A
+ * forwarded attachment can carry a Content-ID of the message it came from, which nothing
+ * in the new text refers to: it is not sent inline, in multipart/related, as an image
+ * the text shows would be. The cid goes into a header line
+ * as it is, so one with a blank, a control character or an angle bracket is not taken.
+ */
+function inlineCid(att, shown) {
+  const cid = typeof att.cid === 'string' ? att.cid.trim().replace(/^<|>$/g, '') : '';
+  return cid && !/[\s<>"'()\x00-\x1f\x7f]/.test(cid) && shown.has(cid) ? cid : '';
+}
+
 async function fetchAttachments(req) {
   const list = req.attachments || [];
   const out = [];
+  const shown = new Set(Array.from(String(req.htmlBody || req.html || '').matchAll(CID_REFERENCE), (m) => m[1]));
   for (const att of list) {
     if (!att || !att.blobId) continue;
     try {
       const bytes = await host.jmap.fetchBlob(att.blobId, { name: att.name, type: att.type });
+      // An image the HTML body shows with a cid: URL keeps its Content-ID.
+      const cid = inlineCid(att, shown);
       out.push({
         filename: att.name || 'attachment',
         contentType: att.type || 'application/octet-stream',
         content: bytesArrayBuffer(bytes),
+        ...(cid ? { cid } : {}),
       });
     } catch (err) {
       host.log.warn('attachment fetch failed', att.name, err);

@@ -24,7 +24,7 @@ export async function smimeVerify(cmsBytes, fromHeader, trust) {
   const innerContent = extractInnerContent(signedData);
   const status = await verifyStatus(signedData, { signer: 0, checkChain: false }, fromHeader, trust);
 
-  return { mimeBytes: innerContent, status, chain: otherCertificates(signedData) };
+  return { mimeBytes: innerContent, status, chain: await otherCertificates(signedData) };
 }
 
 /**
@@ -47,19 +47,19 @@ export async function smimeVerifyDetached(signatureDer, entityBytes, fromHeader,
     if (retry.cryptoValid) status = retry;
   }
 
-  return { mimeBytes: entityBytes, status, chain: otherCertificates(signedData) };
+  return { mimeBytes: entityBytes, status, chain: await otherCertificates(signedData) };
 }
 
 // The DER of the message's certificates other than the signer's.
-function otherCertificates(signedData) {
-  const signer = extractSignerCertificate(signedData);
+async function otherCertificates(signedData) {
+  const signer = await extractSignerCertificate(signedData);
   return (signedData.certificates || [])
     .filter((c) => c instanceof pkijs.Certificate && c !== signer)
     .map((c) => c.toSchema(true).toBER(false));
 }
 
 async function verifyStatus(signedData, verifyParams, fromHeader, trust) {
-  const signerCert = extractSignerCertificate(signedData);
+  const signerCert = await extractSignerCertificate(signedData);
   if (!signerCert) {
     return {
       isSigned: true,
@@ -217,7 +217,20 @@ function extractInnerContent(signedData) {
   throw new Error('Unable to extract content from SignedData');
 }
 
-function extractSignerCertificate(signedData) {
+// The bytes of a SignerIdentifier's subjectKeyIdentifier, the [0] alternative, or null.
+function subjectKeyIdentifier(sid) {
+  if (!sid?.idBlock || sid.idBlock.tagClass !== 3 || sid.idBlock.tagNumber !== 0) return null;
+  const block = sid.idBlock.isConstructed ? sid.valueBlock.value?.[0]?.valueBlock : sid.valueBlock;
+  return block?.valueHexView ? new Uint8Array(block.valueHexView) : null;
+}
+
+/**
+ * The certificate the first SignerInfo names: by issuer and serial number, or by subject
+ * key identifier (RFC 5652 §5.3; `openssl cms -sign -keyid` writes that).
+ * A key identifier is matched the way pkijs matches it when it checks the signature: it
+ * is the SHA-1 of the certificate's public key (RFC 5280 §4.2.1.2, method 1).
+ */
+async function extractSignerCertificate(signedData) {
   if (!signedData.signerInfos?.length || !signedData.certificates?.length) return null;
 
   const signerInfo = signedData.signerInfos[0];
@@ -235,6 +248,13 @@ function extractSignerCertificate(signedData) {
       const sidIssuerDer = new Uint8Array(sid.issuer.toSchema().toBER(false));
       const certIssuerDer = new Uint8Array(cert.issuer.toSchema().toBER(false));
       if (arraysEqual(sidIssuerDer, certIssuerDer)) return cert;
+    }
+  } else {
+    const keyId = subjectKeyIdentifier(sid);
+    for (const cert of keyId ? signedData.certificates : []) {
+      if (!(cert instanceof pkijs.Certificate)) continue;
+      const digest = await crypto.subtle.digest('SHA-1', cert.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView);
+      if (arraysEqual(new Uint8Array(digest), keyId)) return cert;
     }
   }
 
