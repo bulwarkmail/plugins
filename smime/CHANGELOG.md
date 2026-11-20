@@ -9,13 +9,13 @@
 - A signature is checked against the certificate the banner names. A message carrying a second certificate with the same serial number, and the issuer's name in another spelling, had its signature checked against that certificate and still read "Valid signature by" the sender whose certificate it also carried #44 (thanks @kah-ja)
 - Other mail programs can open encrypted mail sent from Bulwark. The body is encrypted with AES-CBC and the message key is wrapped with RSA PKCS#1 v1.5, the pairing every S/MIME client reads. Until now they stopped at the cipher and usually reported a missing recipient. Mail sent with earlier versions still opens in Bulwark #42 (thanks @b3rsrk)
 - A detached signature stays valid when a mail server or list rewrites the message's MIME framing: the signed part now ends with a line break of its own
-- Attachments in signed and encrypted mail are listed under their names. A name with an umlaut or another non-ASCII character showed as it is written in the message, `=?UTF-8?Q?Bericht_M=C3=A4rz.pdf?=` for one, which was also how the names of attachments sent from Bulwark came back
-- Signed and encrypted mail with more than one text part shows all of them. Of a message with text before and after an attachment, or with a footer in a text part of its own, only the last part was shown
-- Signed or encrypted content without MIME headers of its own, as `openssl cms -sign` writes it for plain text, is shown from its first line. Its first paragraph was taken for a header and left out
-- A signature that names its signer by key identifier is checked when the message carries the issuer's certificate too. It read "Invalid signature: The signer's certificate is missing from the signature" although the signature was intact
-- An image placed in the text of a message you sign or encrypt arrives in the text. It went out as an ordinary attachment, with an empty frame where it stood
-- An attachment whose name holds a quotation mark keeps its whole name in signed and encrypted mail; the name was cut at the mark. A long name with non-ASCII characters no longer makes a header line longer than mail servers have to accept
-- A line that starts with "From " and a stray carriage return in the text of a signed message are encoded, as a mail server may rewrite them on the way and break the signature
+- Attachments in signed and encrypted mail are listed under their names. A name with an umlaut or another non-ASCII character showed as it is written in the message, `=?UTF-8?Q?Bericht_M=C3=A4rz.pdf?=` for one, which was also how the names of attachments sent from Bulwark came back #48 (thanks @kah-ja)
+- Signed and encrypted mail with more than one text part shows all of them. Of a message with text before and after an attachment, or with a footer in a text part of its own, only the last part was shown #48 (thanks @kah-ja)
+- Signed or encrypted content without MIME headers of its own, as `openssl cms -sign` writes it for plain text, is shown from its first line. Its first paragraph was taken for a header and left out #48 (thanks @kah-ja)
+- A signature that names its signer by key identifier is checked when the message carries the issuer's certificate too. It read "Invalid signature: The signer's certificate is missing from the signature" although the signature was intact #48 (thanks @kah-ja)
+- An image placed in the text of a message you sign or encrypt arrives in the text. It went out as an ordinary attachment, with an empty frame where it stood #48 (thanks @kah-ja)
+- An attachment whose name holds a quotation mark keeps its whole name in signed and encrypted mail; the name was cut at the mark. A long name with non-ASCII characters no longer makes a header line longer than mail servers have to accept #48 (thanks @kah-ja)
+- A line that starts with "From " and a stray carriage return in the text of a signed message are encoded, as a mail server may rewrite them on the way and break the signature #48 (thanks @kah-ja)
 
 ## 1.5.0 (2026-11-07)
 
