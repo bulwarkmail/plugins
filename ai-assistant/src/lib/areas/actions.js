@@ -20,6 +20,7 @@ import { has } from '../caps.js';
 import { areaAllowed, batchLimit, settingsChangesAllowed } from '../config.js';
 import { clip } from '../prompts.js';
 import { contactParts } from '../widgets.js';
+import { foldersOf, otherAccountOf, parseMessageRef } from '../accounts.js';
 import EN from '../../locales/actions/en.json';
 
 // ─── What the user may switch ─────────────────────────────────
@@ -205,7 +206,8 @@ function findFolder(mailboxes, wanted) {
 }
 
 async function folderFor(api, wanted) {
-  const mailboxes = (await api.mailboxes.list()) ?? [];
+  // The user's own folders: moves and filters work in their own account only.
+  const mailboxes = foldersOf((await api.mailboxes.list()) ?? []);
   const folder = findFolder(mailboxes, wanted);
   if (!folder) throw new Error(`no folder "${text(wanted, 100)}"; the folders are: ${mailboxes.map((m) => m.name).join(', ')}`);
   // Moving mail to the trash comes close to deleting it, which the assistant never does.
@@ -228,12 +230,22 @@ async function tagFor(api, wanted) {
   return tag;
 }
 
+/** The message an id names; "<accountId>:<id>" reads it from that account (as in ../actions.js). */
 async function messageFor(api, id) {
-  const messageId = text(id, 200);
+  const { id: messageId, accountId } = parseMessageRef(text(id, 200));
   if (!messageId) throw new Error('id is empty');
-  const email = await api.email.get(messageId);
+  const email = await api.email.get(messageId, ...(accountId ? [accountId] : []));
   if (!email) throw new Error('no message with that id');
-  return email;
+  return accountId && !email.accountId ? { ...email, accountId } : email;
+}
+
+/** The account of a team or shared mailbox the message is in, undefined for the user's own (or when the folders can't be read). */
+async function otherAccountFor(api, email) {
+  try {
+    return otherAccountOf(email, (await api.mailboxes.list()) ?? []);
+  } catch {
+    return undefined;
+  }
 }
 
 const senderOf = (email) => {
@@ -513,17 +525,19 @@ function tagAction(name, on) {
       const keywords = Array.isArray(email.keywords) ? email.keywords : Object.keys(email.keywords ?? {});
       const had = keywords.some((k) => String(k).toLowerCase() === keyword.toLowerCase());
       const summary = api.i18n.t(on ? 'do.tag.add' : 'do.tag.remove', { subject: email.subject || '…', tag: tag.label || tag.id });
-      return { summary, plan: { id: email.id, keyword, had, label: tag.label || tag.id, subject: email.subject ?? '' } };
+      // Tagged in its account: the same id names another message in the user's own.
+      const accountId = await otherAccountFor(api, email);
+      return { summary, plan: { id: email.id, ...(accountId ? { accountId } : {}), keyword, had, label: tag.label || tag.id, subject: email.subject ?? '' } };
     },
     async perform(api, plan) {
-      await api.email.updateKeywords(plan.id, { [plan.keyword]: on });
+      await api.email.updateKeywords(plan.id, { [plan.keyword]: on }, ...(plan.accountId ? [plan.accountId] : []));
       return {
         text: on ? `Done: "${plan.subject}" is tagged ${plan.label}.` : `Done: the tag ${plan.label} is removed from "${plan.subject}".`,
-        undo: { id: plan.id, keyword: plan.keyword, had: plan.had },
+        undo: { id: plan.id, ...(plan.accountId ? { accountId: plan.accountId } : {}), keyword: plan.keyword, had: plan.had },
       };
     },
     async undo(api, undo) {
-      await api.email.updateKeywords(undo.id, { [undo.keyword]: undo.had });
+      await api.email.updateKeywords(undo.id, { [undo.keyword]: undo.had }, ...(undo.accountId ? [undo.accountId] : []));
     },
   };
 }
@@ -891,6 +905,8 @@ const batchMessages = {
     let more = false;
     if (Array.isArray(args.ids) && args.ids.length) {
       ids = [...new Set(args.ids.map((id) => text(id, 200)).filter(Boolean))];
+      // The webmail changes many messages at once in the user's own account only.
+      if (ids.some((id) => parseMessageRef(id).accountId)) throw new Error('these messages are in a team or shared mailbox; changing many at once works only for the user\'s own mail');
     } else if (args.search && typeof args.search === 'object') {
       const query = {};
       for (const key of ['text', 'from', 'subject']) {

@@ -95,6 +95,11 @@ the one that matters), **the message you reply to** and **your settings**
 ("why are messages marked read so fast?" reads how you set the app up).
 Turn this off in the plugin's settings.
 
+With a team mailbox or one shared with you, the mail search looks in the
+mailbox whose folder is open, or in the one you name ("what came into
+info@ today?"). There it searches one folder at a time, the inbox unless
+you name another. The calendar lookup names the calendar of each event.
+
 The assistant also knows the app itself: its name and version, the
 account and mail server you use, what the app can do, and where each
 setting is. Asked "how do I set up an automatic reply?", it looks the
@@ -148,6 +153,9 @@ a message, move it to a folder, mark it read, unread, starred or not, add
 a calendar event, a task or a contact, and open a reply or a new message
 in the composer with the text it drafted. It never sends and never
 deletes mail; a reply or a message waits in the composer for you.
+Archive and move work only for your own mail: for a message in a team or
+shared mailbox the assistant says so and leaves it where it is. Marks and
+tags work there too.
 
 Each action shows as a card in the chat with what it will do ("Move
 “Invoice 42” to Projects 2026"). Settings > AI Assistant >

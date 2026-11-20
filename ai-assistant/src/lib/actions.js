@@ -16,6 +16,7 @@
 // message or a reply whose address the user didn't name.
 
 import { areaAction, areaActions, offered } from './areas/index.js';
+import { foldersOf, otherAccountOf, parseMessageRef } from './accounts.js';
 
 const ADDRESS_IN_TEXT = /[^\s@<>"',;()]+@[^\s@<>"',;()]+\.[^\s@<>"',;().]+/g;
 
@@ -229,12 +230,32 @@ export function effectiveActionMode(config = {}, prefs = {}) {
 
 const text = (value, max = 500) => String(value ?? '').trim().slice(0, max);
 
-async function messageFor(api, id) {
-  const messageId = text(id, 200);
+/** The message an id names; "<accountId>:<id>" reads it from that account. */
+export async function messageFor(api, id) {
+  const { id: messageId, accountId } = parseMessageRef(text(id, 200));
   if (!messageId) throw new Error('id is empty');
-  const email = await api.email.get(messageId);
+  const email = await api.email.get(messageId, ...(accountId ? [accountId] : []));
   if (!email) throw new Error('no message with that id');
-  return email;
+  return accountId && !email.accountId ? { ...email, accountId } : email;
+}
+
+/** The folders, or null when they can't be read. */
+async function foldersOrNull(api) {
+  try {
+    return (await api.mailboxes.list()) ?? [];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The webmail archives and moves only the user's own messages. One of a
+ * team or shared mailbox is refused here, before the user is asked, with
+ * words the model can pass on.
+ */
+function ownMessageOnly(email, mailboxes, name) {
+  if (!otherAccountOf(email, mailboxes)) return;
+  throw new Error(`"${text(email.subject, 100) || 'the message'}" is in a team or shared mailbox; ${name} works only for the user's own mail. Tell the user to use the mail app's toolbar for it.`);
 }
 
 /** The folder a name or role means: the role first, then the name, then a unique partial match. */
@@ -295,15 +316,19 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
       // Only the open message follows the mode: the user doesn't see another
       // one go. Out of the junk folder always asks (also when the folders
       // can't be read).
-      let fromJunk;
-      try { fromJunk = inJunk(email, (await api.mailboxes.list()) ?? []); } catch { fromJunk = true; }
+      const mailboxes = await foldersOrNull(api);
+      if (mailboxes) ownMessageOnly(email, mailboxes, name);
+      const fromJunk = !mailboxes || inJunk(email, mailboxes);
       return { summary: t('action.archive', { subject: email.subject || '…' }), plan: { name, email }, alwaysAsk: fromJunk || !isOpenMessage(email, ctx) };
     }
     case 'move_message': {
       const email = await messageFor(api, args.id);
       const mailboxes = (await api.mailboxes.list()) ?? [];
-      const folder = findFolder(mailboxes, args.folder);
-      if (!folder) throw new Error(`no folder "${text(args.folder, 100)}"; the folders are: ${mailboxes.map((m) => m.name).join(', ')}`);
+      ownMessageOnly(email, mailboxes, name);
+      // Into one of the user's own folders: the webmail moves nowhere else.
+      const own = foldersOf(mailboxes);
+      const folder = findFolder(own, args.folder);
+      if (!folder) throw new Error(`no folder "${text(args.folder, 100)}"; the folders are: ${own.map((m) => m.name).join(', ')}`);
       // By the folder's role, whatever it is called ("Spam", "Papierkorb"):
       // into Trash or Junk, or out of Junk.
       const alwaysAsk = ASK_FOLDER_ROLES.has(folder.role) || inJunk(email, mailboxes) || !isOpenMessage(email, ctx);
@@ -318,7 +343,11 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
       const parts = [];
       if (read !== undefined) parts.push(t(read ? 'action.mark_read' : 'action.mark_unread', { subject }));
       if (starred !== undefined) parts.push(t(starred ? 'action.star' : 'action.unstar', { subject }));
-      return { summary: parts.join(' · '), plan: { name, email, read, starred } };
+      // A message of a team or shared mailbox is marked in its account: the
+      // same id names another message in the user's own.
+      const mailboxes = await foldersOrNull(api);
+      const accountId = mailboxes ? otherAccountOf(email, mailboxes) : undefined;
+      return { summary: parts.join(' · '), plan: { name, email, read, starred, ...(accountId ? { accountId } : {}) } };
     }
     case 'create_event': {
       const title = text(args.title);
@@ -444,9 +473,8 @@ export async function performAction(api, plan) {
     }
     case 'mark_message': {
       const { email, read, starred } = plan;
-      if (read !== undefined) await (read ? api.email.setKeyword(email.id, '$seen') : api.email.removeKeyword(email.id, '$seen'));
-      if (starred !== undefined) await (starred ? api.email.setKeyword(email.id, '$flagged') : api.email.removeKeyword(email.id, '$flagged'));
-      const undo = { kind: 'keywords', id: email.id };
+      await markKeywords(api, email.id, plan.accountId, { read, starred });
+      const undo = { kind: 'keywords', id: email.id, ...(plan.accountId ? { accountId: plan.accountId } : {}) };
       if (read !== undefined) undo.read = !!email.isRead;
       if (starred !== undefined) undo.starred = !!email.isFlagged;
       return { text: `Done: the message "${email.subject ?? ''}" is marked.`, undo };
@@ -477,6 +505,14 @@ export async function performAction(api, plan) {
   }
 }
 
+/** Set or clear read and starred on a message, in its account when that is another one. */
+async function markKeywords(api, id, accountId, { read, starred }) {
+  const account = accountId ? [accountId] : [];
+  const set = (keyword, on) => (on ? api.email.setKeyword(id, keyword, ...account) : api.email.removeKeyword(id, keyword, ...account));
+  if (read !== undefined) await set('$seen', read);
+  if (starred !== undefined) await set('$flagged', starred);
+}
+
 /** Take an action back. */
 export async function undoAction(api, undo) {
   const area = undo?.action ? areaAction(undo.action) : null;
@@ -484,8 +520,7 @@ export async function undoAction(api, undo) {
   switch (undo?.kind) {
     case 'move': return api.email.move([undo.id], undo.mailboxId);
     case 'keywords':
-      if (undo.read !== undefined) await (undo.read ? api.email.setKeyword(undo.id, '$seen') : api.email.removeKeyword(undo.id, '$seen'));
-      if (undo.starred !== undefined) await (undo.starred ? api.email.setKeyword(undo.id, '$flagged') : api.email.removeKeyword(undo.id, '$flagged'));
+      await markKeywords(api, undo.id, undo.accountId, { read: undo.read, starred: undo.starred });
       return undefined;
     case 'event': return api.calendar.deleteEvent(undo.id);
     case 'task': return api.tasks.delete(undo.id);

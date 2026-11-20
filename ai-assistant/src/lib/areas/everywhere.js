@@ -7,6 +7,7 @@ import { clock, dateIn, addDays, whenIn } from '../clock.js';
 import { clip } from '../prompts.js';
 import { normalizeWidget } from '../widgets.js';
 import { has } from '../caps.js';
+import { foldersOf } from '../accounts.js';
 
 /** The views of the app-side-panel. Mail has the reader's panel. */
 export const VIEWS = ['calendar', 'contacts', 'files', 'settings'];
@@ -108,7 +109,8 @@ const isUnread = (m) => !(Array.isArray(m.keywords) && m.keywords.includes('$see
 
 async function mailboxByRole(api, role) {
   try {
-    const list = (await api.mailboxes.list()) ?? [];
+    // The user's own inbox and sent folder, not a team mailbox's.
+    const list = foldersOf((await api.mailboxes.list()) ?? []);
     return list.find((m) => m.role === role) ?? null;
   } catch {
     return null;

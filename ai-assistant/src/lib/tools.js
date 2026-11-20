@@ -9,6 +9,8 @@ import { clip } from './prompts.js';
 import { userZone, whenIn } from './clock.js';
 import { calendarWidget, contactParts, contactsWidget, emailsWidget } from './widgets.js';
 import { areaTool, areaTools, offered } from './areas/index.js';
+import { accountOfId, findAccount, foldersOf, inOtherAccount, mailAccounts, messageRef, parseMessageRef } from './accounts.js';
+import { findFolder } from './actions.js';
 
 /** Longest tool result handed to the model, in characters. */
 export const MAX_TOOL_RESULT = 8000;
@@ -46,7 +48,7 @@ const DEFINITIONS = {
     },
   },
   search_mail: {
-    description: 'Search the user\'s mail. Returns the newest matching messages (id, sender, date, subject, a preview); read one with read_message. Give at least one of text, from, subject, after, before.',
+    description: 'Search the user\'s mail. Returns the newest matching messages (id, sender, date, subject, a preview); read one with read_message. Give at least one of text, from, subject, after, before. Searches the account of the open folder unless account names another: all folders of the user\'s own account, one folder (the inbox unless folder names another) of a team or shared mailbox.',
     parameters: {
       type: 'object',
       properties: {
@@ -55,6 +57,8 @@ const DEFINITIONS = {
         subject: { type: 'string', description: 'Words of the subject' },
         after: { type: 'string', description: 'Only messages after this date, YYYY-MM-DD' },
         before: { type: 'string', description: 'Only messages before this date, YYYY-MM-DD' },
+        account: { type: 'string', description: 'Whose mail: the name or address of one of the user\'s mail accounts (their own, a team mailbox or one shared with them)' },
+        folder: { type: 'string', description: 'Only this folder, by name or role (inbox, sent, archive)' },
         limit: { type: 'integer', description: 'How many, 1 to 10 (default 5)' },
       },
       additionalProperties: false,
@@ -74,7 +78,7 @@ const DEFINITIONS = {
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   read_message: {
-    description: 'Read one message of the user\'s mail by the id search_mail gave: sender, date, subject and text.',
+    description: 'Read one message of the user\'s mail by the id search_mail gave (with the account in front for a team or shared mailbox): sender, date, subject and text.',
     parameters: {
       type: 'object',
       properties: { id: { type: 'string', description: 'The message id from search_mail' } },
@@ -110,8 +114,8 @@ function addDays(date, days) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Events as lines the model reads: one per event, day first. */
-export function formatEvents(events, { from, to, locale = 'en', zone } = {}) {
+/** Events as lines the model reads: one per event, day first, with its calendar where there are several. */
+export function formatEvents(events, { from, to, locale = 'en', zone, calendars = {} } = {}) {
   if (!events.length) return `No events between ${from} and ${to}.`;
   const fmt = (value) => {
     if (!value) return '';
@@ -124,7 +128,8 @@ export function formatEvents(events, { from, to, locale = 'en', zone } = {}) {
   const lines = events.slice(0, 60).map((e) => {
     const when = e.isAllDay ? `${String(e.start ?? '').slice(0, 10)} (all day)` : `${fmt(e.utcStart ?? e.start)}${e.utcEnd ? ` to ${fmt(e.utcEnd)}` : (e.duration ? `, ${e.duration}` : '')}`;
     const where = e.location ? ` at ${e.location}` : '';
-    return `- ${when}: ${e.title || '(no title)'}${where}`;
+    const calendar = calendars[e.calendarId] ? ` [${calendars[e.calendarId]}]` : '';
+    return `- ${when}: ${e.title || '(no title)'}${where}${calendar}`;
   });
   if (events.length > 60) lines.push(`(${events.length - 60} more events not listed)`);
   return `Events between ${from} and ${to}, in the user's time zone:\n${lines.join('\n')}`;
@@ -157,12 +162,13 @@ export function formatMySettings(settings) {
   return `The user's settings (internal names; find_setting gives the names they see):\n${lines.join('\n')}`;
 }
 
-/** Search results as lines the model reads, with the ids read_message takes. */
-export function formatMessages(messages, query, zone) {
+/** Search results as lines the model reads, with the ids read_message takes; `where` names the folder searched. */
+export function formatMessages(messages, query, zone, where = '') {
   const what = Object.entries(query).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
-  if (!messages.length) return `No messages match (${what}).`;
+  const scope = where ? ` in ${where}` : '';
+  if (!messages.length) return `No messages${scope} match (${what}).`;
   const lines = messages.map((m) => `- id ${m.id} | ${zone && m.receivedAt ? whenIn(zone, m.receivedAt) : (m.receivedAt ?? '')} | from ${m.from?.map(person).join(', ') || '?'} | ${m.subject || '(no subject)'}${m.preview ? ` | ${String(m.preview).slice(0, 120)}` : ''}`);
-  return `Messages matching (${what}), newest first:\n${lines.join('\n')}`;
+  return `Messages${scope} matching (${what}), newest first:\n${lines.join('\n')}`;
 }
 
 function messageText(email, zone) {
@@ -175,6 +181,62 @@ function messageText(email, zone) {
  * card for the panel; throws when the lookup failed (the chat tells the
  * model so).
  */
+/**
+ * Where search_mail looks: {} for all of the user's own mail, else the
+ * folder (mailboxId), its account when that is another one, and a label.
+ * Without `account` it is the account of the open folder. The webmail
+ * searches another account one folder at a time.
+ */
+async function searchScope(api, args) {
+  const wantedAccount = String(args.account ?? '').trim().slice(0, 200);
+  const wantedFolder = String(args.folder ?? '').trim().slice(0, 200);
+  const accounts = await mailAccounts(api);
+  let account = null;
+  if (wantedAccount) {
+    account = findAccount(accounts, wantedAccount);
+    if (!account) {
+      throw new Error(accounts.length > 1
+        ? `no account "${wantedAccount}"; the user's accounts are: ${accounts.map((a) => a.name).join(', ')}`
+        : 'only the user\'s own mail can be searched here');
+    }
+  } else {
+    account = accounts.find((a) => a.isOpen) ?? null;
+  }
+  const other = account && account.kind !== 'personal' ? account : null;
+  if (!other && !wantedFolder) return {};
+  const folders = foldersOf((await api.mailboxes.list()) ?? [], other?.accountId);
+  if (other && !folders.length) throw new Error(`the folders of ${other.name} can't be read`);
+  const folder = wantedFolder ? findFolder(folders, wantedFolder) : folders.find((m) => m.role === 'inbox');
+  if (!folder) {
+    const names = folders.map((m) => m.name).join(', ');
+    throw new Error(wantedFolder
+      ? `no folder "${wantedFolder}"${other ? ` in ${other.name}` : ''}; the folders are: ${names}`
+      : `${other.name} has no inbox; give folder, one of: ${names}`);
+  }
+  const own = accounts.find((a) => a.kind === 'personal');
+  const hint = other && !wantedAccount && own ? ` (the open folder's account; give account "${own.name}" for the user's own mail)` : '';
+  return { mailboxId: folder.id, accountId: other?.accountId, label: `${other ? `${other.name}, folder ${folder.name}` : `the folder ${folder.name}`}${hint}` };
+}
+
+/** Names for the calendars of a lookup's events, "<name> of <account>" for another account's. */
+async function calendarNames(api, events) {
+  const ids = new Set(events.map((e) => e.calendarId).filter(Boolean));
+  if (ids.size < 2 || typeof api.calendar?.listCalendars !== 'function') return {};
+  try {
+    const calendars = (await api.calendar.listCalendars()) ?? [];
+    const accounts = [...ids].some(inOtherAccount) ? await mailAccounts(api) : [];
+    const names = {};
+    for (const c of calendars) {
+      if (!ids.has(c.id) || !c.name) continue;
+      const account = accounts.find((a) => a.accountId === accountOfId(c.id));
+      names[c.id] = account ? `${c.name} of ${account.name}` : c.name;
+    }
+    return names;
+  } catch {
+    return {};
+  }
+}
+
 /** The user's time zone for a lookup: the panel's, else the host's. */
 function zoneOf(api, ctx) {
   return ctx.zone || userZone(api);
@@ -201,8 +263,9 @@ export async function runTool(api, name, args = {}, ctx = {}) {
       if (addDays(from, MAX_CALENDAR_DAYS) < to) to = addDays(from, MAX_CALENDAR_DAYS);
       // `to` of the api is exclusive: the day after the last day.
       const events = (await api.calendar.getEvents({ from, to: addDays(to, 1) })) ?? [];
+      const calendars = await calendarNames(api, events);
       return {
-        text: clip(formatEvents(events, { from, to, locale: api.i18n?.getLocale?.() ?? 'en', zone: zoneOf(api, ctx) }), MAX_TOOL_RESULT),
+        text: clip(formatEvents(events, { from, to, locale: api.i18n?.getLocale?.() ?? 'en', zone: zoneOf(api, ctx), calendars }), MAX_TOOL_RESULT),
         widget: calendarWidget(events, { from, to, zone: zoneOf(api, ctx) }),
       };
     }
@@ -226,8 +289,11 @@ export async function runTool(api, name, args = {}, ctx = {}) {
       }
       if (!Object.keys(query).length) throw new Error('give at least one of text, from, subject, after or before');
       const limit = Math.min(MAX_SEARCH_RESULTS, Math.max(1, Number(args.limit) || 5));
-      const messages = (await api.email.search({ ...query, limit })) ?? [];
-      return { text: clip(formatMessages(messages, query, zoneOf(api, ctx)), MAX_TOOL_RESULT), widget: emailsWidget(messages) };
+      const where = await searchScope(api, args);
+      const messages = (await api.email.search({ ...query, ...(where.mailboxId ? { mailboxId: where.mailboxId } : {}), limit })) ?? [];
+      // Another account's messages go to the model with their account in front.
+      const listed = where.accountId ? messages.map((m) => ({ ...m, id: messageRef(m.id, where.accountId) })) : messages;
+      return { text: clip(formatMessages(listed, query, zoneOf(api, ctx), where.label), MAX_TOOL_RESULT), widget: emailsWidget(messages) };
     }
     case 'find_setting': {
       const query = String(args.query ?? '').trim().slice(0, 200);
@@ -240,9 +306,9 @@ export async function runTool(api, name, args = {}, ctx = {}) {
       return clip(formatMySettings(settings), MAX_TOOL_RESULT);
     }
     case 'read_message': {
-      const id = String(args.id ?? '').trim();
+      const { id, accountId } = parseMessageRef(args.id);
       if (!id) throw new Error('id is empty');
-      const email = await api.email.get(id);
+      const email = await api.email.get(id, ...(accountId ? [accountId] : []));
       if (!email) throw new Error('no message with that id');
       return messageText(email, zoneOf(api, ctx));
     }
