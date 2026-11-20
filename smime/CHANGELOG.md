@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.6.0 (2026-11-20)
+
 ### Changed
 - Encrypted mail that isn't also signed now opens with the note that it has no integrity protection, and external content stays off. That's the price of the format other mail programs read; signed and encrypted mail, the default, is not affected
 
