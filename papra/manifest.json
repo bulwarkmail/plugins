@@ -1,7 +1,7 @@
 {
   "id": "papra",
   "name": "Papra",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "author": "Bulwark Mail Community",
   "description": "Attach documents from Papra to the message you are writing, and save attachments and whole messages to a Papra organization.",
   "type": "ui-extension",
