@@ -6,7 +6,25 @@ import { buildPrompt } from './prompts.js';
 import { streamCompletion } from './client.js';
 import { AiError } from './errors.js';
 
-const PREFS_KEY = 'prefs';
+export const PREFS_KEY = 'prefs';
+
+/**
+ * The user's choices and their OK for a service go with the account to
+ * every browser (Bulwark's settings sync; an older webmail ignores the
+ * option and keeps them in this browser). The key itself is a credential on
+ * the webmail server already.
+ */
+const SYNC = { sync: true };
+
+/** Store a choice for every browser; in this browser only when the account's synced space is full. */
+async function setSynced(api, key, value) {
+  try {
+    await api.storage.set(key, value, SYNC);
+  } catch (err) {
+    if (!/full/i.test(String(err?.message ?? err))) throw err;
+    await api.storage.set(key, value);
+  }
+}
 
 export const PROVIDER_LABELS = { openai: 'OpenAI-compatible', anthropic: 'Anthropic' };
 
@@ -21,7 +39,7 @@ export async function loadPrefs(api) {
 
 export async function savePrefs(api, patch) {
   const next = { ...(await loadPrefs(api)), ...patch };
-  await api.storage.set(PREFS_KEY, next);
+  await setSynced(api, PREFS_KEY, next);
   return next;
 }
 
@@ -100,8 +118,24 @@ export async function ensureConsent(api, endpoint, ask = confirmWithHost(api)) {
   const key = consentKey(endpoint);
   if (await api.storage.get(key)) return true;
   const ok = (await ask(endpoint)) === true;
-  if (ok) await api.storage.set(key, true);
+  if (ok) await setSynced(api, key, true);
   return ok;
+}
+
+/**
+ * At start: hand the choices made in this browser before they synced to the
+ * account. The host keeps the account's copy when it has one, so a browser
+ * that never chose anything doesn't overwrite another one's choices.
+ */
+export async function syncChoices(api) {
+  try {
+    const keys = await api.storage.keys();
+    for (const key of keys) {
+      if (key !== PREFS_KEY && !key.startsWith(`consent:v${CONSENT_VERSION}:`)) continue;
+      const value = await api.storage.get(key);
+      if (value !== null && value !== undefined) await setSynced(api, key, value);
+    }
+  } catch { /* storage blocked: the choices stay in this browser */ }
 }
 
 /**

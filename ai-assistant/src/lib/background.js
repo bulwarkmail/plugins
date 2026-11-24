@@ -6,7 +6,7 @@
 // buttons only show when they can work.
 
 import { registerGrammarChecker } from './underlines.js';
-import { loadSetup } from './assistant.js';
+import { loadSetup, syncChoices } from './assistant.js';
 import { withStrings } from './i18n.js';
 import { areaAllowed } from './config.js';
 import { has } from './caps.js';
@@ -255,6 +255,7 @@ export function createBackground(api, { now = () => Date.now(), every = (fn, ms)
       await forgetComposerChats();
       await forgetOldReaderChats();
       await api.storage.remove(COMPOSER_CONTEXT_KEY).catch(() => {});
+      await syncChoices(api);
       await markVisit();
       await refresh(true);
       // Bulwark 1.20 and later: the grammar check's suggestions can show as

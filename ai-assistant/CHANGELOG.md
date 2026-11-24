@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Fixed
+- Your settings, the own key's service, address and model and the services you confirmed follow your account to other browsers (with Bulwark's settings sync, once the webmail syncs plugin settings), so the assistant works there without setting it up again #27
 - Team and shared mailboxes: the mail search looks in the mailbox whose folder is open, or the one you name ("search the info@ mailbox"), one folder at a time, the inbox unless you name another. Marking and tagging change the message in its own mailbox, not one with the same id in yours. Archive and move say right away that they work only for your own mail, instead of failing after you agreed, and the calendar lookup names each event's calendar and mailbox #39
 
 ## 2.2.1 (2026-11-03)

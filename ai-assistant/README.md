@@ -385,6 +385,10 @@ waiting for a reply. When the administrator allows it, a user can connect their 
 they pick the service and address here, and type the key into the
 webmail's own dialog, so the plugin never sees it. Their key is stored
 encrypted on the server and only sent to the address they approved there.
+With a Bulwark that syncs plugin settings, the choices in these settings (the own key's service,
+address and model included) and the services a user confirmed follow the
+account to their other browsers through Bulwark's settings sync, so the
+assistant works there without setting it up again.
 
 ## What is sent where
 
@@ -424,7 +428,9 @@ lookups and actions only when they are switched on. When an update makes
 the assistant send more, the notice comes once more.
 
 Nothing else leaves the webmail. In the browser the plugin keeps your
-choices, which services you confirmed, the chats of the open composer and
+choices and which services you confirmed (where Bulwark syncs plugin settings, also
+in the account's synced settings on the webmail server, encrypted, so your
+other browsers get them), the chats of the open composer and
 of the messages you talked about, the earlier chats, your saved prompts
 and the notes you asked it to remember, when the webmail was last open and
 your last Catch me up (for "unread since"), and, while a composer is open, the
