@@ -35,6 +35,7 @@ with the tools to build and test them:
 | [nextcloud](nextcloud/) | Attach files from Nextcloud, send large files as share links, save attachments and messages there, add Talk meetings to events | `http:proxy` `ui:settings-section` `ui:composer-toolbar` `email:read` `email:send` `email:blob-write` `email:blob-read` `ui:toolbar` `ui:app-page` `compose:open` `ui:download-file` `calendar:read` `ui:calendar-action` |
 | [outlook-style-headers](outlook-style-headers/) | Outlook-style From / Sent / To / Subject block above quoted replies and forwards | `email:send` |
 | [paperless](paperless/) | Send attachments and messages to Paperless-ngx, find documents there and attach them to new mail | `http:proxy` `admin:config` `email:read` `email:blob-read` `email:blob-write` `compose:open` `ui:composer-toolbar` `ui:message-list` `ui:toolbar` `ui:app-page` `ui:settings-section` `ui:notifications` `ui:download-file` |
+| [papra](papra/) | Attach documents from Papra in the composer and save attachments and whole messages to Papra | `http:proxy` `admin:config` `email:read` `email:blob-read` `email:blob-write` `ui:composer-toolbar` `ui:toolbar` `ui:settings-section` |
 | [plugin-template](plugin-template/) | A starting point for a new plugin | `email:read` `ui:sidebar-widget` |
 | [quick-notes](quick-notes/) | Notes per message, shown again when you open it | `email:read` `ui:email-banner` `ui:email-details` |
 | [reply-all-guardrail](reply-all-guardrail/) | Asks before a reply-all (or any send) to more recipients than a limit | `email:read` `email:send` `admin:config` |
