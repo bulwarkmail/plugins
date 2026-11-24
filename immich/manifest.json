@@ -1,7 +1,7 @@
 {
   "id": "immich",
   "name": "Immich",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "author": "Bulwark Mail Community",
   "description": "Attach photos and videos from Immich to the message you are writing, and save photos and videos you receive to Immich.",
   "type": "ui-extension",
