@@ -27,6 +27,7 @@ with the tools to build and test them:
 | [external-mail-warning](external-mail-warning/) | Retired: Bulwark 1.19 does this itself (Organisation > Security). On older versions, asks before sending outside your safe domains and marks mail from outside with a banner | `email:read` `email:send` `identity:read` `ui:email-banner` `admin:config` |
 | [gravatar](gravatar/) | Sender pictures from Gravatar | `email:read` `http:fetch` |
 | [hello-world](hello-world/) | The smallest example: logs app and mail events to the console | `email:read` |
+| [immich](immich/) | Attach photos and videos from Immich in the composer and save the ones you receive to Immich | `http:proxy` `admin:config` `email:read` `email:blob-read` `email:blob-write` `ui:composer-toolbar` `ui:settings-section` |
 | [impersonation-notice](impersonation-notice/) | A banner while an admin is signed in as another user (Stalwart master user), with a way back | `account:read` `auth:emit` `ui:app-top-banner` `admin:config` |
 | [jitsi-meet](jitsi-meet/) | An "Add Jitsi Meeting" button in the event form | `calendar:read` `calendar:write` `ui:calendar-action` `http:post` |
 | [languagetool](languagetool/) | Underlines spelling, grammar and style mistakes while you write, checked by your own LanguageTool server (or the public API, if the admin allows it); never for signed or encrypted mail | `compose:check` `http:proxy` `ui:settings-section` |
