@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.3.0 (2026-11-24)
+
 ### Added
 - "From Paperless" in the composer's Attach menu: find documents in Paperless and attach them to the message you are writing #24
 
