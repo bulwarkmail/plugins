@@ -5,7 +5,7 @@ import {
 } from '@plugin-host/ui';
 import { getApi, t, formatDate } from './host.js';
 import { ConnectEmptyState, ErrorAlert, PickOne, TagPicker, useConnection, useTaxonomies } from './common.jsx';
-import { attachDocuments, downloadDocument } from '../lib/documents.js';
+import { attachDocuments, attachToComposer, downloadDocument } from '../lib/documents.js';
 
 const nameOf = (list, id) => list?.find((x) => x.id === id)?.name || '';
 const EMPTY_FILTERS = { text: '', tags: [], correspondent: null, documentType: null, from: '', to: '' };
@@ -93,9 +93,12 @@ function DocumentDetails({ client, doc, tax }) {
 /**
  * Search Paperless and use documents in mail. The app page (Page with a
  * header, at the app's content width) and the "Browse documents" dialog
- * (the same content, its buttons in the dialog footer).
+ * (the same content, its buttons in the dialog footer). Opened from a
+ * composer's Attach menu (`composerId`), Attach adds the documents to that
+ * message instead of opening a new one; `onClose(count)` then says how many
+ * went in.
  */
-export function DocumentBrowser({ onClose, inDialog = false }) {
+export function DocumentBrowser({ onClose, inDialog = false, composerId = '' }) {
   const { connection, client, loading, refresh } = useConnection();
   const { tax } = useTaxonomies(client);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -112,6 +115,8 @@ export function DocumentBrowser({ onClose, inDialog = false }) {
   const [busy, setBusy] = useState('');
   const phone = usePhone();
   const api = getApi();
+  const attachedCount = useRef(0);
+  const close = () => onClose?.(attachedCount.current);
 
   // Only the latest search may fill the list: an earlier, slower one must
   // not overwrite it.
@@ -151,9 +156,22 @@ export function DocumentBrowser({ onClose, inDialog = false }) {
   const attach = async (docs) => {
     setBusy(t('common.working'));
     setError(null);
+    const onProgress = (i, n) => setBusy(t('browse.attaching', { current: i + 1, total: n }));
     try {
-      await attachDocuments(api, client, docs, (i, n) => setBusy(t('browse.attaching', { current: i + 1, total: n })));
-      if (inDialog) onClose?.();
+      if (composerId) {
+        // Documents already in the message leave the selection, so trying
+        // again after a failure doesn't attach them twice.
+        await attachToComposer(api, client, composerId, docs, {
+          onProgress,
+          onAttached: (doc) => {
+            attachedCount.current++;
+            setPicked((prev) => { const n = new Set(prev); n.delete(doc.id); return n; });
+          },
+        });
+      } else {
+        await attachDocuments(api, client, docs, onProgress);
+      }
+      if (inDialog) close();
     } catch (err) {
       setError(err);
     } finally {
@@ -174,6 +192,10 @@ export function DocumentBrowser({ onClose, inDialog = false }) {
   };
 
   const openInPaperless = (doc) => { void api.ui.openExternalUrl(client.documentUrl(doc.id)); };
+  const attachLabel = (n) => {
+    if (composerId) return n ? t('browse.attach_here_count', { count: n }) : t('browse.attach_here');
+    return n ? t('browse.attach_count', { count: n }) : t('browse.attach');
+  };
   const togglePick = (id) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const wrap = (header, body) => (inDialog
@@ -216,7 +238,7 @@ export function DocumentBrowser({ onClose, inDialog = false }) {
               { id: 'back', label: t('browse.back'), variant: 'secondary' },
               { id: 'open', label: t('browse.open_in_paperless'), variant: 'secondary' },
               { id: 'download', label: t('browse.download'), variant: 'secondary', disabled: !!busy },
-              { id: 'attach', label: t('browse.attach'), variant: 'primary', busy: !!busy },
+              { id: 'attach', label: attachLabel(0), variant: 'primary', busy: !!busy },
             ]}
             onClick={(id) => {
               if (id === 'back') back();
@@ -336,10 +358,10 @@ export function DocumentBrowser({ onClose, inDialog = false }) {
         <DialogButtons
           buttons={[
             { id: 'cancel', label: t('common.cancel'), variant: 'secondary' },
-            { id: 'attach', label: picked.size ? t('browse.attach_count', { count: picked.size }) : t('browse.attach'), variant: 'primary', disabled: pickedDocs.length === 0, busy: !!busy },
+            { id: 'attach', label: attachLabel(picked.size), variant: 'primary', disabled: pickedDocs.length === 0, busy: !!busy },
           ]}
           onClick={(id) => {
-            if (id === 'cancel') onClose?.();
+            if (id === 'cancel') close();
             else if (id === 'attach') void attach(pickedDocs);
           }}
         />

@@ -1,6 +1,6 @@
 # Paperless-ngx
 
-Send attachments and whole messages from Bulwark to [Paperless-ngx](https://docs.paperless-ngx.com/), find your documents there and attach them to new mail.
+Send attachments and whole messages from Bulwark to [Paperless-ngx](https://docs.paperless-ngx.com/), find your documents there and attach them to mail.
 
 ![Send to Paperless](screenshots/send-dialog-light.png)
 
@@ -11,6 +11,7 @@ Send attachments and whole messages from Bulwark to [Paperless-ngx](https://docs
 - **Already in Paperless.** Each file's SHA-256 (Paperless 3) and MD5 (older versions) are compared with the documents in Paperless. A file that is there already is flagged with its title and left unticked; "Open in Paperless" in the dialog opens the copy that is there.
 - **Follows the import.** After the upload the plugin watches the consume task and tells you when the document is filed or why it failed, for example a duplicate or a file type Paperless can't read. The notice has an "Open in Paperless" link to the new document (to the copy already there for a duplicate). When Paperless doesn't name the document, or the plugin stops waiting, the link opens the Paperless document list filtered by the title. Open tasks survive a reload; it gives up after 15 minutes.
 - **Documents page** in the navigation: search title and text, filter by tags, correspondent, document type and date, see a preview and the text, open a document in Paperless, download the original, or attach one or several documents to a new message. The same browser opens from Settings > Paperless-ngx > Browse documents.
+- **From Paperless** in the composer's Attach menu: the same document browser, and Attach adds the picked documents to the message you are writing.
 - **Rules for new mail** (Settings > Paperless-ngx): "mail from billing@acme.com (or acme.com) with 'Invoice' in the subject → send the attachments (or the whole message) with these tags, correspondent, type and storage path". A rule is off until you switch it on and only runs on mail that arrives after that, never on mail already in the mailbox. Each message is handled once.
 
 ![Documents](screenshots/documents-light.png)
@@ -62,6 +63,7 @@ The webmail's plugin proxy forwards uploads as a stream (`Transfer-Encoding: chu
 | `email:blob-read` | The bytes of an attachment or of the whole message, to upload them and to compare checksums. |
 | `email:blob-write` | Uploads a Paperless document to the mail server to attach it to a new message. |
 | `compose:open` | Opens the composer with the attached documents. |
+| `ui:composer-toolbar` | "From Paperless" in the composer's Attach menu, which attaches documents to the message being written. |
 | `ui:message-list`, `ui:toolbar` | The buttons in the selection toolbar and the reader toolbar. |
 | `ui:app-page` | The documents page in the navigation. |
 | `ui:settings-section` | Connection and rules in Settings. |

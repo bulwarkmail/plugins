@@ -37,6 +37,10 @@ export const hooks = {
 
 function Dialog(props) {
   if (props.view === 'send') return h(SendDialog, props);
+  // From a composer's Attach menu the documents go into that message.
+  if (props.composerId) {
+    return h(DocumentBrowser, { inDialog: true, composerId: props.composerId, onClose: (attached) => props.onResult?.({ attached }) });
+  }
   return h(DocumentBrowser, { inDialog: true, onClose: () => props.onResult?.(null) });
 }
 

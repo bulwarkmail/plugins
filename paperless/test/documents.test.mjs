@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
-import { attachDocuments, downloadDocument, MAX_ATTACH_BYTES } from '../src/lib/documents.js';
+import { attachDocuments, attachToComposer, downloadDocument, MAX_ATTACH_BYTES } from '../src/lib/documents.js';
 
 function client(files) {
   return { download: async (id) => files[id] };
@@ -40,6 +40,36 @@ describe('attachDocuments', () => {
     await expect(attachDocuments(api, client({ 1: big }), [{ id: 1 }])).rejects.toMatchObject({ key: 'error.attach_too_large' });
     expect(api.calls('jmap.uploadBlob')).toHaveLength(0);
     expect(api.calls('compose.open')).toHaveLength(0);
+  });
+});
+
+describe('attachToComposer', () => {
+  const files = {
+    1: { data: new Uint8Array([1, 2, 3]).buffer, name: 'a.pdf', type: 'application/pdf' },
+    2: { data: new Uint8Array([4]).buffer, name: 'b.png', type: 'image/png' },
+  };
+  const upload = async (bytes, name, type) => ({ blobId: `blob-${name}`, size: bytes.byteLength, type });
+
+  it('adds each document to the message being written, not a new one', async () => {
+    const api = fakeApi({ handlers: { 'jmap.uploadBlob': upload, 'composer.attach': async () => true } });
+    const done = [];
+    const count = await attachToComposer(api, client(files), 'c-7', [{ id: 1 }, { id: 2 }], { onAttached: (d) => done.push(d.id) });
+    expect(count).toBe(2);
+    expect(api.calls('composer.attach').map((c) => c.args)).toEqual([
+      ['c-7', { blobId: 'blob-a.pdf', name: 'a.pdf', type: 'application/pdf', size: 3 }],
+      ['c-7', { blobId: 'blob-b.png', name: 'b.png', type: 'image/png', size: 1 }],
+    ]);
+    expect(done).toEqual([1, 2]);
+    expect(api.calls('compose.open')).toHaveLength(0);
+  });
+
+  it('stops with the file name when the composer refuses one', async () => {
+    let n = 0;
+    const api = fakeApi({ handlers: { 'jmap.uploadBlob': upload, 'composer.attach': async () => (++n === 1) } });
+    const done = [];
+    await expect(attachToComposer(api, client(files), 'c-7', [{ id: 1 }, { id: 2 }], { onAttached: (d) => done.push(d.id) }))
+      .rejects.toMatchObject({ key: 'error.attach_refused', vars: { name: 'b.png' } });
+    expect(done).toEqual([1]);
   });
 });
 

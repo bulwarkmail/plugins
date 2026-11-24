@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- "From Paperless" in the composer's Attach menu: find documents in Paperless and attach them to the message you are writing #24
+
 ### Fixed
 - Send to Paperless has its own icon in the reader toolbar, the attachment menu and bulk actions, so it no longer looks like Archive #45 (thanks @mmomjian)
 

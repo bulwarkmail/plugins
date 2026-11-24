@@ -12,6 +12,7 @@
     "email:blob-read",
     "email:blob-write",
     "compose:open",
+    "ui:composer-toolbar",
     "ui:message-list",
     "ui:toolbar",
     "ui:app-page",
@@ -196,7 +197,12 @@
       "rules.summary_subject": "البريد من {from} الذي يحتوي موضوعه على «{subject}»",
       "rules.on": "مفعّلة",
       "rules.off": "متوقفة. فعّلها لاستخدامها.",
-      "rules.delete": "حذف القاعدة الخاصة بـ {from}"
+      "rules.delete": "حذف القاعدة الخاصة بـ {from}",
+      "composer.attach_menu": "من Paperless",
+      "composer.attached": "مرفق من Paperless: {count}",
+      "browse.attach_here": "إرفاق",
+      "browse.attach_here_count": "إرفاق {count}",
+      "error.attach_refused": "تعذّرت إضافة {name} إلى الرسالة. قد تكون الرسالة كبيرة جدًا."
     },
     "ca": {
       "action.send": "Envia a Paperless",
@@ -321,7 +327,12 @@
       "rules.summary_subject": "Correu de {from} amb «{subject}» a l'assumpte",
       "rules.on": "Activada",
       "rules.off": "Desactivada. Activeu-la per fer-la servir.",
-      "rules.delete": "Suprimeix la regla per a {from}"
+      "rules.delete": "Suprimeix la regla per a {from}",
+      "composer.attach_menu": "Des de Paperless",
+      "composer.attached": "Adjuntats des de Paperless: {count}",
+      "browse.attach_here": "Adjunta",
+      "browse.attach_here_count": "Adjunta {count}",
+      "error.attach_refused": "No s'ha pogut afegir {name} al missatge. Potser el missatge és massa gran."
     },
     "cs": {
       "action.send": "Odeslat do Paperless",
@@ -446,7 +457,12 @@
       "rules.summary_subject": "Pošta od {from} s „{subject}“ v předmětu",
       "rules.on": "Zapnuto",
       "rules.off": "Vypnuto. Zapněte ho, chcete-li ho používat.",
-      "rules.delete": "Odstranit pravidlo pro {from}"
+      "rules.delete": "Odstranit pravidlo pro {from}",
+      "composer.attach_menu": "Z Paperless",
+      "composer.attached": "Připojeno z Paperless: {count}",
+      "browse.attach_here": "Připojit",
+      "browse.attach_here_count": "Připojit ({count})",
+      "error.attach_refused": "{name} se nepodařilo přidat do zprávy. Zpráva je možná příliš velká."
     },
     "da": {
       "action.send": "Send til Paperless",
@@ -571,7 +587,12 @@
       "rules.summary_subject": "Mail fra {from} med »{subject}« i emnet",
       "rules.on": "Til",
       "rules.off": "Fra. Slå den til for at bruge den.",
-      "rules.delete": "Slet reglen for {from}"
+      "rules.delete": "Slet reglen for {from}",
+      "composer.attach_menu": "Fra Paperless",
+      "composer.attached": "Vedhæftet fra Paperless: {count}",
+      "browse.attach_here": "Vedhæft",
+      "browse.attach_here_count": "Vedhæft {count}",
+      "error.attach_refused": "{name} kunne ikke føjes til beskeden. Beskeden er måske for stor."
     },
     "de": {
       "action.send": "An Paperless senden",
@@ -696,7 +717,12 @@
       "rules.summary_subject": "Mails von {from} mit „{subject}“ im Betreff",
       "rules.on": "An",
       "rules.off": "Aus. Schalten Sie sie ein, um sie zu nutzen.",
-      "rules.delete": "Regel für {from} löschen"
+      "rules.delete": "Regel für {from} löschen",
+      "composer.attach_menu": "Aus Paperless",
+      "composer.attached": "Aus Paperless angehängt: {count}",
+      "browse.attach_here": "Anhängen",
+      "browse.attach_here_count": "{count} anhängen",
+      "error.attach_refused": "{name} konnte nicht zur Nachricht hinzugefügt werden. Die Nachricht ist vielleicht zu groß."
     },
     "en": {
       "action.send": "Send to Paperless",
@@ -821,7 +847,12 @@
       "rules.summary_subject": "Mail from {from} with “{subject}” in the subject",
       "rules.on": "On",
       "rules.off": "Off. Switch it on to use it.",
-      "rules.delete": "Delete the rule for {from}"
+      "rules.delete": "Delete the rule for {from}",
+      "composer.attach_menu": "From Paperless",
+      "composer.attached": "Attached from Paperless: {count}",
+      "browse.attach_here": "Attach",
+      "browse.attach_here_count": "Attach {count}",
+      "error.attach_refused": "The message didn't take {name}. It may be too large."
     },
     "es": {
       "action.send": "Enviar a Paperless",
@@ -946,7 +977,12 @@
       "rules.summary_subject": "Correo de {from} con «{subject}» en el asunto",
       "rules.on": "Activada",
       "rules.off": "Desactivada. Actívala para usarla.",
-      "rules.delete": "Eliminar la regla para {from}"
+      "rules.delete": "Eliminar la regla para {from}",
+      "composer.attach_menu": "Desde Paperless",
+      "composer.attached": "Adjuntados desde Paperless: {count}",
+      "browse.attach_here": "Adjuntar",
+      "browse.attach_here_count": "Adjuntar {count}",
+      "error.attach_refused": "No se pudo añadir {name} al mensaje. Puede que el mensaje sea demasiado grande."
     },
     "fa": {
       "action.send": "ارسال به Paperless",
@@ -1071,7 +1107,12 @@
       "rules.summary_subject": "ایمیل از {from} با «{subject}» در موضوع",
       "rules.on": "روشن",
       "rules.off": "خاموش. برای استفاده روشنش کنید.",
-      "rules.delete": "حذف قانون {from}"
+      "rules.delete": "حذف قانون {from}",
+      "composer.attach_menu": "از Paperless",
+      "composer.attached": "پیوست‌شده از Paperless: {count}",
+      "browse.attach_here": "پیوست",
+      "browse.attach_here_count": "پیوست {count}",
+      "error.attach_refused": "{name} به پیام اضافه نشد. شاید پیام بیش از حد بزرگ باشد."
     },
     "fr": {
       "action.send": "Envoyer à Paperless",
@@ -1196,7 +1237,12 @@
       "rules.summary_subject": "Emails de {from} avec « {subject} » dans l'objet",
       "rules.on": "Activée",
       "rules.off": "Désactivée. Activez-la pour l'utiliser.",
-      "rules.delete": "Supprimer la règle pour {from}"
+      "rules.delete": "Supprimer la règle pour {from}",
+      "composer.attach_menu": "Depuis Paperless",
+      "composer.attached": "Joints depuis Paperless : {count}",
+      "browse.attach_here": "Joindre",
+      "browse.attach_here_count": "Joindre {count}",
+      "error.attach_refused": "{name} n'a pas pu être ajouté au message. Le message est peut-être trop volumineux."
     },
     "he": {
       "action.send": "שליחה ל-Paperless",
@@ -1321,7 +1367,12 @@
       "rules.summary_subject": "דואר מ-{from} עם “{subject}” בנושא",
       "rules.on": "פעיל",
       "rules.off": "כבוי. הפעילו אותו כדי להשתמש בו.",
-      "rules.delete": "מחיקת הכלל עבור {from}"
+      "rules.delete": "מחיקת הכלל עבור {from}",
+      "composer.attach_menu": "מ-Paperless",
+      "composer.attached": "צורפו מ-Paperless: {count}",
+      "browse.attach_here": "צירוף",
+      "browse.attach_here_count": "צירוף {count}",
+      "error.attach_refused": "לא ניתן היה להוסיף את {name} להודעה. ייתכן שההודעה גדולה מדי."
     },
     "hu": {
       "action.send": "Küldés a Paperlessbe",
@@ -1446,7 +1497,12 @@
       "rules.summary_subject": "Levelek tőle: {from}, a tárgyban: „{subject}”",
       "rules.on": "Be",
       "rules.off": "Ki. Kapcsold be a használatához.",
-      "rules.delete": "{from} szabályának törlése"
+      "rules.delete": "{from} szabályának törlése",
+      "composer.attach_menu": "A Paperlessből",
+      "composer.attached": "Csatolva a Paperlessből: {count}",
+      "browse.attach_here": "Csatolás",
+      "browse.attach_here_count": "{count} csatolása",
+      "error.attach_refused": "{name} nem adható hozzá az üzenethez. Lehet, hogy túl nagy az üzenet."
     },
     "it": {
       "action.send": "Invia a Paperless",
@@ -1571,7 +1627,12 @@
       "rules.summary_subject": "Posta da {from} con «{subject}» nell'oggetto",
       "rules.on": "Attiva",
       "rules.off": "Disattivata. Attivala per usarla.",
-      "rules.delete": "Elimina la regola per {from}"
+      "rules.delete": "Elimina la regola per {from}",
+      "composer.attach_menu": "Da Paperless",
+      "composer.attached": "Allegati da Paperless: {count}",
+      "browse.attach_here": "Allega",
+      "browse.attach_here_count": "Allega {count}",
+      "error.attach_refused": "Non è stato possibile aggiungere {name} al messaggio. Forse il messaggio è troppo grande."
     },
     "ja": {
       "action.send": "Paperless に送る",
@@ -1696,7 +1757,12 @@
       "rules.summary_subject": "{from} からの、件名に「{subject}」を含むメール",
       "rules.on": "オン",
       "rules.off": "オフ。使うにはオンにしてください。",
-      "rules.delete": "{from} のルールを削除"
+      "rules.delete": "{from} のルールを削除",
+      "composer.attach_menu": "Paperless から",
+      "composer.attached": "Paperless から添付: {count}",
+      "browse.attach_here": "添付",
+      "browse.attach_here_count": "{count} 件を添付",
+      "error.attach_refused": "{name} をメッセージに追加できませんでした。メッセージが大きすぎる可能性があります。"
     },
     "ko": {
       "action.send": "Paperless로 보내기",
@@ -1821,7 +1887,12 @@
       "rules.summary_subject": "{from}에서 온, 제목에 “{subject}”이(가) 포함된 메일",
       "rules.on": "켜짐",
       "rules.off": "꺼짐. 사용하려면 켜세요.",
-      "rules.delete": "{from} 규칙 삭제"
+      "rules.delete": "{from} 규칙 삭제",
+      "composer.attach_menu": "Paperless에서",
+      "composer.attached": "Paperless에서 첨부함: {count}",
+      "browse.attach_here": "첨부",
+      "browse.attach_here_count": "{count}개 첨부",
+      "error.attach_refused": "{name}을(를) 메일에 추가하지 못했습니다. 메일이 너무 클 수 있습니다."
     },
     "lv": {
       "action.send": "Sūtīt uz Paperless",
@@ -1946,7 +2017,12 @@
       "rules.summary_subject": "Vēstules no {from} ar „{subject}” tematā",
       "rules.on": "Ieslēgts",
       "rules.off": "Izslēgts. Ieslēdziet to, lai izmantotu.",
-      "rules.delete": "Dzēst noteikumu sūtītājam {from}"
+      "rules.delete": "Dzēst noteikumu sūtītājam {from}",
+      "composer.attach_menu": "No Paperless",
+      "composer.attached": "Pievienoti no Paperless: {count}",
+      "browse.attach_here": "Pievienot",
+      "browse.attach_here_count": "Pievienot {count}",
+      "error.attach_refused": "{name} neizdevās pievienot vēstulei. Iespējams, vēstule ir pārāk liela."
     },
     "mn": {
       "action.send": "Paperless руу илгээх",
@@ -2071,7 +2147,12 @@
       "rules.summary_subject": "Сэдэвтээ «{subject}» агуулсан, {from}-с ирсэн захидал",
       "rules.on": "Асаалттай",
       "rules.off": "Унтраалттай. Ашиглахын тулд асаана уу.",
-      "rules.delete": "{from}-н дүрмийг устгах"
+      "rules.delete": "{from}-н дүрмийг устгах",
+      "composer.attach_menu": "Paperless-ээс",
+      "composer.attached": "Paperless-ээс хавсаргасан: {count}",
+      "browse.attach_here": "Хавсаргах",
+      "browse.attach_here_count": "{count}-г хавсаргах",
+      "error.attach_refused": "{name}-г захидалд нэмж чадсангүй. Захидал хэт том байж магадгүй."
     },
     "nb": {
       "action.send": "Send til Paperless",
@@ -2196,7 +2277,12 @@
       "rules.summary_subject": "E-post fra {from} med «{subject}» i emnet",
       "rules.on": "På",
       "rules.off": "Av. Slå den på for å bruke den.",
-      "rules.delete": "Slett regelen for {from}"
+      "rules.delete": "Slett regelen for {from}",
+      "composer.attach_menu": "Fra Paperless",
+      "composer.attached": "Lagt ved fra Paperless: {count}",
+      "browse.attach_here": "Legg ved",
+      "browse.attach_here_count": "Legg ved {count}",
+      "error.attach_refused": "{name} kunne ikke legges til i meldingen. Meldingen er kanskje for stor."
     },
     "nl": {
       "action.send": "Naar Paperless sturen",
@@ -2321,7 +2407,12 @@
       "rules.summary_subject": "Mail van {from} met “{subject}” in het onderwerp",
       "rules.on": "Aan",
       "rules.off": "Uit. Schakel hem in om hem te gebruiken.",
-      "rules.delete": "Regel voor {from} verwijderen"
+      "rules.delete": "Regel voor {from} verwijderen",
+      "composer.attach_menu": "Uit Paperless",
+      "composer.attached": "Bijgevoegd uit Paperless: {count}",
+      "browse.attach_here": "Bijvoegen",
+      "browse.attach_here_count": "{count} bijvoegen",
+      "error.attach_refused": "{name} kon niet aan het bericht worden toegevoegd. Misschien is het bericht te groot."
     },
     "pl": {
       "action.send": "Wyślij do Paperless",
@@ -2446,7 +2537,12 @@
       "rules.summary_subject": "Poczta od {from} z „{subject}” w temacie",
       "rules.on": "Wł.",
       "rules.off": "Wył. Włącz ją, aby jej używać.",
-      "rules.delete": "Usuń regułę dla {from}"
+      "rules.delete": "Usuń regułę dla {from}",
+      "composer.attach_menu": "Z Paperless",
+      "composer.attached": "Załączono z Paperless: {count}",
+      "browse.attach_here": "Załącz",
+      "browse.attach_here_count": "Załącz {count}",
+      "error.attach_refused": "Nie udało się dodać pliku {name} do wiadomości. Wiadomość może być za duża."
     },
     "pt": {
       "action.send": "Enviar para o Paperless",
@@ -2571,7 +2667,12 @@
       "rules.summary_subject": "E-mails de {from} com “{subject}” no assunto",
       "rules.on": "Ativada",
       "rules.off": "Desativada. Ative-a para usá-la.",
-      "rules.delete": "Excluir a regra para {from}"
+      "rules.delete": "Excluir a regra para {from}",
+      "composer.attach_menu": "Do Paperless",
+      "composer.attached": "Anexados do Paperless: {count}",
+      "browse.attach_here": "Anexar",
+      "browse.attach_here_count": "Anexar {count}",
+      "error.attach_refused": "Não foi possível adicionar {name} à mensagem. Talvez a mensagem esteja grande demais."
     },
     "ro": {
       "action.send": "Trimiteți în Paperless",
@@ -2696,7 +2797,12 @@
       "rules.summary_subject": "E-mailuri de la {from} cu „{subject}” în subiect",
       "rules.on": "Activată",
       "rules.off": "Dezactivată. Activați-o pentru a o folosi.",
-      "rules.delete": "Ștergeți regula pentru {from}"
+      "rules.delete": "Ștergeți regula pentru {from}",
+      "composer.attach_menu": "Din Paperless",
+      "composer.attached": "Atașate din Paperless: {count}",
+      "browse.attach_here": "Atașați",
+      "browse.attach_here_count": "Atașați {count}",
+      "error.attach_refused": "{name} nu a putut fi adăugat la mesaj. Poate mesajul este prea mare."
     },
     "ru": {
       "action.send": "Отправить в Paperless",
@@ -2821,7 +2927,12 @@
       "rules.summary_subject": "Письма от {from} со словом «{subject}» в теме",
       "rules.on": "Вкл.",
       "rules.off": "Выкл. Включите, чтобы использовать.",
-      "rules.delete": "Удалить правило для {from}"
+      "rules.delete": "Удалить правило для {from}",
+      "composer.attach_menu": "Из Paperless",
+      "composer.attached": "Прикреплено из Paperless: {count}",
+      "browse.attach_here": "Прикрепить",
+      "browse.attach_here_count": "Прикрепить: {count}",
+      "error.attach_refused": "Не удалось добавить {name} в письмо. Возможно, письмо слишком большое."
     },
     "sk": {
       "action.send": "Odoslať do Paperless",
@@ -2946,7 +3057,12 @@
       "rules.summary_subject": "Pošta od {from} s „{subject}“ v predmete",
       "rules.on": "Zapnuté",
       "rules.off": "Vypnuté. Ak ho chcete používať, zapnite ho.",
-      "rules.delete": "Odstrániť pravidlo pre {from}"
+      "rules.delete": "Odstrániť pravidlo pre {from}",
+      "composer.attach_menu": "Z Paperless",
+      "composer.attached": "Priložené z Paperless: {count}",
+      "browse.attach_here": "Priložiť",
+      "browse.attach_here_count": "Priložiť ({count})",
+      "error.attach_refused": "{name} sa nepodarilo pridať do správy. Správa je možno príliš veľká."
     },
     "tr": {
       "action.send": "Paperless'a gönder",
@@ -3071,7 +3187,12 @@
       "rules.summary_subject": "{from} adresinden gelen, konusunda “{subject}” geçen e-postalar",
       "rules.on": "Açık",
       "rules.off": "Kapalı. Kullanmak için açın.",
-      "rules.delete": "{from} için kuralı sil"
+      "rules.delete": "{from} için kuralı sil",
+      "composer.attach_menu": "Paperless'tan",
+      "composer.attached": "Paperless'tan eklenen: {count}",
+      "browse.attach_here": "Ekle",
+      "browse.attach_here_count": "{count} öğeyi ekle",
+      "error.attach_refused": "{name} iletiye eklenemedi. İleti çok büyük olabilir."
     },
     "uk": {
       "action.send": "Надіслати в Paperless",
@@ -3196,7 +3317,12 @@
       "rules.summary_subject": "Листи від {from} зі словом «{subject}» у темі",
       "rules.on": "Увімк.",
       "rules.off": "Вимк. Увімкніть, щоб використовувати.",
-      "rules.delete": "Видалити правило для {from}"
+      "rules.delete": "Видалити правило для {from}",
+      "composer.attach_menu": "З Paperless",
+      "composer.attached": "Прикріплено з Paperless: {count}",
+      "browse.attach_here": "Прикріпити",
+      "browse.attach_here_count": "Прикріпити: {count}",
+      "error.attach_refused": "Не вдалося додати {name} до листа. Можливо, лист завеликий."
     },
     "zh": {
       "action.send": "发送到 Paperless",
@@ -3321,7 +3447,12 @@
       "rules.summary_subject": "来自 {from} 且主题包含“{subject}”的邮件",
       "rules.on": "开",
       "rules.off": "关。启用后才会生效。",
-      "rules.delete": "删除 {from} 的规则"
+      "rules.delete": "删除 {from} 的规则",
+      "composer.attach_menu": "从 Paperless",
+      "composer.attached": "已从 Paperless 添加附件：{count}",
+      "browse.attach_here": "添加附件",
+      "browse.attach_here_count": "添加 {count} 个附件",
+      "error.attach_refused": "无法将 {name} 添加到邮件。邮件可能太大了。"
     },
     "zh-TW": {
       "action.send": "傳送到 Paperless",
@@ -3446,7 +3577,12 @@
       "rules.summary_subject": "來自 {from} 且主題包含「{subject}」的郵件",
       "rules.on": "開啟",
       "rules.off": "關閉。啟用後才會生效。",
-      "rules.delete": "刪除 {from} 的規則"
+      "rules.delete": "刪除 {from} 的規則",
+      "composer.attach_menu": "從 Paperless",
+      "composer.attached": "已從 Paperless 附加：{count}",
+      "browse.attach_here": "附加",
+      "browse.attach_here_count": "附加 {count} 個",
+      "error.attach_refused": "無法將 {name} 加入郵件。郵件可能太大。"
     }
   }
 }

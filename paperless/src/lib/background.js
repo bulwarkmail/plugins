@@ -16,6 +16,7 @@ export const LINKS_KEY = 'links';
 export const ACTION_ATTACHMENT = 'send-attachment';
 export const ACTION_MESSAGE = 'send-message';
 export const ACTION_BULK = 'send-bulk';
+export const ACTION_COMPOSER = 'from-paperless';
 
 export function createBackground(api, { setTimer = setTimeout } = {}) {
   const t = (key, vars) => api.i18n.t(key, vars);
@@ -163,9 +164,28 @@ export function createBackground(api, { setTimer = setTimeout } = {}) {
     return upload(connection, groups, choice);
   }
 
+  /**
+   * "From Paperless" in a composer's Attach menu: the browser attaches the
+   * picked documents to that message (it asks to connect first when needed).
+   */
+  async function attachFromPaperless(composerId) {
+    const result = await api.ui.openDialog({
+      title: t('page.title'),
+      slot: 'plugin-dialog',
+      extraProps: { view: 'browse', composerId },
+      width: 900,
+    });
+    const attached = Number(result?.attached) || 0;
+    if (attached) api.toast.success(t('composer.attached', { count: attached }));
+    return attached;
+  }
+
   /** onAction: start the flow and return at once (the host times hooks out). */
   function onAction({ surface, actionId, context } = {}) {
     const ctx = context || {};
+    if (actionId === ACTION_COMPOSER && typeof ctx.composerId === 'string' && ctx.composerId) {
+      return attachFromPaperless(ctx.composerId);
+    }
     if (actionId === ACTION_ATTACHMENT && ctx.emailId && ctx.blobId) {
       return sendFlow(() => collectAttachment(api, ctx));
     }
@@ -222,6 +242,7 @@ export function createBackground(api, { setTimer = setTimeout } = {}) {
       api.ui.setActions('attachment-menu', [{ id: ACTION_ATTACHMENT, label, icon: 'archive-restore' }]),
       api.ui.setActions('reader-actions', [{ id: ACTION_MESSAGE, label, icon: 'archive-restore' }]),
       api.ui.setActions('message-bulk-actions', [{ id: ACTION_BULK, label, icon: 'archive-restore' }]),
+      api.ui.setActions('composer-attach-menu', [{ id: ACTION_COMPOSER, label: t('composer.attach_menu'), icon: 'archive' }]),
       api.ui.setPages([{ id: 'documents', title: t('page.title'), icon: 'archive' }]),
     ];
     await Promise.all(calls.map((p) => Promise.resolve(p).catch((err) => api.log?.warn?.('setup failed', err?.message))));

@@ -49,11 +49,34 @@ describe('registerUi', () => {
       ['attachment-menu', ['send-attachment']],
       ['reader-actions', ['send-message']],
       ['message-bulk-actions', ['send-bulk']],
+      ['composer-attach-menu', ['from-paperless']],
     ]);
     // Not the webmail's own Archive icon, which sits next to these in the reader toolbar.
     const icons = a.calls('ui.setActions').flatMap((c) => c.args[1].map((x) => x.icon));
-    expect(icons).toEqual(['archive-restore', 'archive-restore', 'archive-restore']);
+    expect(icons).toEqual(['archive-restore', 'archive-restore', 'archive-restore', 'archive']);
     expect(a.calls('ui.setPages')[0].args[0]).toEqual([{ id: 'documents', title: 'page.title', icon: 'archive' }]);
+  });
+});
+
+describe('From Paperless in the composer', () => {
+  it('opens the document browser for that composer and says how many went in', async () => {
+    const { api: a } = api({ extra: { 'ui.openDialog': async () => ({ attached: 2 }) } });
+    const attached = await createBackground(a, { setTimer: noTimer }).onAction({ surface: 'composer-attach-menu', actionId: 'from-paperless', context: { composerId: 'c-1' } });
+    expect(attached).toBe(2);
+    expect(a.calls('ui.openDialog')[0].args[0]).toMatchObject({ slot: 'plugin-dialog', extraProps: { view: 'browse', composerId: 'c-1' } });
+    expect(a.calls('toast.success').map((c) => c.args[0])).toEqual(['composer.attached']);
+  });
+
+  it('says nothing when the dialog was closed without attaching', async () => {
+    const { api: a } = api({ extra: { 'ui.openDialog': async () => ({ attached: 0 }) } });
+    await createBackground(a, { setTimer: noTimer }).onAction({ actionId: 'from-paperless', context: { composerId: 'c-1' } });
+    expect(a.calls('toast.success')).toHaveLength(0);
+  });
+
+  it('does nothing without a composer to attach to', async () => {
+    const { api: a } = api();
+    await createBackground(a, { setTimer: noTimer }).onAction({ actionId: 'from-paperless', context: {} });
+    expect(a.calls('ui.openDialog')).toHaveLength(0);
   });
 });
 
@@ -214,7 +237,7 @@ describe('plugin exports', () => {
   it('activates, and hooks answer at once while the work runs on', async () => {
     const { api: a } = api({ dialog: new Promise(() => {}) });
     await activate(a);
-    expect(a.calls('ui.setActions')).toHaveLength(3);
+    expect(a.calls('ui.setActions')).toHaveLength(4);
     // onAction must not wait for the dialog (the host gives hooks only seconds).
     expect(hooks.onAction({ actionId: 'send-message', context: { emailId: 'e1' } })).toBeUndefined();
     expect(Object.keys(slots).sort()).toEqual(['app-page', 'plugin-dialog', 'settings-section']);
