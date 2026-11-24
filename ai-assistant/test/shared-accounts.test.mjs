@@ -112,15 +112,48 @@ describe('the calendar lookup', () => {
 });
 
 describe('actions on a team mailbox\'s message', () => {
-  it('refuses archive and move before asking the user, with words for the model', async () => {
+  it('archives the message in its own account', async () => {
     const api = apiWith();
-    await expect(describeAction(api, 'archive_message', { id: 'g:1' })).rejects.toThrow(/"Team request" is in a team or shared mailbox; archive_message works only for the user's own mail/);
-    await expect(describeAction(api, 'move_message', { id: 'g:1', folder: 'Archive' })).rejects.toThrow(/team or shared mailbox; move_message/);
-    expect(api.calls('email.archive')).toEqual([]);
-    expect(api.calls('email.move')).toEqual([]);
+    await performAction(api, (await describeAction(api, 'archive_message', { id: 'g:1' })).plan);
+    expect(api.calls('email.archive').map((c) => c.args)).toEqual([[[{ id: '1', accountId: 'g' }]]]);
   });
 
-  it('still archives the user\'s own message, and moves only into the user\'s own folders', async () => {
+  it('archives by the account the model named when the folders can\'t be read', async () => {
+    const api = apiWith({ handlers: { 'mailboxes.list': async () => { throw new Error('offline'); } } });
+    await performAction(api, (await describeAction(api, 'archive_message', { id: 'g:1' })).plan);
+    expect(api.calls('email.archive').map((c) => c.args)).toEqual([[[{ id: '1', accountId: 'g' }]]]);
+  });
+
+  it('moves into a folder of the message\'s mailbox, and back there on undo', async () => {
+    const api = apiWith();
+    const { plan, summary } = await describeAction(api, 'move_message', { id: 'g:1', folder: 'Clients' });
+    expect(summary).toContain('Clients');
+    const done = await performAction(api, plan);
+    expect(api.calls('email.move').map((c) => c.args)).toEqual([[[{ id: '1', accountId: 'g' }], 'g:clients']]);
+    // The message names its folders by the server's ids.
+    await undoAction(api, done.undo);
+    expect(api.calls('email.move').at(-1).args).toEqual([[{ id: '1', accountId: 'g' }], 'inbox']);
+    // Not into the user's own folders.
+    await expect(describeAction(api, 'move_message', { id: 'g:1', folder: 'Archive' })).rejects.toThrow(/the folders are: Inbox, Sent, Clients$/);
+  });
+
+  it('asks first when the team message is in the team mailbox\'s junk folder', async () => {
+    const api = apiWith({ handlers: {
+      'mailboxes.list': async () => [...FOLDERS, { id: 'g:junk', name: 'Junk', role: 'junk' }],
+      'email.get': async () => ({ ...TEAM_MESSAGE, mailboxIds: ['junk'] }),
+    } });
+    const ctx = { openEmailId: '1' };
+    expect((await describeAction(api, 'archive_message', { id: 'g:1' }, ctx)).alwaysAsk).toBe(true);
+    expect((await describeAction(api, 'move_message', { id: 'g:1', folder: 'Inbox' }, ctx)).alwaysAsk).toBe(true);
+  });
+
+  it('tells the model when the webmail moves only the user\'s own mail', async () => {
+    const api = apiWith({ handlers: { 'email.archive': async () => { throw new Error('email.archive: emailIds[0] must be a string of 1-256 characters'); } } });
+    const { plan } = await describeAction(api, 'archive_message', { id: 'g:1' });
+    await expect(performAction(api, plan)).rejects.toThrow(/archives and moves only the user's own mail/);
+  });
+
+  it('still archives and moves the user\'s own message by its id, among the user\'s own folders', async () => {
     const api = apiWith();
     await performAction(api, (await describeAction(api, 'archive_message', { id: '1' })).plan);
     expect(api.calls('email.archive').map((c) => c.args)).toEqual([[['1']]]);

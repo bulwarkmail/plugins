@@ -16,7 +16,7 @@
 // message or a reply whose address the user didn't name.
 
 import { areaAction, areaActions, offered } from './areas/index.js';
-import { foldersOf, otherAccountOf, parseMessageRef } from './accounts.js';
+import { foldersOf, inOtherAccount, otherAccountOf, parseMessageRef } from './accounts.js';
 
 const ADDRESS_IN_TEXT = /[^\s@<>"',;()]+@[^\s@<>"',;()]+\.[^\s@<>"',;().]+/g;
 
@@ -90,13 +90,15 @@ const ASK_FOLDER_ROLES = new Set(['trash', 'junk']);
  * Whether `email` is in the junk folder (by role). A move out of it puts a
  * message back in sight that the server or the user put away, so it asks
  * first; a message whose folders the view doesn't name counts as in it.
+ * A message of another account (`accountId`) names its folders by the
+ * server's ids, which the folder list shows as "<accountId>:<id>".
  */
-function inJunk(email, mailboxes) {
+function inJunk(email, mailboxes, accountId) {
   const raw = email?.mailboxIds;
   if (!raw || typeof raw !== 'object') return true;
   const ids = Array.isArray(raw) ? raw : Object.keys(raw).filter((id) => raw[id]);
   const junk = new Set((mailboxes ?? []).filter((m) => m?.role === 'junk').map((m) => m.id));
-  return ids.some((id) => junk.has(id));
+  return ids.some((id) => junk.has(accountId && !inOtherAccount(id) ? `${accountId}:${id}` : id));
 }
 
 /** Whether `email` is the message open next to the panel (the composer has none). */
@@ -116,11 +118,11 @@ const MESSAGE_ID = { type: 'string', description: 'The message id: the open mess
 
 export const ACTION_DEFINITIONS = {
   archive_message: {
-    description: 'Archive a message (move it to the Archive folder).',
+    description: 'Archive a message (move it to the Archive folder of its mailbox: the user\'s own, or the team or shared mailbox it is in).',
     parameters: { type: 'object', properties: { id: MESSAGE_ID }, required: ['id'], additionalProperties: false },
   },
   move_message: {
-    description: 'Move a message to another folder of the user, by the folder\'s name or role (inbox, archive, junk, trash).',
+    description: 'Move a message to another folder of its mailbox (the user\'s own, or the team or shared mailbox it is in), by the folder\'s name or role (inbox, archive, junk, trash).',
     parameters: {
       type: 'object',
       properties: { id: MESSAGE_ID, folder: { type: 'string', description: 'Folder name, or inbox, archive, junk, trash' } },
@@ -249,13 +251,22 @@ async function foldersOrNull(api) {
 }
 
 /**
- * The webmail archives and moves only the user's own messages. One of a
- * team or shared mailbox is refused here, before the user is asked, with
- * words the model can pass on.
+ * Archive or move one message. One of a team or shared mailbox goes as
+ * `{ id, accountId }`, so the webmail moves it in that account. A webmail
+ * that moves only the user's own mail refuses that form instead of moving
+ * the user's message with the same id; the model gets words to pass on.
  */
-function ownMessageOnly(email, mailboxes, name) {
-  if (!otherAccountOf(email, mailboxes)) return;
-  throw new Error(`"${text(email.subject, 100) || 'the message'}" is in a team or shared mailbox; ${name} works only for the user's own mail. Tell the user to use the mail app's toolbar for it.`);
+async function moveMessage(api, id, accountId, folderId) {
+  const target = accountId ? [{ id, accountId }] : [id];
+  try {
+    if (folderId === undefined) await api.email.archive(target);
+    else await api.email.move(target, folderId);
+  } catch (err) {
+    if (accountId && /emailIds\[0\] must be a string/.test(String(err?.message ?? err))) {
+      throw new Error('this Bulwark version archives and moves only the user\'s own mail. Tell the user to use the mail app\'s toolbar for a message in a team or shared mailbox.');
+    }
+    throw err;
+  }
 }
 
 /** The folder a name or role means: the role first, then the name, then a unique partial match. */
@@ -317,22 +328,33 @@ export async function describeAction(api, name, args = {}, ctx = {}) {
       // one go. Out of the junk folder always asks (also when the folders
       // can't be read).
       const mailboxes = await foldersOrNull(api);
-      if (mailboxes) ownMessageOnly(email, mailboxes, name);
-      const fromJunk = !mailboxes || inJunk(email, mailboxes);
-      return { summary: t('action.archive', { subject: email.subject || '…' }), plan: { name, email }, alwaysAsk: fromJunk || !isOpenMessage(email, ctx) };
+      // A team or shared mailbox's message goes to that mailbox's Archive.
+      // Without the folders, the account the model named it by.
+      const accountId = mailboxes ? otherAccountOf(email, mailboxes) : parseMessageRef(text(args.id, 200)).accountId;
+      const fromJunk = !mailboxes || inJunk(email, mailboxes, accountId);
+      return {
+        summary: t('action.archive', { subject: email.subject || '…' }),
+        plan: { name, email, ...(accountId ? { accountId } : {}) },
+        alwaysAsk: fromJunk || !isOpenMessage(email, ctx),
+      };
     }
     case 'move_message': {
       const email = await messageFor(api, args.id);
       const mailboxes = (await api.mailboxes.list()) ?? [];
-      ownMessageOnly(email, mailboxes, name);
-      // Into one of the user's own folders: the webmail moves nowhere else.
-      const own = foldersOf(mailboxes);
-      const folder = findFolder(own, args.folder);
-      if (!folder) throw new Error(`no folder "${text(args.folder, 100)}"; the folders are: ${own.map((m) => m.name).join(', ')}`);
+      // Into a folder of the message's own mailbox: the webmail moves
+      // nowhere else.
+      const accountId = otherAccountOf(email, mailboxes);
+      const folders = foldersOf(mailboxes, accountId);
+      const folder = findFolder(folders, args.folder);
+      if (!folder) throw new Error(`no folder "${text(args.folder, 100)}"; the folders are: ${folders.map((m) => m.name).join(', ')}`);
       // By the folder's role, whatever it is called ("Spam", "Papierkorb"):
       // into Trash or Junk, or out of Junk.
-      const alwaysAsk = ASK_FOLDER_ROLES.has(folder.role) || inJunk(email, mailboxes) || !isOpenMessage(email, ctx);
-      return { summary: t('action.move', { subject: email.subject || '…', folder: folder.name }), plan: { name, email, folder }, alwaysAsk };
+      const alwaysAsk = ASK_FOLDER_ROLES.has(folder.role) || inJunk(email, mailboxes, accountId) || !isOpenMessage(email, ctx);
+      return {
+        summary: t('action.move', { subject: email.subject || '…', folder: folder.name }),
+        plan: { name, email, folder, ...(accountId ? { accountId } : {}) },
+        alwaysAsk,
+      };
     }
     case 'mark_message': {
       const email = await messageFor(api, args.id);
@@ -466,10 +488,10 @@ export async function performAction(api, plan) {
     case 'move_message': {
       const { email } = plan;
       const from = Array.isArray(email.mailboxIds) ? email.mailboxIds[0] : undefined;
-      if (plan.name === 'archive_message') await api.email.archive([email.id]);
-      else await api.email.move([email.id], plan.folder.id);
+      await moveMessage(api, email.id, plan.accountId, plan.name === 'archive_message' ? undefined : plan.folder.id);
       const where = plan.name === 'archive_message' ? 'archived' : `moved to ${plan.folder.name}`;
-      return { text: `Done: the message "${email.subject ?? ''}" is ${where}.`, undo: from ? { kind: 'move', id: email.id, mailboxId: from } : null };
+      const undo = from ? { kind: 'move', id: email.id, mailboxId: from, ...(plan.accountId ? { accountId: plan.accountId } : {}) } : null;
+      return { text: `Done: the message "${email.subject ?? ''}" is ${where}.`, undo };
     }
     case 'mark_message': {
       const { email, read, starred } = plan;
@@ -518,7 +540,9 @@ export async function undoAction(api, undo) {
   const area = undo?.action ? areaAction(undo.action) : null;
   if (area) return area.undo(api, undo);
   switch (undo?.kind) {
-    case 'move': return api.email.move([undo.id], undo.mailboxId);
+    // Another account's message goes back by the server's folder id, which
+    // the webmail takes for that account.
+    case 'move': return moveMessage(api, undo.id, undo.accountId, undo.mailboxId);
     case 'keywords':
       await markKeywords(api, undo.id, undo.accountId, { read: undo.read, starred: undo.starred });
       return undefined;

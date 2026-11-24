@@ -1790,8 +1790,11 @@ await checker.dispose();
 await api.email.get(emailId)                 // EmailReadView or null; any message of the account
 await api.email.list({ mailboxId, limit, position })   // EmailSummary[]; limit 1-100, default 50
 await api.email.search({ text, from, to, subject, after, before, hasAttachment, mailboxId, limit, position })   // EmailSummary[], newest first; limit 1-50
-await api.email.move(emailIds, mailboxId)    // at most 100 ids; 20 moves a minute
-await api.email.archive(emailIds)
+await api.email.move(emailIds, mailboxId, accountId?)    // at most 100 ids; 20 moves a minute
+await api.email.archive(emailIds, accountId?)            // into the Archive of the messages' account
+// after 1.21.3: accountId (or entries { id, accountId }, one account per call) moves
+// messages of a shared or team account, into one of its folders; without it, the
+// user's own messages, and only while a folder of their own is open
 await api.email.getAttachment(emailId, blobId)   // { name, type, size, data: ArrayBuffer }, at most 25 MB
 await api.email.getRaw(emailId)              // the RFC 5322 source as ArrayBuffer, at most 25 MB
 await api.email.setKeyword(emailId, keyword, accountId?)

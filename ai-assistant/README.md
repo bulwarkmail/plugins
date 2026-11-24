@@ -153,9 +153,11 @@ a message, move it to a folder, mark it read, unread, starred or not, add
 a calendar event, a task or a contact, and open a reply or a new message
 in the composer with the text it drafted. It never sends and never
 deletes mail; a reply or a message waits in the composer for you.
-Archive and move work only for your own mail: for a message in a team or
-shared mailbox the assistant says so and leaves it where it is. Marks and
-tags work there too.
+Archive, move, marks and tags work in team and shared mailboxes too: a
+message there goes to that mailbox's Archive or one of its folders, never
+into yours. Archive and move there need a webmail release after 1.21.3;
+with an older one the assistant says it can only do this for your own
+mail.
 
 Each action shows as a card in the chat with what it will do ("Move
 “Invoice 42” to Projects 2026"). Settings > AI Assistant >
