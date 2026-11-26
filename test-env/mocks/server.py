@@ -343,10 +343,14 @@ def typed_text(messages, provider):
     if i < 0:
         return ''
     c = messages[i].get('content')
+    if provider == 'openai-responses' and isinstance(c, list):
+        return ' '.join(p.get('text', '') for p in c if isinstance(p, dict) and p.get('type') == 'input_text')
     return _anthropic_text(c) if provider == 'anthropic' else (c if isinstance(c, str) else _anthropic_text(c))
 
 
 def system_text(body, provider):
+    if provider == 'openai-responses':
+        return body.get('instructions') or ''
     if provider == 'anthropic':
         s = body.get('system')
         return s if isinstance(s, str) else _anthropic_text(s or [])
@@ -356,6 +360,16 @@ def system_text(body, provider):
 
 def step_of(messages, provider):
     start = typed_index(messages, provider)
+    if provider == 'openai-responses':
+        # Parallel function results belong to one tool-calling turn.
+        n = 0
+        in_results = False
+        for m in messages[start + 1:]:
+            is_result = m.get('type') == 'function_call_output'
+            if is_result and not in_results:
+                n += 1
+            in_results = is_result
+        return n
     n = 0
     for m in messages[start + 1:]:
         if m.get('role') != 'assistant':
@@ -381,12 +395,14 @@ def tool_results(messages, provider):
         elif provider == 'openai' and m.get('role') == 'tool':
             c = m.get('content')
             out.append(c if isinstance(c, str) else _anthropic_text(c))
+        elif provider == 'openai-responses' and m.get('type') == 'function_call_output':
+            out.append(m.get('output', ''))
     return out
 
 
 def offered_tools(body, provider):
     tools = body.get('tools') or []
-    if provider == 'anthropic':
+    if provider in ('anthropic', 'openai-responses'):
         return [t.get('name') for t in tools if isinstance(t, dict)]
     return [(t.get('function') or {}).get('name') for t in tools if isinstance(t, dict)]
 
@@ -423,7 +439,7 @@ def log_ai(path, provider, body, marker, step):
 
 def scripted(body, provider):
     """None for the plain echo; else a dict: kind text|tools|error, with what to send."""
-    messages = body.get('messages') or []
+    messages = body.get('input' if provider == 'openai-responses' else 'messages') or []
     found = MARKER.search(typed_text(messages, provider)) or MARKER.search(system_text(body, provider))
     if not found:
         return None
@@ -722,7 +738,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.send_json(200, {'object': 'list', 'data': [
             {'id': m, 'object': 'model', 'created': FIXED_TIME, 'owned_by': 'bulwark-mock'}
-            for m in ('mock-gpt-small', 'mock-gpt-large')]})
+            for m in ('mock-gpt-small', 'mock-gpt-large', 'mock-gpt-reasoning')]})
 
     def openai_chat(self, q):
         if not self.openai_auth():
@@ -734,6 +750,11 @@ class Handler(BaseHTTPRequestHandler):
                 'param': None, 'code': None}})
         script = scripted(body, 'openai')
         log_ai(self.path, 'openai', body, script and script['marker'], script and script['step'])
+        if body['model'] == 'mock-gpt-reasoning' and body.get('tools'):
+            return self.send_json(400, {'error': {
+                'message': 'Function tools with reasoning_effort are not supported for mock-gpt-reasoning in /v1/chat/completions. '
+                           "To use function tools, use /v1/responses or set reasoning_effort to 'none'.",
+                'type': 'invalid_request_error', 'param': 'reasoning_effort', 'code': None}})
         if script and script['kind'] == 'error':
             err = script['error']
             return self.send_json(int(err.get('status', 500)), {'error': {
@@ -795,6 +816,69 @@ class Handler(BaseHTTPRequestHandler):
                 self.sse(chunk({'tool_calls': [{'index': i, 'function': {'arguments': piece}}]}))
         self.sse(chunk({}, 'tool_calls'))
         self.sse('[DONE]')
+
+    def openai_responses(self, q):
+        if not self.openai_auth():
+            return
+        body = self.body_json()
+        if not body.get('model') or 'input' not in body or body['input'] is None:
+            return self.send_json(400, {'error': {
+                'message': 'model and input are required', 'type': 'invalid_request_error',
+                'param': None, 'code': None}})
+        script = scripted(body, 'openai-responses')
+        log_ai(self.path, 'openai-responses', body, script and script['marker'], script and script['step'])
+        if script and script['kind'] == 'error':
+            err = script['error']
+            return self.send_json(int(err.get('status', 500)), {'error': {
+                'message': err.get('message', 'Mock error'), 'type': err.get('type', 'server_error'),
+                'param': None, 'code': None}})
+        step = script['step'] if script else 0
+        output = []
+        is_tools = script and script['kind'] == 'tools'
+        if is_tools:
+            output.append({'type': 'reasoning', 'id': f'rs_mock_{step}', 'summary': [], 'encrypted_content': 'enc_mock'})
+        text = script['text'] if script else reply_text(typed_text(body['input'], 'openai-responses'))
+        if text or not is_tools:
+            output.append({'type': 'message', 'id': f'msg_mock_{step}', 'status': 'completed', 'role': 'assistant',
+                           'content': [{'type': 'output_text', 'text': text, 'annotations': []}]})
+        if is_tools:
+            output.extend({'type': 'function_call', 'id': f'fc_mock_{step}_{i}', 'call_id': f'call_mock_{step}_{i}',
+                           'name': t['name'], 'arguments': json.dumps(t.get('input') or {}), 'status': 'completed'}
+                          for i, t in enumerate(script['tools']))
+        in_tok = count_tokens(json.dumps(body['input']) + system_text(body, 'openai-responses'))
+        out_tok = count_tokens(json.dumps(output))
+        response = {'id': f'resp_mock_{step}', 'object': 'response', 'created_at': FIXED_TIME,
+                    'status': 'completed', 'model': body['model'], 'output': output,
+                    'usage': {'input_tokens': in_tok, 'output_tokens': out_tok, 'total_tokens': in_tok + out_tok}}
+        if not body.get('stream'):
+            return self.send_json(200, response)
+        self.start_sse()
+        sequence = 0
+
+        def event(kind, **data):
+            nonlocal sequence
+            self.sse({'type': kind, 'sequence_number': sequence, **data}, kind)
+            sequence += 1
+
+        event('response.created', response={**response, 'status': 'in_progress', 'output': []})
+        for i, item in enumerate(output):
+            added = dict(item)
+            if item['type'] == 'message':
+                added.update(status='in_progress', content=[])
+            elif item['type'] == 'function_call':
+                added.update(status='in_progress', arguments='')
+            event('response.output_item.added', output_index=i, item=added)
+            if item['type'] == 'message':
+                text = item['content'][0]['text']
+                for piece in chunks(text):
+                    event('response.output_text.delta', item_id=item['id'], output_index=i, content_index=0, delta=piece)
+                event('response.output_text.done', item_id=item['id'], output_index=i, content_index=0, text=text)
+            elif item['type'] == 'function_call':
+                for piece in split_json(json.loads(item['arguments'])):
+                    event('response.function_call_arguments.delta', item_id=item['id'], output_index=i, delta=piece)
+                event('response.function_call_arguments.done', item_id=item['id'], output_index=i, arguments=item['arguments'])
+            event('response.output_item.done', output_index=i, item=item)
+        event('response.completed', response=response)
 
     # -- Todoist API v1 ----------------------------------------------------
     def todoist_auth(self):
@@ -959,6 +1043,7 @@ ROUTES = [
     ('POST', r'/anthropic/v1/messages', Handler.anthropic_messages),
     ('GET', r'/openai/v1/models', Handler.openai_models),
     ('POST', r'/openai/v1/chat/completions', Handler.openai_chat),
+    ('POST', r'/openai/v1/responses', Handler.openai_responses),
     ('GET', r'/todoist/api/v1/tasks', Handler.todoist_list),
     ('POST', r'/todoist/api/v1/tasks', Handler.todoist_create),
     ('GET', r'/todoist/api/v1/tasks/([A-Za-z0-9]+)', Handler.todoist_task_route),
