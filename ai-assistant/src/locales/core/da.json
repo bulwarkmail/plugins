@@ -31,6 +31,8 @@
   "error.too_long": "Teksten er for lang til denne model.",
   "error.bad_request": "AI-tjenesten afviste forespørgslen.",
   "error.service_said": "Tjenesten svarede: {detail}",
+  "error.needs_responses": "Denne model kræver Responses API, og tjenesten er sat til Chat Completions. En administrator kan skifte det under \"OpenAI-compatible: API\" i pluginnets indstillinger.",
+  "error.needs_responses_own": "Denne model kræver Responses API. Med din egen nøgle bruges den kun til api.openai.com: forbind til https://api.openai.com/v1, eller vælg en anden model.",
   "error.blocked": "Serveren blokerer AI-tjenestens adresse. Spørg din administrator.",
   "error.unreachable": "Kunne ikke få forbindelse til AI-tjenesten.",
   "error.server": "AI-tjenesten havde et problem. Prøv igen senere.",

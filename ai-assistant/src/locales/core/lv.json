@@ -31,6 +31,8 @@
   "error.too_long": "Teksts ir pārāk garš šim modelim.",
   "error.bad_request": "MI pakalpojums noraidīja pieprasījumu.",
   "error.service_said": "Atbilde: {detail}",
+  "error.needs_responses": "Šim modelim vajag Responses API, bet šis pakalpojums ir iestatīts uz Chat Completions. Administrators to var pārslēgt spraudņa iestatījumos sadaļā \"OpenAI-compatible: API\".",
+  "error.needs_responses_own": "Šim modelim vajag Responses API. Ar savu atslēgu to izmanto tikai api.openai.com: pievienojieties https://api.openai.com/v1 vai izvēlieties citu modeli.",
   "error.blocked": "Serveris bloķē MI pakalpojuma adresi. Jautājiet administratoram.",
   "error.unreachable": "Neizdevās sasniegt MI pakalpojumu.",
   "error.server": "MI pakalpojumā radās problēma. Mēģiniet vēlreiz vēlāk.",

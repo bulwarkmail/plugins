@@ -31,6 +31,8 @@
   "error.too_long": "Teksten er for lang for denne modellen.",
   "error.bad_request": "KI-tjenesten avviste forespørselen.",
   "error.service_said": "Svar: {detail}",
+  "error.needs_responses": "Denne modellen trenger Responses API, og tjenesten er satt til Chat Completions. En administrator kan bytte under \"OpenAI-compatible: API\" i innstillingene for programtillegget.",
+  "error.needs_responses_own": "Denne modellen trenger Responses API. Med din egen nøkkel brukes den bare for api.openai.com: koble til https://api.openai.com/v1, eller velg en annen modell.",
   "error.blocked": "Serveren blokkerer adressen til KI-tjenesten. Spør administratoren din.",
   "error.unreachable": "Fikk ikke kontakt med KI-tjenesten.",
   "error.server": "KI-tjenesten hadde et problem. Prøv igjen senere.",

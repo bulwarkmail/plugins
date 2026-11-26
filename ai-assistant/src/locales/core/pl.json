@@ -31,6 +31,8 @@
   "error.too_long": "Tekst jest za długi dla tego modelu.",
   "error.bad_request": "Usługa AI odrzuciła żądanie.",
   "error.service_said": "Odpowiedź: {detail}",
+  "error.needs_responses": "Ten model wymaga Responses API, a ta usługa jest ustawiona na Chat Completions. Administrator może to zmienić w ustawieniach wtyczki, w polu \"OpenAI-compatible: API\".",
+  "error.needs_responses_own": "Ten model wymaga Responses API. Z własnym kluczem jest ono używane tylko dla api.openai.com: połącz się z https://api.openai.com/v1 albo wybierz inny model.",
   "error.blocked": "Serwer blokuje adres usługi AI. Zapytaj administratora.",
   "error.unreachable": "Nie udało się połączyć z usługą AI.",
   "error.server": "Wystąpił problem z usługą AI. Spróbuj ponownie później.",

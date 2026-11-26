@@ -31,6 +31,8 @@
   "error.too_long": "متن برای این مدل خیلی طولانی است.",
   "error.bad_request": "سرویس هوش مصنوعی درخواست را رد کرد.",
   "error.service_said": "پاسخ سرویس: {detail}",
+  "error.needs_responses": "این مدل به Responses API نیاز دارد، اما این سرویس روی Chat Completions تنظیم شده است. مدیر می‌تواند آن را در تنظیمات افزونه، در \"OpenAI-compatible: API\"، تغییر دهد.",
+  "error.needs_responses_own": "این مدل به Responses API نیاز دارد. با کلید خودتان فقط برای api.openai.com استفاده می‌شود: به https://api.openai.com/v1 وصل شوید یا مدل دیگری انتخاب کنید.",
   "error.blocked": "سرور نشانی سرویس هوش مصنوعی را مسدود کرده است. از مدیر خود بپرسید.",
   "error.unreachable": "دسترسی به سرویس هوش مصنوعی ممکن نشد.",
   "error.server": "سرویس هوش مصنوعی با مشکل روبه‌رو شد. بعداً دوباره تلاش کنید.",

@@ -31,6 +31,8 @@
   "error.too_long": "Text je pro tento model příliš dlouhý.",
   "error.bad_request": "Služba AI požadavek odmítla.",
   "error.service_said": "Odpověď služby: {detail}",
+  "error.needs_responses": "Tento model potřebuje rozhraní Responses API, ale tato služba je nastavená na Chat Completions. Správce to může změnit v nastavení pluginu pod \"OpenAI-compatible: API\".",
+  "error.needs_responses_own": "Tento model potřebuje rozhraní Responses API. S vlastním klíčem se používá jen pro api.openai.com: připojte se k https://api.openai.com/v1, nebo zvolte jiný model.",
   "error.blocked": "Server blokuje adresu služby AI. Obraťte se na správce.",
   "error.unreachable": "Službu AI se nepodařilo zastihnout.",
   "error.server": "Ve službě AI nastala chyba. Zkuste to později.",

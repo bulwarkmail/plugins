@@ -18,7 +18,8 @@ export class AiError extends Error {
   /**
    * code: not_configured | declined | bad_key | forbidden | not_found |
    *       rate_limit | quota | busy | timeout | too_long | bad_request |
-   *       blocked | unreachable | server | cancelled | empty
+   *       blocked | unreachable | server | cancelled | empty |
+   *       needs_responses | needs_responses_own
    */
   constructor(code, { status, retryAfter, detail, partial } = {}) {
     super(detail ? `${code}: ${detail}` : code);
@@ -82,6 +83,16 @@ const PROXY_ERRORS = {
 };
 
 /**
+ * Whether chat completions refused the request because the model needs the
+ * Responses API (newer OpenAI models that call tools while they reason):
+ * "To use function tools, use /v1/responses or set reasoning_effort to 'none'."
+ */
+function needsResponses(endpoint, message) {
+  if (endpoint?.provider !== 'openai' || endpoint.api === 'responses') return false;
+  return /\buse \/v1\/responses\b|\b(?:requires?|needs?|only (?:with|in|via)) (?:the )?responses api\b/i.test(message);
+}
+
+/**
  * An AiError for a response that is not ok: { status, headers, body, proxyError }.
  * `endpoint`: where it went. The proxy finds no credential for a plain-http
  * address it may not reach (one the server's admin didn't allow), which is a
@@ -109,6 +120,8 @@ export function errorFromResponse(res, endpoint) {
   }
   if (status === 529 || /overloaded/i.test(type)) return new AiError('busy', { status, retryAfter });
   if (status === 400 || status === 422) {
+    // With the user's own key the admin's setting doesn't apply: say what does.
+    if (needsResponses(endpoint, message)) return new AiError(endpoint.own ? 'needs_responses_own' : 'needs_responses', { status, detail });
     if (/context|too long|too many tokens|maximum.*tokens/i.test(message)) return new AiError('too_long', { status, detail });
     if (/credit balance|billing/i.test(message)) return new AiError('quota', { status, detail });
     return new AiError('bad_request', { status, detail });
@@ -135,7 +148,7 @@ export function messageFor(t, error, { host = '' } = {}) {
   const key = `error.${code}`;
   const text = t(key, { host });
   const base = text === key ? t('error.unreachable', { host }) : text;
-  if ((code === 'bad_request' || code === 'not_found' || code === 'forbidden') && error.detail) {
+  if ((code === 'bad_request' || code === 'not_found' || code === 'forbidden' || code === 'needs_responses' || code === 'needs_responses_own') && error.detail) {
     return `${base} ${t('error.service_said', { detail: error.detail })}`;
   }
   return base;

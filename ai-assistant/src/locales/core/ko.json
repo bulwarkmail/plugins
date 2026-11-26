@@ -31,6 +31,8 @@
   "error.too_long": "이 모델에 비해 텍스트가 너무 길어요.",
   "error.bad_request": "AI 서비스가 요청을 거부했어요.",
   "error.service_said": "서비스 응답: {detail}",
+  "error.needs_responses": "이 모델에는 Responses API가 필요하지만 이 서비스는 Chat Completions로 설정되어 있습니다. 관리자가 플러그인 설정의 \"OpenAI-compatible: API\"에서 바꿀 수 있습니다.",
+  "error.needs_responses_own": "이 모델에는 Responses API가 필요합니다. 내 키로는 api.openai.com에만 사용됩니다. https://api.openai.com/v1에 연결하거나 다른 모델을 선택하세요.",
   "error.blocked": "서버가 AI 서비스 주소를 차단합니다. 관리자에게 문의하세요.",
   "error.unreachable": "AI 서비스에 연결할 수 없어요.",
   "error.server": "AI 서비스에 문제가 생겼어요. 나중에 다시 시도하세요.",

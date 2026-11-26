@@ -31,6 +31,8 @@
   "error.too_long": "Текст слишком длинный для этой модели.",
   "error.bad_request": "Сервис ИИ отклонил запрос.",
   "error.service_said": "Ответ сервиса: {detail}",
+  "error.needs_responses": "Этой модели нужен Responses API, а для этого сервиса выбран Chat Completions. Администратор может переключить это в настройках плагина, в поле \"OpenAI-compatible: API\".",
+  "error.needs_responses_own": "Этой модели нужен Responses API. С вашим собственным ключом он используется только для api.openai.com: подключитесь к https://api.openai.com/v1 или выберите другую модель.",
   "error.blocked": "Сервер блокирует адрес ИИ-сервиса. Обратитесь к администратору.",
   "error.unreachable": "Не удалось связаться с сервисом ИИ.",
   "error.server": "В сервисе ИИ произошла ошибка. Попробуйте позже.",

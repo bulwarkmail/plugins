@@ -31,6 +31,8 @@
   "error.too_long": "Textul este prea lung pentru acest model.",
   "error.bad_request": "Serviciul AI a refuzat cererea.",
   "error.service_said": "Răspunsul serviciului: {detail}",
+  "error.needs_responses": "Acest model are nevoie de Responses API, iar acest serviciu este setat pe Chat Completions. Un administrator îl poate schimba la \"OpenAI-compatible: API\" în setările pluginului.",
+  "error.needs_responses_own": "Acest model are nevoie de Responses API. Cu cheia proprie, acesta este folosit doar pentru api.openai.com: conectați-vă la https://api.openai.com/v1 sau alegeți alt model.",
   "error.blocked": "Serverul blochează adresa serviciului AI. Întrebați administratorul.",
   "error.unreachable": "Serviciul AI nu a putut fi contactat.",
   "error.server": "Serviciul AI a avut o problemă. Încercați din nou mai târziu.",

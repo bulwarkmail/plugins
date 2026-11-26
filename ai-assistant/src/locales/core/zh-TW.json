@@ -31,6 +31,8 @@
   "error.too_long": "文字對這個模型來說太長了。",
   "error.bad_request": "AI 服務拒絕了這個要求。",
   "error.service_said": "服務回應：{detail}",
+  "error.needs_responses": "此模型需要 Responses API，但此服務設定為 Chat Completions。管理員可以在外掛程式設定的 \"OpenAI-compatible: API\" 中切換。",
+  "error.needs_responses_own": "此模型需要 Responses API。使用你自己的金鑰時，僅在 api.openai.com 上使用：請連線到 https://api.openai.com/v1，或選擇其他模型。",
   "error.blocked": "伺服器封鎖了 AI 服務的位址。請洽詢管理員。",
   "error.unreachable": "無法連線到 AI 服務。",
   "error.server": "AI 服務發生問題。請稍後再試。",

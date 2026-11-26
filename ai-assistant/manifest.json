@@ -87,6 +87,26 @@
       "description": "For example gpt-4o-mini, or qwen2.5:7b on Ollama. Users may pick another one.",
       "placeholder": "gpt-4o-mini"
     },
+    "openaiApi": {
+      "type": "select",
+      "label": "OpenAI-compatible: API",
+      "description": "Which API the assistant speaks to the OpenAI-compatible service. Automatic: the Responses API for api.openai.com, Chat Completions for other servers such as Ollama. OpenAI's newer models (GPT-5.4 and later) only use tools through the Responses API: pick it for a gateway in front of OpenAI that supports it. Users' own keys always use Automatic.",
+      "default": "auto",
+      "options": [
+        {
+          "label": "Automatic",
+          "value": "auto"
+        },
+        {
+          "label": "Chat Completions",
+          "value": "chat"
+        },
+        {
+          "label": "Responses",
+          "value": "responses"
+        }
+      ]
+    },
     "anthropicBaseUrl": {
       "type": "string",
       "label": "Anthropic API address",

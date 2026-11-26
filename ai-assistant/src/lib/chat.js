@@ -179,7 +179,8 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
     }
     if (turn.text.trim()) lastSaid = turn.text;
     onText('');
-    history.push({ role: 'assistant', content: turn.text, toolCalls: turn.toolCalls });
+    // `raw` (Responses API): the model's own items, reasoning included, go back with the results.
+    history.push({ role: 'assistant', content: turn.text, toolCalls: turn.toolCalls, ...(turn.raw ? { raw: turn.raw } : {}) });
     for (const call of turn.toolCalls) {
       if (signal?.aborted) throw new AiError('cancelled', { partial: lastSaid });
       const step = { id: call.id, name: call.name, args: call.args, status: 'running', result: '', widget: null };

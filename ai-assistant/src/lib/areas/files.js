@@ -14,7 +14,7 @@
 // Reads share the context area's budget per request (CONTEXT_BUDGET).
 
 import { has } from '../caps.js';
-import { areaAllowed } from '../config.js';
+import { areaAllowed, isOfficialOpenAI } from '../config.js';
 import { LOCAL_IMAGE_SIDE, MAX_READ_CHARS, READ_CHARS, SPENT, budgetOf, canSeeImages, imageStandIn, statusSentence } from './context.js';
 
 /** Most entries one lookup lists for the model. */
@@ -212,7 +212,7 @@ async function readPicture(api, file, args, ctx, budget) {
   const key = `file:${file.id}`;
   if (budget.images <= 0 || budget.perMessage.get(key)) return imageStandIn(stand, 'No more images fit in this request.');
   const endpoint = ctx.files?.endpoint ?? ctx.endpoint;
-  const local = endpoint?.provider === 'openai' && !/^https:\/\/api\.openai\.com(\/|$)/i.test(endpoint?.baseUrl ?? '');
+  const local = endpoint?.provider === 'openai' && !isOfficialOpenAI(endpoint?.baseUrl);
   const exif = args.photoDetails === true && ctx.files?.flags?.photoDetails === true;
   const read = await api.files.getImage(file.id, { ...(local ? { maxSide: LOCAL_IMAGE_SIDE } : {}), ...(exif ? { exif: true } : {}) });
   if (!read || read.status !== 'ok' || !read.data) return statusSentence(read?.status, file.name);

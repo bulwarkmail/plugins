@@ -31,6 +31,8 @@
   "error.too_long": "De tekst is te lang voor dit model.",
   "error.bad_request": "De AI-dienst heeft het verzoek geweigerd.",
   "error.service_said": "Antwoord: {detail}",
+  "error.needs_responses": "Dit model heeft de Responses API nodig, maar deze dienst staat op Chat Completions. Een beheerder kan dit omzetten onder \"OpenAI-compatible: API\" in de instellingen van de plug-in.",
+  "error.needs_responses_own": "Dit model heeft de Responses API nodig. Met je eigen sleutel wordt die alleen voor api.openai.com gebruikt: maak verbinding met https://api.openai.com/v1 of kies een ander model.",
   "error.blocked": "De server blokkeert het adres van de AI-dienst. Vraag het je beheerder.",
   "error.unreachable": "De AI-dienst is niet bereikbaar.",
   "error.server": "Er ging iets mis bij de AI-dienst. Probeer het later opnieuw.",

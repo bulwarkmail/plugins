@@ -13,7 +13,7 @@
 // characters and MAX_IMAGES images.
 
 import { has } from '../caps.js';
-import { areaAllowed, imagesAllowed } from '../config.js';
+import { areaAllowed, imagesAllowed, isOfficialOpenAI } from '../config.js';
 import { ownText } from '../draft.js';
 import { whenIn } from '../clock.js';
 
@@ -187,7 +187,7 @@ async function readAttachmentImage(api, email, att, args, ctx, budget) {
   const used = budget.perMessage.get(email.id) ?? 0;
   if (budget.images <= 0 || used >= MAX_IMAGES_PER_MESSAGE) return imageStandIn(att, 'No more images fit in this request.');
   // Local models get smaller pictures (their encoders shrink them anyway).
-  const local = ctx.endpoint?.provider === 'openai' && !/^https:\/\/api\.openai\.com(\/|$)/i.test(ctx.endpoint?.baseUrl ?? '');
+  const local = ctx.endpoint?.provider === 'openai' && !isOfficialOpenAI(ctx.endpoint?.baseUrl);
   // A photo's date and place only with the user's own switch: text in a message can't turn it on.
   const exif = args.photoDetails === true && ctx.context?.flags?.photoDetails === true;
   const read = await api.email.getAttachmentImage(email.id, att.blobId, {
