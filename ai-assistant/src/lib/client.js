@@ -111,8 +111,9 @@ export async function streamTurn(api, endpoint, prompt, {
         } catch {
           throw new AiError('server', { detail: 'unreadable answer' });
         }
-        // An error in a body that came back ok: what the service said, not "unreadable".
-        if (json && typeof json.error === 'object' && json.error && !json.choices && !json.output && !Array.isArray(json.content)) {
+        // An error in a body that came back ok: what the service said, not
+        // "unreadable" (a Responses API body gives it in its turn).
+        if (format !== 'responses' && json?.error && typeof json.error === 'object') {
           throw errorFromStream({ type: json.error.code ?? json.error.type ?? 'api_error', message: json.error.message ?? '' }, '');
         }
         const turn = turnFromResponse(format, json);
@@ -160,17 +161,13 @@ export async function streamTurn(api, endpoint, prompt, {
   }
 }
 
-/**
- * The end of a Responses API turn. Tool calls only come from the whole
- * response at the end: a stream that broke off before it, or a response that
- * stopped early, calls none (their arguments may be cut off).
- */
+/** The end of a Responses API turn: tool calls only come from the whole response at the end. */
 function responsesTurn(final, text, emit) {
   if (final?.error) throw errorFromStream(final.error, text);
   // A body or stream that carried the text only in the whole response.
   if (!text && final?.text) emit(final.text);
   const answer = text || final?.text || '';
-  const calls = final && !final.incomplete ? final.toolCalls : [];
+  const calls = final?.toolCalls ?? [];
   if (!answer.trim() && calls.length === 0) {
     if (final?.incomplete) throw new AiError('server', { detail: `incomplete: ${final.incomplete}` });
     throw new AiError('empty');

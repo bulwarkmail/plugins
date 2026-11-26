@@ -63,11 +63,9 @@ export function isOfficialOpenAI(baseUrl) {
 }
 
 /**
- * Which OpenAI API to speak: 'responses' or 'chat'. The admin's choice for
- * their service (configSchema openaiApi: auto | chat | responses); otherwise (Automatic, or the user's own key) a guess from
- * the address: OpenAI's own service gets the Responses API, which its newer
- * models need to call tools while they reason; other servers (Ollama, LM
- * Studio, vLLM, llama.cpp, gateways) keep Chat Completions, which they all speak.
+ * Which OpenAI API to speak, 'responses' or 'chat': the admin's choice
+ * (openaiApi), else Responses for OpenAI's own service, whose newer models
+ * need it for tools, and Chat Completions elsewhere. Own keys always guess.
  */
 export function openaiApi(config = {}, baseUrl = '', { own = false } = {}) {
   const choice = own ? 'auto' : config.openaiApi;
