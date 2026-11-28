@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.3.0 (2026-11-28)
+
 ### Added
 - Admins can send extra request headers to the OpenAI-compatible and the Anthropic service, as JSON, for services such as OpenCode Go that need more than the key. {{CHAT_ID}} becomes the conversation's id. They go only to that service, never to a user's own key's server #52
 
