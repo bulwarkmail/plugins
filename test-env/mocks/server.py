@@ -827,6 +827,15 @@ class Handler(BaseHTTPRequestHandler):
                 'param': None, 'code': None}})
         script = scripted(body, 'openai-responses')
         log_ai(self.path, 'openai-responses', body, script and script['marker'], script and script['step'])
+        # As at OpenAI: with store false nothing is kept, so an item sent back
+        # by id alone (a reasoning item without its encrypted content) is unknown.
+        if body.get('store') is False:
+            for item in body['input']:
+                if isinstance(item, dict) and item.get('type') == 'reasoning' and not item.get('encrypted_content'):
+                    return self.send_json(404, {'error': {
+                        'message': f"Item with id '{item.get('id')}' not found. Items are not persisted when `store` is set to false. "
+                                   'Try again with `store` set to true, or remove this item from your input.',
+                        'type': 'invalid_request_error', 'param': 'input', 'code': None}})
         if script and script['kind'] == 'error':
             err = script['error']
             return self.send_json(int(err.get('status', 500)), {'error': {
@@ -836,7 +845,11 @@ class Handler(BaseHTTPRequestHandler):
         output = []
         is_tools = script and script['kind'] == 'tools'
         if is_tools:
-            output.append({'type': 'reasoning', 'id': f'rs_mock_{step}', 'summary': [], 'encrypted_content': 'enc_mock'})
+            reasoning = {'type': 'reasoning', 'id': f'rs_mock_{step}', 'summary': []}
+            # The encrypted content only comes when the request asks for it.
+            if 'reasoning.encrypted_content' in (body.get('include') or []):
+                reasoning['encrypted_content'] = 'enc_mock'
+            output.append(reasoning)
         text = script['text'] if script else reply_text(typed_text(body['input'], 'openai-responses'))
         if text or not is_tools:
             output.append({'type': 'message', 'id': f'msg_mock_{step}', 'status': 'completed', 'role': 'assistant',

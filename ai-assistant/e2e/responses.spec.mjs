@@ -5,7 +5,8 @@ import { ID, MOCK, acceptPrivacy, ask, chatInput, configure, mockReadsChunked, m
 
 // OpenAI's newer models only call tools through the Responses API. The
 // mock's mock-gpt-reasoning refuses tools in chat completions as they do,
-// and its /responses returns a reasoning item with each tool call.
+// and its /responses returns a reasoning item with each tool call, which
+// can't go back without its encrypted content when nothing is stored.
 
 const toggle = (page) => page.locator('[data-plugin-panel-toggle]');
 const SLOT_FRAME = `iframe[title="plugin-${ID}-slot"]`;
@@ -48,7 +49,7 @@ async function openPanel(page) {
   return frame;
 }
 
-test('with the Responses API, a reasoning model calls a tool and gets its reasoning back with the result', async ({ page }) => {
+test('with the Responses API, a reasoning model calls a tool and gets the result', async ({ page }) => {
   const api = await install(await adminApi(), ID, installPlugin);
   try {
     await setUp(page, api, 'responses');
@@ -75,16 +76,15 @@ test('with the Responses API, a reasoning model calls a tool and gets its reason
     expect(first).toMatchObject({ model: 'mock-gpt-reasoning', store: false, stream: true });
     expect(first.previous_response_id).toBeUndefined();
     expect(first.tools).toContainEqual(expect.objectContaining({ type: 'function', name: 'remember', strict: false }));
-    // The model's items (reasoning, text, call) go back as they came, followed by the result.
+    // The model's text and call go back without ids (nothing is stored at
+    // OpenAI), followed by the result; its reasoning came without encrypted
+    // content, so it can't go back (the mock refuses it as OpenAI does).
     const items = second.input.filter((m) => m.type);
-    expect(items.map((m) => [m.type, m.id ?? m.call_id])).toEqual([
-      ['reasoning', 'rs_mock_0'],
-      ['message', 'msg_mock_0'],
-      ['function_call', 'fc_mock_0_0'],
-      ['function_call_output', 'call_mock_0_0'],
+    expect(items.map((m) => [m.type, m.id, m.call_id])).toEqual([
+      ['message', undefined, undefined],
+      ['function_call', undefined, 'call_mock_0_0'],
+      ['function_call_output', undefined, 'call_mock_0_0'],
     ]);
-    expect(items[0].encrypted_content).toBe('enc_mock');
-    expect(items[2].call_id).toBe('call_mock_0_0');
   } finally {
     await uninstallPlugin(api, ID);
   }

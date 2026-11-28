@@ -95,6 +95,20 @@ function responsesUserContent(content) {
     .map((p) => (p.type === 'image' ? { type: 'input_image', image_url: dataUrl(p) } : { type: 'input_text', text: p.text }));
 }
 
+/**
+ * One of the model's output items, as it can go back in a stateless
+ * request (store: false). OpenAI keeps no items then, so an id would point
+ * at nothing: a reasoning item only goes back with its encrypted content,
+ * and text and tool calls go back without their ids.
+ */
+function replayItem(item) {
+  if (item.type === 'reasoning') {
+    return typeof item.encrypted_content === 'string' && item.encrypted_content ? item : null;
+  }
+  const { id, ...rest } = item;
+  return rest;
+}
+
 function responsesInput(messages) {
   const out = [];
   // As with chat completions, the tool results' images follow them in a user message.
@@ -111,8 +125,8 @@ function responsesInput(messages) {
       out.push({ type: 'function_call_output', call_id: m.toolCallId, output: text });
       pending.push(...images);
     } else if (m.role === 'assistant' && m.raw?.length) {
-      // The model's own items, reasoning and tool calls included, go back as they came.
-      out.push(...m.raw);
+      // The model's own items go back with the results of its tool calls.
+      out.push(...m.raw.map(replayItem).filter(Boolean));
     } else {
       out.push({ role: m.role, content: m.role === 'user' ? responsesUserContent(m.content) : contentText(m.content) });
     }

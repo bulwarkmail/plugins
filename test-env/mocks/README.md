@@ -118,11 +118,14 @@ Tests: `python test-env/mocks/test_server.py`.
   `response.output_item.added`, `response.output_text.delta` (or
   `response.function_call_arguments.delta`), `...done`,
   `response.output_item.done` and `response.completed`, without `[DONE]`.
-  A scripted tool step adds a `reasoning` item (`rs_mock_<step>`,
-  `encrypted_content` `enc_mock`) and `function_call` items (`fc_mock_<step>_<i>`,
+  A scripted tool step adds a `reasoning` item (`rs_mock_<step>`, with
+  `encrypted_content` `enc_mock` only when `include` asks for
+  `reasoning.encrypted_content`) and `function_call` items (`fc_mock_<step>_<i>`,
   `call_id` `call_mock_<step>_<i>`); the step is the number of
-  `function_call_output` runs after the typed message. 400 when `model` or
-  `input` is missing. Requests are logged with provider `openai-responses`.
+  `function_call_output` runs after the typed message. As at OpenAI, with
+  `"store": false` a `reasoning` item sent back without `encrypted_content`
+  gives 404 "Item with id ... not found". 400 when `model` or `input` is
+  missing. Requests are logged with provider `openai-responses`.
 
 ## Todoist API v1
 

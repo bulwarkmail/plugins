@@ -241,11 +241,13 @@ describe('runChat with the Responses API', () => {
     expect(out.text).toBe('Free all day.');
     expect(sent).toHaveLength(3);
     expect(sent[0]).toMatchObject({ instructions: 's', store: false, tool_choice: 'auto' });
+    // The calls go back without their ids: nothing is stored at OpenAI.
+    const sentBack = (round) => [item(round)[0], { type: 'function_call', call_id: `call_${round}`, name: 'check_calendar', arguments: '{}', status: 'completed' }];
     expect(sent[2].input).toEqual([
       { role: 'user', content: 'free?' },
-      ...item(1),
+      ...sentBack(1),
       { type: 'function_call_output', call_id: 'call_1', output: 'none' },
-      ...item(2),
+      ...sentBack(2),
       { type: 'function_call_output', call_id: 'call_2', output: 'none' },
     ]);
   });

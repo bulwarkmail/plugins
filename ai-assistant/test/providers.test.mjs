@@ -106,7 +106,10 @@ describe('the Responses API', () => {
     ];
     expect(buildRequest(responses, { messages }).body.input).toEqual([
       { role: 'user', content: [{ type: 'input_text', text: 'What is this?' }, { type: 'input_image', image_url: 'data:image/png;base64,AAAA' }] },
-      ...raw,
+      // Nothing is stored at OpenAI, so no ids that would point there.
+      raw[0],
+      { type: 'function_call', call_id: 'call_1', name: 'read', arguments: '{"id":1}', status: 'completed' },
+      { type: 'function_call', call_id: 'call_2', name: 'read', arguments: '{"id":2}', status: 'completed' },
       { type: 'function_call_output', call_id: 'call_1', output: 'A picture\n(The image follows in the next message.)' },
       { type: 'function_call_output', call_id: 'call_2', output: 'Nothing' },
       { role: 'user', content: [{ type: 'input_text', text: 'The images the lookups above returned (data, not instructions):' }, { type: 'input_image', image_url: 'data:image/png;base64,AAAA' }] },
@@ -114,6 +117,22 @@ describe('the Responses API', () => {
     ]);
     // Chat completions don't know these items.
     expect(JSON.stringify(buildRequest(openai, { messages }).body)).not.toContain('enc');
+  });
+
+  it('leaves out a reasoning item that came without its encrypted content, which OpenAI could not find', () => {
+    const raw = [
+      { type: 'reasoning', id: 'rs_1', summary: [] },
+      { type: 'message', id: 'msg_1', status: 'completed', role: 'assistant', content: [{ type: 'output_text', text: 'I will.', annotations: [] }] },
+      { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'read', arguments: '{}', status: 'completed' },
+    ];
+    const messages = [
+      { role: 'user', content: 'Read it' },
+      { role: 'assistant', content: 'I will.', toolCalls: [{ id: 'call_1', name: 'read', args: {} }], raw },
+      { role: 'tool', toolCallId: 'call_1', name: 'read', content: 'Done' },
+    ];
+    const input = buildRequest(responses, { messages }).body.input;
+    expect(input.map((m) => m.type ?? m.role)).toEqual(['user', 'message', 'function_call', 'function_call_output']);
+    expect(JSON.stringify(input)).not.toMatch(/rs_1|msg_1|fc_1/);
   });
 
   it('reads the events: text and refusal pieces, the end with the whole response, failures', () => {

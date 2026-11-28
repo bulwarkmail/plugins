@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- OpenAI's newer models (GPT-5.4 and later) can call tools again: with api.openai.com the assistant uses OpenAI's Responses API, and nothing is stored at OpenAI. Other OpenAI-compatible servers (Ollama, LM Studio, vLLM, OpenRouter, ...) keep Chat Completions. Admins can pick the API under "OpenAI-compatible: API", for a gateway in front of OpenAI #51
+
 ## 2.2.2 (2026-11-24)
 
 ### Fixed

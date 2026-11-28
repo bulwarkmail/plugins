@@ -144,7 +144,8 @@ class MockAI(unittest.TestCase):
         self.assertEqual(self.get('/__ai/last')['provider'], 'openai-responses')
 
     def test_responses_tools_with_reasoning_then_answer_with_results(self):
-        body = {'model': 'mock-gpt-reasoning', 'stream': True, 'tools': TOOLS_R,
+        body = {'model': 'mock-gpt-reasoning', 'stream': True, 'tools': TOOLS_R, 'store': False,
+                'include': ['reasoning.encrypted_content'],
                 'instructions': 'Standing: [[mock:lookup]]', 'input': [{'role': 'user', 'content': 'find it'}]}
         status, raw = self.post('/openai/v1/responses', body, OPENAI)
         self.assertEqual(status, 200)
@@ -157,6 +158,20 @@ class MockAI(unittest.TestCase):
         status, raw = self.post('/openai/v1/responses', {**body, 'stream': False, 'input': second}, OPENAI)
         self.assertEqual(json.loads(raw)['output'][0]['content'][0]['text'], 'Found: Invoice 42 from Dan')
         self.assertEqual([r['step'] for r in self.get('/__ai/requests?marker=lookup')], [0, 1])
+
+    def test_responses_unstored_reasoning_comes_without_content_and_cannot_go_back(self):
+        body = {'model': 'mock-gpt-reasoning', 'stream': False, 'tools': TOOLS_R, 'store': False,
+                'instructions': 'Standing: [[mock:lookup]]', 'input': [{'role': 'user', 'content': 'find it'}]}
+        status, raw = self.post('/openai/v1/responses', body, OPENAI)
+        self.assertEqual(status, 200)
+        output = json.loads(raw)['output']
+        self.assertEqual(output[0], {'type': 'reasoning', 'id': 'rs_mock_0', 'summary': []})
+        result = {'type': 'function_call_output', 'call_id': output[-1]['call_id'], 'output': 'Invoice 42 from Dan'}
+        status, raw = self.post('/openai/v1/responses', {**body, 'input': body['input'] + output + [result]}, OPENAI)
+        self.assertEqual(status, 404)
+        self.assertIn("Item with id 'rs_mock_0' not found", json.loads(raw)['error']['message'])
+        status, raw = self.post('/openai/v1/responses', {**body, 'input': body['input'] + output[1:] + [result]}, OPENAI)
+        self.assertEqual(status, 200)
 
     def test_responses_parallel_results_are_one_step(self):
         messages = [{'role': 'user', 'content': 'hi'},
