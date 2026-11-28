@@ -317,6 +317,8 @@ export function useAssistantChat(props) {
         const out = await runChat(api, endpoint, {
           // Images only for a model that can see them (the context area says so).
           system, messages, tools, runTool: callTool, images: ctx.images === true,
+          // The conversation's id (its first turn's) for the admin's {{CHAT_ID}} header.
+          session: previous[0]?.id ?? userTurn.id,
         }, {
           onText,
           onStep: (step) => patchTurn(turn.id, (cur) => ({ steps: cur.steps.some((s) => s.id === step.id) ? cur.steps.map((s) => (s.id === step.id ? { ...s, ...step } : s)) : [...cur.steps, step] })),

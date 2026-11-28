@@ -337,6 +337,7 @@ settings. Set up one or both services:
 | Anthropic API address | `https://api.anthropic.com/v1` (Ollama also speaks this API at `http://ollama:11434/v1`) |
 | Anthropic API key | The key |
 | Anthropic model | e.g. `claude-haiku-4-5` |
+| OpenAI-compatible / Anthropic: extra headers | Optional. Headers a service needs besides the key, as a JSON object, e.g. `{"x-opencode-session": "{{CHAT_ID}}"}` for OpenCode Go. `{{CHAT_ID}}` becomes the conversation's id (a new id for each quick action). They go only to that service, never to a user's own key's server. Users' browsers can read them, so don't put secrets here. Headers the assistant sets itself (`content-type`, `accept`, `anthropic-version`, the key's header) can't be replaced |
 | Default service | Which one users get when both are set up |
 | Instructions for the assistant | Standing instructions for everyone, added to every request (house style, sign-offs, languages, things never to say) |
 | Actions | The most users may choose: off, ask first, or automatic (default: automatic allowed; each user starts with actions off) |

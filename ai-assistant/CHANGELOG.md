@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Admins can send extra request headers to the OpenAI-compatible and the Anthropic service, as JSON, for services such as OpenCode Go that need more than the key. {{CHAT_ID}} becomes the conversation's id. They go only to that service, never to a user's own key's server #52
+
 ### Fixed
 - OpenAI's newer models (GPT-5.4 and later) can call tools again: with api.openai.com the assistant uses OpenAI's Responses API, and nothing is stored at OpenAI. Other OpenAI-compatible servers (Ollama, LM Studio, vLLM, OpenRouter, ...) keep Chat Completions. Admins can pick the API under "OpenAI-compatible: API", for a gateway in front of OpenAI #51
 

@@ -107,6 +107,14 @@
         }
       ]
     },
+    "openaiHeaders": {
+      "type": "string",
+      "multiline": true,
+      "label": "OpenAI-compatible: extra headers",
+      "description": "Request headers the service needs besides the key, as JSON. {{CHAT_ID}} becomes the id of the conversation. They only go to this service, not to users' own keys. Users' browsers can see them: put secrets in the key field.",
+      "placeholder": "{\"x-opencode-session\": \"{{CHAT_ID}}\"}",
+      "default": ""
+    },
     "anthropicBaseUrl": {
       "type": "string",
       "label": "Anthropic API address",
@@ -123,6 +131,14 @@
       "label": "Anthropic model",
       "description": "For example claude-haiku-4-5. Users may pick another one.",
       "placeholder": "claude-haiku-4-5"
+    },
+    "anthropicHeaders": {
+      "type": "string",
+      "multiline": true,
+      "label": "Anthropic: extra headers",
+      "description": "Request headers the service needs besides the key, as JSON. {{CHAT_ID}} becomes the id of the conversation. They only go to this service, not to users' own keys. Users' browsers can see them: put secrets in the key field.",
+      "placeholder": "{\"x-opencode-session\": \"{{CHAT_ID}}\"}",
+      "default": ""
     },
     "instructions": {
       "type": "string",

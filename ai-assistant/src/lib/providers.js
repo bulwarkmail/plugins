@@ -173,11 +173,30 @@ export function formatOf(endpoint) {
   return endpoint?.api === 'responses' ? 'responses' : 'openai';
 }
 
+/** Where an extra header's value takes the conversation's id. */
+export const CHAT_ID_PLACEHOLDER = '{{CHAT_ID}}';
+
 /**
  * The HTTP request for one completion.
- * endpoint: from resolveEndpoint; prompt: { system, messages, maxTokens, tools }.
+ * endpoint: from resolveEndpoint; prompt: { system, messages, maxTokens,
+ * tools, session }. endpoint.headers (the admin's extra headers) go along,
+ * with {{CHAT_ID}} as prompt.session, the conversation's id, or a new id
+ * for a request on its own.
  */
 export function buildRequest(endpoint, prompt, { stream = true } = {}) {
+  const request = completionRequest(endpoint, prompt, { stream });
+  const extra = Object.entries(endpoint.headers ?? {});
+  if (!extra.length) return request;
+  const session = typeof prompt.session === 'string' && prompt.session ? prompt.session : newSession();
+  const headers = Object.fromEntries(extra.map(([name, value]) => [name, value.split(CHAT_ID_PLACEHOLDER).join(session)]));
+  return { ...request, headers: { ...headers, ...request.headers } };
+}
+
+function newSession() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function completionRequest(endpoint, prompt, { stream }) {
   // images: false: the model can't see images, so it hears their names.
   const messages = prompt.images === false ? withoutImages(prompt.messages ?? []) : (prompt.messages ?? []);
   const maxTokens = prompt.maxTokens ?? 1500;

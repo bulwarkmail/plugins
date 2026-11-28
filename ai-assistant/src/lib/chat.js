@@ -129,10 +129,11 @@ export function historyMessages(turns, { limit = HISTORY_TURNS, chars = HISTORY_
  * or the state of an action; it gets the call's { id, imagesRefused } as
  * third argument (imagesRefused: the service refused images in this chat,
  * so hand over names only). `images: false`: the model can't see images, so
- * every image goes as its name. Resolves to { text, steps }. Rejects with
+ * every image goes as its name. `session`: the conversation's id, for the
+ * admin's {{CHAT_ID}} header. Resolves to { text, steps }. Rejects with
  * AiError like streamTurn.
  */
-export async function runChat(api, endpoint, { system, messages, tools = [], runTool, maxTokens = 2500, images = true }, {
+export async function runChat(api, endpoint, { system, messages, tools = [], runTool, maxTokens = 2500, images = true, session }, {
   onText = () => {},
   onStep = () => {},
   signal,
@@ -153,6 +154,7 @@ export async function runChat(api, endpoint, { system, messages, tools = [], run
       // Once refused, every later request of this chat goes without images too.
       messages: imagesRefused ? withoutImages(history, IMAGE_REFUSED) : history,
       maxTokens,
+      ...(session ? { session } : {}),
       ...(images === false ? { images: false } : {}),
       ...(canUseTools ? { tools, ...(allowTools ? {} : { toolChoice: 'none' }) } : {}),
     }, {

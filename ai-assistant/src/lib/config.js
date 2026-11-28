@@ -73,6 +73,43 @@ export function openaiApi(config = {}, baseUrl = '', { own = false } = {}) {
   return isOfficialOpenAI(baseUrl) ? 'responses' : 'chat';
 }
 
+/** Most extra headers per service, and the longest value. */
+export const MAX_EXTRA_HEADERS = 20;
+const MAX_HEADER_VALUE = 1000;
+/** A header name (an RFC 9110 token). */
+const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$/;
+/** Headers the assistant or the webmail's proxy sets: extra headers can't replace them. */
+const OWN_HEADERS = new Set(['content-type', 'accept', 'anthropic-version', 'authorization', 'x-api-key', 'host', 'cookie', 'content-length']);
+
+/**
+ * The admin's extra request headers for a service (config
+ * `<provider>Headers`): a JSON object of names and text values, such as
+ * {"x-opencode-session": "{{CHAT_ID}}"}. Unreadable JSON gives none; names
+ * that aren't tokens, values with line breaks and the assistant's own
+ * headers are left out.
+ */
+export function extraHeaders(value) {
+  let json = value;
+  if (typeof value === 'string') {
+    if (!value.trim()) return {};
+    try {
+      json = JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return {};
+  const out = {};
+  for (const [name, raw] of Object.entries(json)) {
+    if (Object.keys(out).length >= MAX_EXTRA_HEADERS) break;
+    const v = typeof raw === 'number' ? String(raw) : raw;
+    if (!HEADER_NAME.test(name) || OWN_HEADERS.has(name.toLowerCase())) continue;
+    if (typeof v !== 'string' || !v || v.length > MAX_HEADER_VALUE || /[\r\n\0]/.test(v)) continue;
+    out[name.toLowerCase()] = v;
+  }
+  return out;
+}
+
 function cleanModel(value) {
   return typeof value === 'string' ? value.trim().slice(0, 200) : '';
 }
@@ -175,6 +212,8 @@ export function resolveEndpoint({ config = {}, prefs = {}, accounts = [] } = {})
   if (list.length === 0) return null;
   const wanted = PROVIDERS.includes(prefs.provider) ? prefs.provider : config.defaultProvider;
   const pick = list.find((p) => p.provider === wanted) ?? list[0];
+  // Only the admin's own service gets its extra headers, never a user's own server.
+  const headers = extraHeaders(config[`${pick.provider}Headers`]);
   return {
     provider: pick.provider,
     credentialId: ADMIN_CREDENTIALS[pick.provider],
@@ -183,5 +222,6 @@ export function resolveEndpoint({ config = {}, prefs = {}, accounts = [] } = {})
     model: cleanModel(prefs.model) || pick.model || DEFAULT_MODELS[pick.provider],
     own: false,
     ...(pick.provider === 'openai' ? { api: openaiApi(config, pick.baseUrl) } : {}),
+    ...(Object.keys(headers).length ? { headers } : {}),
   };
 }
