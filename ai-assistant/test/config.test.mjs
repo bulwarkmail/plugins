@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveEndpoint, normalizeBaseUrl, adminProviders, DEFAULT_MODELS } from '../src/lib/config.js';
+import { resolveEndpoint, normalizeBaseUrl, adminProviders, isOfficialOpenAI, openaiApi, DEFAULT_MODELS } from '../src/lib/config.js';
 
 const both = {
   openaiBaseUrl: 'http://localhost:18099/openai/v1/',
@@ -55,5 +55,45 @@ describe('resolveEndpoint', () => {
     const ep = resolveEndpoint({ config: { allowUserKeys: true }, prefs, accounts });
     expect(ep.baseUrl).toBe('https://proxy.example.org/v1');
     expect(ep.model).toBe(DEFAULT_MODELS.openai);
+  });
+});
+
+describe('which OpenAI API', () => {
+  const official = { openaiBaseUrl: 'https://api.openai.com/v1', openaiModel: 'gpt-6.1-terra' };
+  const ollama = { openaiBaseUrl: 'http://ollama:11434/v1', openaiModel: 'qwen2.5:7b' };
+
+  it('knows OpenAI\'s own service by its https address alone', () => {
+    expect(isOfficialOpenAI('https://api.openai.com/v1')).toBe(true);
+    expect(isOfficialOpenAI('https://API.OpenAI.com')).toBe(true);
+    expect(isOfficialOpenAI('http://api.openai.com/v1')).toBe(false);
+    expect(isOfficialOpenAI('https://api.openai.com.example.org/v1')).toBe(false);
+    expect(isOfficialOpenAI('https://gateway.example.org/api.openai.com/v1')).toBe(false);
+    expect(isOfficialOpenAI('not a url')).toBe(false);
+    expect(isOfficialOpenAI(undefined)).toBe(false);
+  });
+
+  it('Automatic: the Responses API for api.openai.com, chat completions for every other server', () => {
+    expect(resolveEndpoint({ config: official }).api).toBe('responses');
+    expect(resolveEndpoint({ config: { ...official, openaiApi: 'auto' } }).api).toBe('responses');
+    expect(resolveEndpoint({ config: ollama }).api).toBe('chat');
+    expect(openaiApi({}, 'http://api.openai.com/v1')).toBe('chat');
+  });
+
+  it('follows the administrator\'s choice for their service', () => {
+    expect(resolveEndpoint({ config: { ...official, openaiApi: 'chat' } }).api).toBe('chat');
+    expect(resolveEndpoint({ config: { ...ollama, openaiApi: 'responses' } }).api).toBe('responses');
+    expect(resolveEndpoint({ config: { ...ollama, openaiApi: 'nonsense' } }).api).toBe('chat');
+  });
+
+  it('guesses from the address for the user\'s own key, whatever the administrator chose', () => {
+    const accounts = [{ credentialId: 'own-openai', origin: 'https://api.openai.com', connected: true }];
+    const prefs = { useOwn: true, own: { provider: 'openai', baseUrl: 'https://api.openai.com/v1' } };
+    expect(resolveEndpoint({ config: { allowUserKeys: true, openaiApi: 'chat' }, prefs, accounts })).toMatchObject({ own: true, api: 'responses' });
+    const proxy = [{ credentialId: 'own-openai', origin: 'https://proxy.example.org', connected: true }];
+    expect(resolveEndpoint({ config: { allowUserKeys: true, openaiApi: 'responses' }, prefs, accounts: proxy })).toMatchObject({ own: true, api: 'chat' });
+  });
+
+  it('is no question for Anthropic', () => {
+    expect(resolveEndpoint({ config: both })).not.toHaveProperty('api');
   });
 });

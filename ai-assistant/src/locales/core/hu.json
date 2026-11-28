@@ -31,6 +31,8 @@
   "error.too_long": "A szöveg túl hosszú ehhez a modellhez.",
   "error.bad_request": "Az AI-szolgáltatás elutasította a kérést.",
   "error.service_said": "Válasza: {detail}",
+  "error.needs_responses": "Ehhez a modellhez a Responses API kell, ez a szolgáltatás viszont Chat Completions-re van állítva. Egy rendszergazda átállíthatja a bővítmény beállításaiban, a(z) \"OpenAI-compatible: API\" alatt.",
+  "error.needs_responses_own": "Ehhez a modellhez a Responses API kell. Saját kulccsal csak az api.openai.com címhez használja: csatlakozzon a(z) https://api.openai.com/v1 címhez, vagy válasszon másik modellt.",
   "error.blocked": "A szerver letiltja az AI-szolgáltatás címét. Forduljon a rendszergazdához.",
   "error.unreachable": "Az AI-szolgáltatás nem érhető el.",
   "error.server": "Hiba történt az AI-szolgáltatásnál. Próbáld újra később.",

@@ -31,6 +31,8 @@
   "error.too_long": "הטקסט ארוך מדי עבור המודל הזה.",
   "error.bad_request": "שירות ה-AI דחה את הבקשה.",
   "error.service_said": "תשובת השירות: {detail}",
+  "error.needs_responses": "המודל הזה צריך את Responses API, והשירות מוגדר ל-Chat Completions. מנהל יכול לשנות זאת תחת \"OpenAI-compatible: API\" בהגדרות התוסף.",
+  "error.needs_responses_own": "המודל הזה צריך את Responses API. עם מפתח משלך משתמשים בו רק עבור api.openai.com: התחבר ל-https://api.openai.com/v1 או בחר מודל אחר.",
   "error.blocked": "השרת חוסם את הכתובת של שירות ה-AI. פנו למנהל המערכת.",
   "error.unreachable": "לא ניתן להגיע לשירות ה-AI.",
   "error.server": "אירעה בעיה בשירות ה-AI. נסה שוב מאוחר יותר.",

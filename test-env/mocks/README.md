@@ -97,9 +97,13 @@ Tests: `python test-env/mocks/test_server.py`.
 
 ## OpenAI-compatible API
 
-- `GET /openai/v1/models` lists `mock-gpt-small` and `mock-gpt-large`.
+- `GET /openai/v1/models` lists `mock-gpt-small`, `mock-gpt-large` and
+  `mock-gpt-reasoning`.
 - `POST /openai/v1/chat/completions` returns a `chat.completion` with the same
   reply text as above (id `chatcmpl-mock0000000000001`, `finish_reason` `stop`).
+  For `mock-gpt-reasoning` with `tools` it gives the 400 OpenAI gives its
+  newer models there ("Function tools with reasoning_effort are not supported
+  ... use /v1/responses ...").
 - With `"stream": true`: `data:` chunks of `chat.completion.chunk`. First the
   role chunk, then four content chunks, then a chunk with
   `finish_reason: "stop"`, then `data: [DONE]`. With
@@ -108,6 +112,17 @@ Tests: `python test-env/mocks/test_server.py`.
 - 401 `{"error":{"code":"invalid_api_key",...}}` for a wrong key, 429
   `rate_limit_exceeded` with `retry-after: 7` for `rate-limited`, 400 when
   `model` or `messages` is missing.
+- `POST /openai/v1/responses` (the Responses API, any model) returns a
+  `response` whose `output` holds a `message` with the reply text, or with
+  `"stream": true` the events `response.created`,
+  `response.output_item.added`, `response.output_text.delta` (or
+  `response.function_call_arguments.delta`), `...done`,
+  `response.output_item.done` and `response.completed`, without `[DONE]`.
+  A scripted tool step adds a `reasoning` item (`rs_mock_<step>`,
+  `encrypted_content` `enc_mock`) and `function_call` items (`fc_mock_<step>_<i>`,
+  `call_id` `call_mock_<step>_<i>`); the step is the number of
+  `function_call_output` runs after the typed message. 400 when `model` or
+  `input` is missing. Requests are logged with provider `openai-responses`.
 
 ## Todoist API v1
 

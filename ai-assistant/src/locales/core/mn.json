@@ -31,6 +31,8 @@
   "error.too_long": "Текст энэ загварт хэт урт байна.",
   "error.bad_request": "AI үйлчилгээ хүсэлтийг татгалзсан.",
   "error.service_said": "Хариу: {detail}",
+  "error.needs_responses": "Энэ загварт Responses API хэрэгтэй, гэтэл энэ үйлчилгээ Chat Completions дээр тохируулагдсан байна. Админ үүнийг плагины тохиргооны \"OpenAI-compatible: API\" хэсгээс сольж болно.",
+  "error.needs_responses_own": "Энэ загварт Responses API хэрэгтэй. Өөрийн түлхүүрээр зөвхөн api.openai.com-д ашиглагдана: https://api.openai.com/v1 руу холбогдох эсвэл өөр загвар сонгоно уу.",
   "error.blocked": "Сервер AI үйлчилгээний хаягийг хаасан байна. Админаасаа асууна уу.",
   "error.unreachable": "AI үйлчилгээнд холбогдож чадсангүй.",
   "error.server": "AI үйлчилгээнд алдаа гарлаа. Дараа дахин оролдоно уу.",

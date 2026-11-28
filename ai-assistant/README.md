@@ -333,6 +333,7 @@ settings. Set up one or both services:
 | OpenAI-compatible API address | Up to and including `/v1`: `https://api.openai.com/v1`, or `http://ollama:11434/v1` for Ollama |
 | OpenAI-compatible API key | The key. Ollama needs none, but the field must not be empty: enter any text |
 | OpenAI-compatible model | e.g. `gpt-4o-mini`, or `qwen2.5:7b` on Ollama |
+| OpenAI-compatible: API | Automatic (default): the Responses API for `api.openai.com`, Chat Completions for other servers such as Ollama. OpenAI's newer models (GPT-5.4 and later) only use tools through the Responses API, so pick Responses for a gateway in front of OpenAI that supports it. Responses are not stored at OpenAI (`store: false`). Users' own keys always use Automatic |
 | Anthropic API address | `https://api.anthropic.com/v1` (Ollama also speaks this API at `http://ollama:11434/v1`) |
 | Anthropic API key | The key |
 | Anthropic model | e.g. `claude-haiku-4-5` |

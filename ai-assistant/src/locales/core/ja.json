@@ -31,6 +31,8 @@
   "error.too_long": "このモデルにはテキストが長すぎます。",
   "error.bad_request": "AI サービスがリクエストを拒否しました。",
   "error.service_said": "サービスからのメッセージ: {detail}",
+  "error.needs_responses": "このモデルには Responses API が必要ですが、このサービスは Chat Completions に設定されています。管理者がプラグインの設定の \"OpenAI-compatible: API\" で切り替えられます。",
+  "error.needs_responses_own": "このモデルには Responses API が必要です。自分のキーでは api.openai.com の場合にだけ使われます。https://api.openai.com/v1 に接続するか、別のモデルを選んでください。",
   "error.blocked": "サーバーが AI サービスのアドレスをブロックしています。管理者に問い合わせてください。",
   "error.unreachable": "AI サービスに接続できませんでした。",
   "error.server": "AI サービスで問題が発生しました。後でもう一度お試しください。",

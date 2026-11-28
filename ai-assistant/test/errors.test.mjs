@@ -55,7 +55,7 @@ describe('messageFor', () => {
   });
 
   it('has an English text for every error code', () => {
-    for (const code of ['not_configured', 'declined', 'bad_key', 'forbidden', 'not_found', 'rate_limit', 'quota', 'busy', 'timeout', 'too_long', 'bad_request', 'blocked', 'unreachable', 'server', 'empty', 'cancelled']) {
+    for (const code of ['not_configured', 'declined', 'bad_key', 'forbidden', 'not_found', 'rate_limit', 'quota', 'busy', 'timeout', 'too_long', 'bad_request', 'blocked', 'unreachable', 'server', 'empty', 'cancelled', 'needs_responses', 'needs_responses_own']) {
       expect(en[`error.${code}`], code).toBeTruthy();
     }
   });
@@ -68,5 +68,36 @@ describe('why an action failed', () => {
     expect(failureReason(new Error('no folder "Projects"; the folders are: Inbox'))).toBe('folder');
     expect(failureReason(new Error('no message with that id'))).toBe('gone');
     expect(failureReason(new Error('boom'))).toBe('other');
+  });
+});
+
+describe('a model that needs the Responses API', () => {
+  const said = "Function tools with reasoning_effort are not supported for gpt-6.1-terra in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.";
+  const res = (message, status = 400) => ({ status, headers: {}, body: JSON.stringify({ error: { message, type: 'invalid_request_error', param: 'reasoning_effort', code: null } }) });
+  const chat = { provider: 'openai', api: 'chat', baseUrl: 'https://gw.example.org/v1' };
+
+  it('is told apart only when chat completions refused it so', () => {
+    expect(errorFromResponse(res(said), chat)).toMatchObject({ code: 'needs_responses', status: 400, detail: said });
+    expect(errorFromResponse(res(said), { provider: 'openai', baseUrl: 'http://ollama:11434/v1' }).code).toBe('needs_responses');
+    expect(errorFromResponse(res(said), { ...chat, api: 'responses' }).code).toBe('bad_request');
+    expect(errorFromResponse(res(said), { provider: 'anthropic' }).code).toBe('bad_request');
+    expect(errorFromResponse(res('Unsupported parameter: responses'), chat).code).toBe('bad_request');
+    expect(errorFromResponse(res(said, 500), chat).code).toBe('server');
+  });
+
+  it('names the setting and what the service said', () => {
+    const text = messageFor(t, new AiError('needs_responses', { detail: 'use /v1/responses' }));
+    expect(text).toContain('"OpenAI-compatible: API"');
+    expect(text).toMatch(/It said: use \/v1\/responses$/);
+    expect(en['error.needs_responses']).toBeTruthy();
+  });
+
+  it('with the user\'s own key, points to what applies there instead of the admin\'s setting', () => {
+    const err = errorFromResponse(res(said), { ...chat, own: true });
+    expect(err.code).toBe('needs_responses_own');
+    const text = messageFor(t, err);
+    expect(text).not.toContain('OpenAI-compatible: API');
+    expect(text).toContain('https://api.openai.com/v1');
+    expect(text).toContain(`It said: ${said}`);
   });
 });

@@ -24,6 +24,8 @@ LOOKUP = {'name': 'lookup', 'steps': [
 ]}
 TOOLS_A = [{'name': 'search_mail', 'description': 'x', 'input_schema': {'type': 'object'}}]
 TOOLS_O = [{'type': 'function', 'function': {'name': 'search_mail', 'parameters': {'type': 'object'}}}]
+TOOLS_R = [{'type': 'function', 'name': 'search_mail', 'description': 'x',
+            'parameters': {'type': 'object'}, 'strict': False}]
 
 
 class MockAI(unittest.TestCase):
@@ -128,6 +130,49 @@ class MockAI(unittest.TestCase):
         status, raw = self.post('/anthropic/v1/messages', {'model': 'm', 'max_tokens': 9, 'messages': [{'role': 'user', 'content': '[[mock:busy]]'}]}, ANTHROPIC)
         self.assertEqual(status, 529)
         self.assertEqual(json.loads(raw)['error']['type'], 'overloaded_error')
+
+    def test_responses_text_reply_streamed_and_whole(self):
+        body = {'model': 'm', 'stream': True, 'input': [{'role': 'user', 'content': 'hello there'}]}
+        status, raw = self.post('/openai/v1/responses', body, OPENAI)
+        self.assertEqual(status, 200)
+        self.assertNotIn('[DONE]', raw)
+        evs = self.events(raw)
+        self.assertEqual(''.join(e['delta'] for e in evs if e['type'] == 'response.output_text.delta'), server.reply_text('hello there'))
+        self.assertEqual(evs[-1]['type'], 'response.completed')
+        status, raw = self.post('/openai/v1/responses', {**body, 'stream': False}, OPENAI)
+        self.assertEqual(json.loads(raw), evs[-1]['response'])
+        self.assertEqual(self.get('/__ai/last')['provider'], 'openai-responses')
+
+    def test_responses_tools_with_reasoning_then_answer_with_results(self):
+        body = {'model': 'mock-gpt-reasoning', 'stream': True, 'tools': TOOLS_R,
+                'instructions': 'Standing: [[mock:lookup]]', 'input': [{'role': 'user', 'content': 'find it'}]}
+        status, raw = self.post('/openai/v1/responses', body, OPENAI)
+        self.assertEqual(status, 200)
+        output = self.events(raw)[-1]['response']['output']
+        self.assertEqual(output[0], {'type': 'reasoning', 'id': 'rs_mock_0', 'summary': [], 'encrypted_content': 'enc_mock'})
+        call = output[-1]
+        self.assertEqual((call['type'], call['call_id'], call['name'], json.loads(call['arguments'])),
+                         ('function_call', 'call_mock_0_0', 'search_mail', {'text': 'invoice'}))
+        second = body['input'] + output + [{'type': 'function_call_output', 'call_id': call['call_id'], 'output': 'Invoice 42 from Dan'}]
+        status, raw = self.post('/openai/v1/responses', {**body, 'stream': False, 'input': second}, OPENAI)
+        self.assertEqual(json.loads(raw)['output'][0]['content'][0]['text'], 'Found: Invoice 42 from Dan')
+        self.assertEqual([r['step'] for r in self.get('/__ai/requests?marker=lookup')], [0, 1])
+
+    def test_responses_parallel_results_are_one_step(self):
+        messages = [{'role': 'user', 'content': 'hi'},
+                    {'type': 'function_call', 'call_id': 'a'}, {'type': 'function_call', 'call_id': 'b'},
+                    {'type': 'function_call_output', 'call_id': 'a', 'output': 'one'},
+                    {'type': 'function_call_output', 'call_id': 'b', 'output': 'two'}]
+        self.assertEqual(server.step_of(messages, 'openai-responses'), 1)
+        self.assertEqual(server.tool_results(messages, 'openai-responses'), ['one', 'two'])
+
+    def test_openai_reasoning_model_refuses_chat_tools(self):
+        body = {'model': 'mock-gpt-reasoning', 'messages': [{'role': 'user', 'content': 'hi'}]}
+        status, raw = self.post('/openai/v1/chat/completions', {**body, 'tools': TOOLS_O}, OPENAI)
+        self.assertEqual(status, 400)
+        self.assertIn('use /v1/responses', json.loads(raw)['error']['message'])
+        status, _ = self.post('/openai/v1/chat/completions', body, OPENAI)
+        self.assertEqual(status, 200)
 
     def test_unscripted_requests_still_echo_and_are_logged(self):
         status, raw = self.post('/anthropic/v1/messages', {'model': 'm', 'max_tokens': 9, 'messages': [{'role': 'user', 'content': 'hello there'}]}, ANTHROPIC)

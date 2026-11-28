@@ -82,7 +82,8 @@ describe('runTask', () => {
     await runTask(api, 'grammar', { text: 'teh' }).catch(() => {});
     const [credentialId, url] = api.calls('proxy.fetch')[0].args;
     expect(credentialId).toBe('own-openai');
-    expect(url).toBe('https://api.openai.com/v1/chat/completions');
+    // OpenAI's own service: the Responses API (an own key always guesses from the address).
+    expect(url).toBe('https://api.openai.com/v1/responses');
     expect(api.calls('ui.confirm')[0].args[0].message).toContain('your own key');
   });
 });

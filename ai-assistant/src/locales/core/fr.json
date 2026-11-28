@@ -31,6 +31,8 @@
   "error.too_long": "Le texte est trop long pour ce modèle.",
   "error.bad_request": "Le service d'IA a refusé la demande.",
   "error.service_said": "Réponse du service : {detail}",
+  "error.needs_responses": "Ce modèle a besoin de l'API Responses, et ce service est réglé sur Chat Completions. Un administrateur peut le changer sous \"OpenAI-compatible: API\" dans les paramètres du plugin.",
+  "error.needs_responses_own": "Ce modèle a besoin de l'API Responses. Avec votre propre clé, elle n'est utilisée que pour api.openai.com : connectez-vous à https://api.openai.com/v1 ou choisissez un autre modèle.",
   "error.blocked": "Le serveur bloque l'adresse du service d'IA. Adressez-vous à votre administrateur.",
   "error.unreachable": "Impossible de joindre le service d'IA.",
   "error.server": "Le service d'IA a rencontré un problème. Réessayez plus tard.",

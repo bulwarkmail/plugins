@@ -19,6 +19,7 @@ export async function configure(api, overrides = {}) {
     openaiBaseUrl: '',
     openaiKey: '',
     openaiModel: '',
+    openaiApi: 'auto',
     defaultProvider: 'anthropic',
     allowUserKeys: false,
     ...overrides,

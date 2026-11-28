@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
-import { ANTHROPIC_EP, OPENAI_EP, anthropicSse, openaiSse, streamResponse } from './helpers.mjs';
+import { ANTHROPIC_EP, OPENAI_EP, RESPONSES_EP, anthropicSse, openaiSse, responsesSse, streamResponse } from './helpers.mjs';
 import { historyMessages, parseAnswer, proposalOf, runChat } from '../src/lib/chat.js';
 
 // The chat: proposals marked with <text> tags, parsed while streaming, and
@@ -222,5 +222,31 @@ describe('runChat', () => {
     const api = modelApi([loop, loop, loop, loop, loop]);
     const out = await runChat(api, ANTHROPIC_EP, { system: 's', messages: [{ role: 'user', content: 'x' }], tools: TOOLS, runTool: async () => 'r' });
     expect(out.text).toBe('Still looking.');
+  });
+});
+
+describe('runChat with the Responses API', () => {
+  it('sends the model\'s reasoning and calls of every round back with the results', async () => {
+    const item = (round) => [
+      { type: 'reasoning', id: `rs_${round}`, summary: [], encrypted_content: `enc_${round}` },
+      { type: 'function_call', id: `fc_${round}`, call_id: `call_${round}`, name: 'check_calendar', arguments: '{}', status: 'completed' },
+    ];
+    const sent = [];
+    const api = modelApi([
+      responsesSse([], { output: item(1) }),
+      responsesSse([], { output: item(2) }),
+      responsesSse(['Free all day.']),
+    ], { sent });
+    const out = await runChat(api, RESPONSES_EP, { system: 's', messages: [{ role: 'user', content: 'free?' }], tools: TOOLS, runTool: async () => 'none' });
+    expect(out.text).toBe('Free all day.');
+    expect(sent).toHaveLength(3);
+    expect(sent[0]).toMatchObject({ instructions: 's', store: false, tool_choice: 'auto' });
+    expect(sent[2].input).toEqual([
+      { role: 'user', content: 'free?' },
+      ...item(1),
+      { type: 'function_call_output', call_id: 'call_1', output: 'none' },
+      ...item(2),
+      { type: 'function_call_output', call_id: 'call_2', output: 'none' },
+    ]);
   });
 });

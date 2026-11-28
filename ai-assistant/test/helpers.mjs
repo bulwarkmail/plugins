@@ -43,3 +43,21 @@ export function byteStream(text, { size = 7, hang = false } = {}) {
 export function streamResponse(text, opts) {
   return { status: 200, ok: true, headers: { 'content-type': 'text/event-stream' }, body: byteStream(text, opts) };
 }
+
+export const RESPONSES_EP = { ...OPENAI_EP, api: 'responses' };
+
+/**
+ * A Responses API stream: the text pieces as deltas, then the whole response
+ * with `output` (default: one message with the text). `end`: 'completed',
+ * 'incomplete', or 'none' (the stream breaks off before its last event).
+ */
+export function responsesSse(pieces, { output, end = 'completed', reason = 'max_output_tokens' } = {}) {
+  const ev = (type, data) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
+  const text = pieces.join('');
+  const items = output ?? [{ type: 'message', id: 'msg_1', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text, annotations: [] }] }];
+  let out = ev('response.created', { response: { id: 'resp_1', status: 'in_progress', output: [] } });
+  for (const delta of pieces) out += ev('response.output_text.delta', { item_id: 'msg_1', output_index: 0, content_index: 0, delta });
+  if (end === 'none') return out;
+  const response = { id: 'resp_1', object: 'response', status: end, output: items, error: null, ...(end === 'incomplete' ? { incomplete_details: { reason } } : {}) };
+  return out + ev(`response.${end}`, { response });
+}

@@ -52,6 +52,27 @@ export function hostOf(value) {
   }
 }
 
+/** Whether an address is OpenAI's own service (https://api.openai.com). */
+export function isOfficialOpenAI(baseUrl) {
+  try {
+    const url = new URL(baseUrl);
+    return url.protocol === 'https:' && url.hostname === 'api.openai.com';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Which OpenAI API to speak, 'responses' or 'chat': the admin's choice
+ * (openaiApi), else Responses for OpenAI's own service, whose newer models
+ * need it for tools, and Chat Completions elsewhere. Own keys always guess.
+ */
+export function openaiApi(config = {}, baseUrl = '', { own = false } = {}) {
+  const choice = own ? 'auto' : config.openaiApi;
+  if (choice === 'chat' || choice === 'responses') return choice;
+  return isOfficialOpenAI(baseUrl) ? 'responses' : 'chat';
+}
+
 function cleanModel(value) {
   return typeof value === 'string' ? value.trim().slice(0, 200) : '';
 }
@@ -113,8 +134,7 @@ export function imagesAllowed(config = {}, endpoint = null) {
   if (endpoint.provider === 'anthropic') return true;
   // OpenAI's own service reads images, apart from a few text-only models;
   // other OpenAI-compatible servers (Ollama, vLLM, ...) can't be told apart.
-  const official = /^https:\/\/api\.openai\.com(\/|$)/i.test(endpoint.baseUrl ?? '');
-  return official && !/^(o3-mini|gpt-oss|gpt-3\.5)/i.test(endpoint.model ?? '');
+  return isOfficialOpenAI(endpoint.baseUrl) && !/^(o3-mini|gpt-oss|gpt-3\.5)/i.test(endpoint.model ?? '');
 }
 
 /** Whether users may connect their own key (admin setting, off by default). */
@@ -147,6 +167,7 @@ export function resolveEndpoint({ config = {}, prefs = {}, accounts = [] } = {})
         origin: account.origin,
         model: cleanModel(prefs.own.model) || DEFAULT_MODELS[provider],
         own: true,
+        ...(provider === 'openai' ? { api: openaiApi(config, baseUrl, { own: true }) } : {}),
       };
     }
   }
@@ -161,5 +182,6 @@ export function resolveEndpoint({ config = {}, prefs = {}, accounts = [] } = {})
     origin: originOf(pick.baseUrl),
     model: cleanModel(prefs.model) || pick.model || DEFAULT_MODELS[pick.provider],
     own: false,
+    ...(pick.provider === 'openai' ? { api: openaiApi(config, pick.baseUrl) } : {}),
   };
 }

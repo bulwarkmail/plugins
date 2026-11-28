@@ -31,6 +31,8 @@
   "error.too_long": "Текст задовгий для цієї моделі.",
   "error.bad_request": "Сервіс ШІ відхилив запит.",
   "error.service_said": "Відповідь сервісу: {detail}",
+  "error.needs_responses": "Цій моделі потрібен Responses API, а для цього сервісу вибрано Chat Completions. Адміністратор може змінити це в налаштуваннях плагіна, у полі \"OpenAI-compatible: API\".",
+  "error.needs_responses_own": "Цій моделі потрібен Responses API. З вашим власним ключем він використовується лише для api.openai.com: підключіться до https://api.openai.com/v1 або виберіть іншу модель.",
   "error.blocked": "Сервер блокує адресу ШІ-сервісу. Зверніться до адміністратора.",
   "error.unreachable": "Не вдалося зв’язатися із сервісом ШІ.",
   "error.server": "У сервісі ШІ сталася помилка. Спробуйте пізніше.",

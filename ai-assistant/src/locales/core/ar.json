@@ -31,6 +31,8 @@
   "error.too_long": "النص طويل جدًا بالنسبة لهذا النموذج.",
   "error.bad_request": "رفضت خدمة الذكاء الاصطناعي الطلب.",
   "error.service_said": "رد الخدمة: {detail}",
+  "error.needs_responses": "يحتاج هذا النموذج إلى واجهة Responses API، وهذه الخدمة مضبوطة على Chat Completions. يمكن للمسؤول تغيير ذلك من \"OpenAI-compatible: API\" في إعدادات الإضافة.",
+  "error.needs_responses_own": "يحتاج هذا النموذج إلى Responses API. مع مفتاحك الخاص لا تُستخدم إلا مع api.openai.com: اتصل بـ https://api.openai.com/v1 أو اختر نموذجًا آخر.",
   "error.blocked": "يحظر الخادم عنوان خدمة الذكاء الاصطناعي. اسأل المسؤول.",
   "error.unreachable": "تعذّر الوصول إلى خدمة الذكاء الاصطناعي.",
   "error.server": "حدثت مشكلة في خدمة الذكاء الاصطناعي. حاول مرة أخرى لاحقًا.",

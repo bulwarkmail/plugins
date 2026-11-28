@@ -31,6 +31,8 @@
   "error.too_long": "Der Text ist zu lang für dieses Modell.",
   "error.bad_request": "Der KI-Dienst hat die Anfrage abgelehnt.",
   "error.service_said": "Meldung des Dienstes: {detail}",
+  "error.needs_responses": "Dieses Modell braucht die Responses API, der Dienst ist aber auf Chat Completions eingestellt. Ein Administrator kann das unter \"OpenAI-compatible: API\" in den Einstellungen des Plugins umstellen.",
+  "error.needs_responses_own": "Dieses Modell braucht die Responses API. Mit Ihrem eigenen Schlüssel wird sie nur für api.openai.com verwendet: Verbinden Sie sich mit https://api.openai.com/v1 oder wählen Sie ein anderes Modell.",
   "error.blocked": "Der Server sperrt die Adresse des KI-Dienstes. Wenden Sie sich an Ihren Administrator.",
   "error.unreachable": "Der KI-Dienst ist nicht erreichbar.",
   "error.server": "Beim KI-Dienst ist ein Fehler aufgetreten. Versuchen Sie es später erneut.",

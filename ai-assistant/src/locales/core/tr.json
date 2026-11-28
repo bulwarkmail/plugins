@@ -31,6 +31,8 @@
   "error.too_long": "Metin bu model için çok uzun.",
   "error.bad_request": "Yapay zekâ hizmeti isteği reddetti.",
   "error.service_said": "Hizmetin yanıtı: {detail}",
+  "error.needs_responses": "Bu model Responses API gerektiriyor, ancak bu hizmet Chat Completions olarak ayarlı. Bir yönetici bunu eklenti ayarlarında \"OpenAI-compatible: API\" altından değiştirebilir.",
+  "error.needs_responses_own": "Bu model Responses API gerektiriyor. Kendi anahtarınızla yalnızca api.openai.com için kullanılır: https://api.openai.com/v1 adresine bağlanın veya başka bir model seçin.",
   "error.blocked": "Sunucu yapay zekâ hizmetinin adresini engelliyor. Yöneticinize sorun.",
   "error.unreachable": "Yapay zekâ hizmetine ulaşılamadı.",
   "error.server": "Yapay zekâ hizmetinde bir sorun oluştu. Daha sonra tekrar deneyin.",

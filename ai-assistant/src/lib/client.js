@@ -1,7 +1,7 @@
 // One streamed completion through the webmail's proxy (api.proxy.fetch),
 // with cancel and timeouts. The proxy adds the API key on the server.
 
-import { buildRequest, createToolCallCollector, deltaFromEvent, turnFromResponse } from './providers.js';
+import { buildRequest, createToolCallCollector, deltaFromEvent, formatOf, turnFromResponse } from './providers.js';
 import { createSseParser } from './sse.js';
 import { AiError, errorFromResponse, errorFromStream } from './errors.js';
 
@@ -19,8 +19,9 @@ function isStream(body) {
  *
  * onText(fullText, delta) is called for every piece of text. Resolves to
  * { text, toolCalls }: the answer and the tools the model wants to call
- * (prompt.tools). Rejects with an AiError: `cancelled` when `signal`
- * aborts (the text so far is in error.partial), `timeout`, `empty` when
+ * (prompt.tools); with the Responses API also `raw`, the model's own items
+ * of the turn, to send back with the tool results. Rejects with an
+ * AiError: `cancelled` when `signal` aborts (the text so far is in error.partial), `timeout`, `empty` when
  * nothing at all came back, or what the service said.
  */
 export async function streamTurn(api, endpoint, prompt, {
@@ -30,12 +31,15 @@ export async function streamTurn(api, endpoint, prompt, {
   idleTimeoutMs = IDLE_TIMEOUT_MS,
 } = {}) {
   if (signal?.aborted) throw new AiError('cancelled');
+  const format = formatOf(endpoint);
   const request = buildRequest(endpoint, prompt, { stream: true });
   const controller = new AbortController();
   let timedOut = false;
   let timer = null;
   let text = '';
   const tools = createToolCallCollector();
+  // Responses API: the whole response its last event (or the body) carries.
+  let final = null;
 
   let stopWaiting;
   const stopped = new Promise((_, reject) => { stopWaiting = reject; });
@@ -85,10 +89,11 @@ export async function streamTurn(api, endpoint, prompt, {
     const parser = createSseParser();
     const handle = (events) => {
       for (const ev of events) {
-        const delta = deltaFromEvent(endpoint.provider, ev);
+        const delta = deltaFromEvent(format, ev);
         if (delta.error) throw errorFromStream(delta.error, text);
         if (delta.text) emit(delta.text);
         if (delta.toolCalls) tools.add(delta.toolCalls);
+        if (delta.response) final = turnFromResponse(format, delta.response);
         if (delta.done) return true;
       }
       return false;
@@ -100,12 +105,23 @@ export async function streamTurn(api, endpoint, prompt, {
       const body = typeof res.body === 'string' ? res.body : '';
       const trimmed = body.trim();
       if (trimmed.startsWith('{')) {
+        let json;
         try {
-          const turn = turnFromResponse(endpoint.provider, JSON.parse(trimmed));
-          emit(turn.text);
-          toolCalls = turn.toolCalls;
+          json = JSON.parse(trimmed);
         } catch {
           throw new AiError('server', { detail: 'unreadable answer' });
+        }
+        // An error in a body that came back ok: what the service said, not
+        // "unreadable" (a Responses API body gives it in its turn).
+        if (format !== 'responses' && json?.error && typeof json.error === 'object') {
+          throw errorFromStream({ type: json.error.code ?? json.error.type ?? 'api_error', message: json.error.message ?? '' }, '');
+        }
+        const turn = turnFromResponse(format, json);
+        if (format === 'responses') {
+          final = turn;
+        } else {
+          emit(turn.text);
+          toolCalls = turn.toolCalls;
         }
       } else {
         handle([...parser.feed(body), ...parser.end()]);
@@ -135,6 +151,7 @@ export async function streamTurn(api, endpoint, prompt, {
         reader.cancel().catch(() => {});
       }
     }
+    if (format === 'responses') return responsesTurn(final, text, emit);
     const calls = toolCalls ?? tools.calls();
     if (!text.trim() && calls.length === 0) throw new AiError('empty');
     return { text, toolCalls: calls };
@@ -142,6 +159,20 @@ export async function streamTurn(api, endpoint, prompt, {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
   }
+}
+
+/** The end of a Responses API turn: tool calls only come from the whole response at the end. */
+function responsesTurn(final, text, emit) {
+  if (final?.error) throw errorFromStream(final.error, text);
+  // A body or stream that carried the text only in the whole response.
+  if (!text && final?.text) emit(final.text);
+  const answer = text || final?.text || '';
+  const calls = final?.toolCalls ?? [];
+  if (!answer.trim() && calls.length === 0) {
+    if (final?.incomplete) throw new AiError('server', { detail: `incomplete: ${final.incomplete}` });
+    throw new AiError('empty');
+  }
+  return { text: answer, toolCalls: calls, ...(calls.length && final.raw?.length ? { raw: final.raw } : {}) };
 }
 
 /**
